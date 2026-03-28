@@ -1,0 +1,26 @@
+{
+  "name": "synapse-portal",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/portal & npm run dev --workspace=apps/api",
+    "dev:portal": "npm run dev --workspace=apps/portal",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1"
+  }
+}

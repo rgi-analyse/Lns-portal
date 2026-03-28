@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+@layer base {
+  :root {
+    /* shadcn/ui tokens — dark glass baseline */
+    --background: 222 47% 11%;
+    --foreground: 0 0% 90%;
+    --card: 222 47% 14%;
+    --card-foreground: 0 0% 90%;
+    --popover: 222 47% 14%;
+    --popover-foreground: 0 0% 90%;
+    --primary: 38 91% 55%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 47% 18%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 222 47% 16%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 222 47% 18%;
+    --accent-foreground: 0 0% 90%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 100% / 0.08;
+    --input: 0 0% 100% / 0.06;
+    --ring: 38 91% 55%;
+    --radius: 0.5rem;
+
+    /* LNS design tokens */
+    --navy-darkest: #0a1628;
+    --navy-dark:    #111D33;
+    --navy:         #1B2A4A;
+    --navy-mid:     #243556;
+    --gold:         #F5A623;
+    --gold-light:   #F7BC55;
+    --gold-dim:     rgba(245,166,35,0.15);
+
+    --glass-bg:           rgba(255,255,255,0.04);
+    --glass-bg-hover:     rgba(255,255,255,0.07);
+    --glass-border:       rgba(255,255,255,0.12);
+    --glass-border-hover: rgba(255,255,255,0.14);
+    --glass-gold-bg:      rgba(245,166,35,0.10);
+    --glass-gold-border:  rgba(245,166,35,0.22);
+
+    --text-primary:   rgba(255,255,255,0.95);
+    --text-secondary: rgba(255,255,255,0.70);
+    --text-muted:     rgba(255,255,255,0.45);
+    --text-gold:      #F5A623;
+  }
+
+  body {
+    background: #0a1628;
+    color: rgba(255,255,255,0.90);
+    font-family: 'Barlow', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Barlow Condensed', system-ui, sans-serif;
+  }
+}
+
+/* Bakgrunns-gradient med orbs */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 15% 15%, rgba(245,166,35,0.10) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 85%, rgba(27,42,74,0.7) 0%, transparent 50%),
+    linear-gradient(135deg, #0a1628 0%, #1B2A4A 50%, #0d1f3c 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ── Dark-glass overrides: erstatter hardkodede Tailwind light-theme klasser ─ */
+
+/* Skjema-elementer (native input/textarea/select) */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+textarea,
+select {
+  color: rgba(255,255,255,0.85) !important;
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+input:not([type="checkbox"]):not([type="radio"])::placeholder,
+textarea::placeholder {
+  color: rgba(255,255,255,0.25) !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(245,166,35,0.40) !important;
+  background: rgba(255,255,255,0.08) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(245,166,35,0.12) !important;
+}
+select option {
+  background: #1B2A4A;
+  color: rgba(255,255,255,0.85);
+}
+
+/* Labels */
+label { color: rgba(255,255,255,0.65) !important; }
+
+/* Tekst-farger */
+.text-gray-900 { color: rgba(255,255,255,0.90) !important; }
+.text-gray-800 { color: rgba(255,255,255,0.80) !important; }
+.text-gray-700 { color: rgba(255,255,255,0.70) !important; }
+.text-gray-600 { color: rgba(255,255,255,0.60) !important; }
+.text-gray-500 { color: rgba(255,255,255,0.45) !important; }
+.text-gray-400 { color: rgba(255,255,255,0.32) !important; }
+.text-gray-300 { color: rgba(255,255,255,0.22) !important; }
+.hover\:text-gray-800:hover { color: rgba(255,255,255,0.80) !important; }
+.hover\:text-gray-700:hover { color: rgba(255,255,255,0.70) !important; }
+.hover\:text-gray-600:hover { color: rgba(255,255,255,0.60) !important; }
+
+/* Hvite kort/tabellbeholdere → mørk glass */
+.bg-white {
+  background: rgba(17,29,51,0.65) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Kanter */
+.border-gray-300 { border-color: rgba(255,255,255,0.12) !important; }
+.border-gray-200 { border-color: rgba(255,255,255,0.08) !important; }
+.border-gray-100 { border-color: rgba(255,255,255,0.05) !important; }
+
+/* Bakgrunner */
+.bg-gray-50 { background: rgba(255,255,255,0.03) !important; }
+.bg-gray-100 { background: rgba(255,255,255,0.05) !important; }
+.hover\:bg-gray-50:hover { background: rgba(255,255,255,0.05) !important; }
+.hover\:bg-gray-100:hover { background: rgba(255,255,255,0.08) !important; }
+
+/* Separatorer */
+.divide-gray-100 > * + * { border-color: rgba(255,255,255,0.06) !important; }
+
+/* Brand-knapper (brukes i admin-sider) */
+.bg-brand-600 {
+  background: rgba(245,166,35,0.15) !important;
+  border: 1px solid rgba(245,166,35,0.30) !important;
+  color: #F5A623 !important;
+}
+.hover\:bg-brand-700:hover { background: rgba(245,166,35,0.25) !important; }
+
+/* Statusbokser — lys bakgrunn → mørk tint */
+.bg-blue-50  { background: rgba(59,130,246,0.10) !important; }
+.bg-amber-50 { background: rgba(245,166,35,0.10) !important; }
+.bg-red-50   { background: rgba(239,68,68,0.10) !important; }
+.border-blue-100,  .border-blue-200  { border-color: rgba(59,130,246,0.25) !important; }
+.border-amber-100, .border-amber-200 { border-color: rgba(245,166,35,0.25) !important; }
+.border-red-100,   .border-red-200   { border-color: rgba(239,68,68,0.25) !important; }
+.text-blue-700  { color: rgba(147,197,253,0.90) !important; }
+.text-amber-800, .text-amber-700 { color: rgba(245,200,90,0.90) !important; }
+.text-red-700   { color: rgba(252,165,165,0.90) !important; }
+
+/* Admin tabeller */
+td {
+  color: rgba(255,255,255,0.82);
+  border-bottom-color: rgba(255,255,255,0.04) !important;
+}
+th {
+  color: rgba(255,255,255,0.45) !important;
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+
+/* Action-ikon hover-bakgrunner → mørke glass-varianter */
+.hover\:bg-red-50:hover    { background: rgba(239,68,68,0.12) !important; }
+.hover\:bg-yellow-50:hover { background: rgba(245,166,35,0.10) !important; }
+.hover\:bg-blue-50:hover   { background: rgba(59,130,246,0.12) !important; }
+.hover\:bg-orange-50:hover { background: rgba(234,88,12,0.12) !important; }
+.hover\:text-red-600:hover    { color: rgba(252,165,165,0.90) !important; }
+.hover\:text-yellow-600:hover { color: rgba(245,200,90,0.90) !important; }
+.hover\:text-blue-600:hover   { color: rgba(147,197,253,0.90) !important; }
+.hover\:text-orange-600:hover { color: rgba(253,186,116,0.90) !important; }
+
+/* ── Print ────────────────────────────────────────────────────────────────── */
+@media print {
+  /* Bevar bakgrunnsfarger og grafikk (gauges, KPI-kort, SVG) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Skjul portal-chrome — kun rapport-innholdet printes */
+  aside, nav,
+  [data-sidebar],
+  [data-topbar],
+  [class*="AIChat"],
+  [class*="toolbar"] {
+    display: none !important;
+  }
+
+  /* iframe (PBI embed) fyller hele utskriftssiden */
+  iframe {
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.10);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245,166,35,0.30);
+}

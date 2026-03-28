@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+model Workspace {
+  id            String             @id @default(uuid())
+  navn          String
+  beskrivelse   String?
+  opprettetAv   String
+  opprettetDato DateTime           @default(now())
+  oppdatert     DateTime           @updatedAt
+  rapporter     WorkspaceRapport[]
+  tilgang       Tilgang[]
+}
+
+model Rapport {
+  id             String             @id @default(uuid())
+  navn           String
+  område         String?            @db.NVarChar(100)
+  beskrivelse    String?
+  nøkkelord      String?            @db.NVarChar(500)
+  erAktiv        Boolean            @default(true)
+  pbiReportId    String
+  pbiDatasetId   String
+  pbiWorkspaceId String
+  opprettetDato  DateTime           @default(now())
+  oppdatert      DateTime           @updatedAt
+  workspaces     WorkspaceRapport[]
+  tilgang        RapportTilgang[]
+}
+
+model RapportTilgang {
+  id           String   @id @default(uuid())
+  rapportId    String
+  type         String
+  entraId      String
+  visningsnavn String
+  epost        String?
+  rolle        String
+  lagtTilDato  DateTime @default(now())
+  rapport      Rapport  @relation(fields: [rapportId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceRapport {
+  workspaceId String
+  rapportId   String
+  rekkefølge  Int      @default(0)
+  lagtTilDato DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rapport     Rapport   @relation(fields: [rapportId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, rapportId])
+}
+
+model BrukerInnstilling {
+  id        String   @id @default(uuid())
+  brukerId  String
+  rapportId String
+  type      String
+  verdi     String   @db.NVarChar(Max)
+  oppdatert DateTime @updatedAt
+
+  @@unique([brukerId, rapportId, type])
+}
+
+model Tilgang {
+  id           String    @id @default(uuid())
+  workspaceId  String
+  type         String
+  entraId      String
+  visningsnavn String
+  epost        String?
+  rolle        String
+  lagtTilDato  DateTime  @default(now())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Bruker {
+  id                String    @id @default(uuid())
+  entraObjectId     String    @unique
+  displayName       String?
+  email             String?
+  erAktiv           Boolean   @default(true)
+  lisensType        String    @default("standard")
+  rolle             String    @default("bruker")
+  erEntraBruker     Boolean   @default(true)  @map("erEntraBruker")
+  passordHash       String?   @db.NVarChar(255) @map("passordHash")
+  måByttePassord    Boolean   @default(false)  @map("måByttePassord")
+  sistPassordEndret DateTime?                  @map("sistPassordEndret")
+  opprettet         DateTime  @default(now())
+  sistInnlogget     DateTime?
+}

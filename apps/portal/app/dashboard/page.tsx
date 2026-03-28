@@ -1,0 +1,393 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { LayoutDashboard, FileBarChart2, Users, Star } from 'lucide-react';
+import AIChat from '@/components/AIChat';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
+
+interface Workspace {
+  id: string;
+  navn: string;
+  beskrivelse?: string | null;
+  erPersonlig?: boolean;
+  _count?: { rapporter: number; tilgang: number };
+}
+
+interface Stats {
+  workspaces: number;
+  rapporter: number;
+  tilgang: number;
+}
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+function projectCode(navn: string): string {
+  const m = navn.match(/\b(\d{4,5})\b/);
+  if (m) return m[1];
+  return navn.slice(0, 3).toUpperCase();
+}
+
+const statCards = [
+  {
+    label: 'Workspaces',
+    key: 'workspaces' as const,
+    Icon: LayoutDashboard,
+    iconBg: 'rgba(27,42,74,0.60)',
+    iconBorder: 'rgba(255,255,255,0.10)',
+    iconColor: 'rgba(255,255,255,0.70)',
+  },
+  {
+    label: 'Rapporter',
+    key: 'rapporter' as const,
+    Icon: FileBarChart2,
+    iconBg: 'rgba(245,166,35,0.12)',
+    iconBorder: 'rgba(245,166,35,0.20)',
+    iconColor: '#F5A623',
+  },
+  {
+    label: 'Tilganger',
+    key: 'tilgang' as const,
+    Icon: Users,
+    iconBg: 'rgba(16,185,129,0.10)',
+    iconBorder: 'rgba(16,185,129,0.20)',
+    iconColor: 'rgba(110,231,183,0.9)',
+  },
+];
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { isAuthenticated, entraObjectId, displayName, authHeaders, grupper } = usePortalAuth();
+  const firstName = displayName.split(' ')[0];
+
+  const [stats,      setStats]      = useState<Stats | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [filter,     setFilter]     = useState<'alle' | 'favoritter'>('favoritter');
+  const [favoritter, setFavoritter] = useState<string[]>([]);
+  const togglingRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isAuthenticated || !entraObjectId) return;
+    const url = new URL(`${API}/api/workspaces`);
+    if (grupper.length > 0) url.searchParams.set('grupper', grupper.join(','));
+
+    fetch(url.toString(), { headers: authHeaders })
+      .then((r) => r.json())
+      .then((data: Workspace[]) => {
+        setWorkspaces(data);
+        setStats({
+          workspaces: data.length,
+          rapporter:  data.reduce((sum, ws) => sum + (ws._count?.rapporter ?? 0), 0),
+          tilgang:    data.reduce((sum, ws) => sum + (ws._count?.tilgang ?? 0), 0),
+        });
+      })
+      .catch(() => {
+        setWorkspaces([]);
+        setStats({ workspaces: 0, rapporter: 0, tilgang: 0 });
+      });
+  }, [isAuthenticated, entraObjectId, authHeaders, grupper]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !entraObjectId) return;
+    fetch(`${API}/api/meg/favoritter`, { headers: authHeaders })
+      .then((r) => r.json())
+      .then((ids: string[]) => setFavoritter(ids))
+      .catch(() => setFavoritter([]));
+  }, [isAuthenticated, entraObjectId, authHeaders]);
+
+  async function toggleFavoritt(e: React.MouseEvent, workspaceId: string) {
+    e.stopPropagation();
+    if (togglingRef.current.has(workspaceId)) return;
+    togglingRef.current.add(workspaceId);
+    const erFavoritt = favoritter.includes(workspaceId);
+    // Optimistisk oppdatering
+    setFavoritter((prev) =>
+      erFavoritt ? prev.filter((id) => id !== workspaceId) : [...prev, workspaceId],
+    );
+    try {
+      await fetch(`${API}/api/meg/favoritter/${workspaceId}`, {
+        method: erFavoritt ? 'DELETE' : 'POST',
+        headers: authHeaders,
+      });
+    } catch {
+      // Rull tilbake ved feil
+      setFavoritter((prev) =>
+        erFavoritt ? [...prev, workspaceId] : prev.filter((id) => id !== workspaceId),
+      );
+    } finally {
+      togglingRef.current.delete(workspaceId);
+    }
+  }
+
+  return (
+    <>
+      <div className="p-8 overflow-y-auto h-full">
+
+        {/* Velkomst */}
+        <div className="mb-8">
+          <h1
+            className="uppercase tracking-wide"
+            style={{
+              fontFamily: 'Barlow Condensed, sans-serif',
+              fontWeight: 800,
+              fontSize: 28,
+              color: 'rgba(255,255,255,0.90)',
+              letterSpacing: '0.03em',
+            }}
+          >
+            Velkommen, {firstName}
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>
+            Her er en oversikt over tilgjengelige ressurser.
+          </p>
+        </div>
+
+        {/* Section label — Oversikt */}
+        <SectionLabel>Oversikt</SectionLabel>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          {statCards.map(({ label, key, Icon, iconBg, iconBorder, iconColor }) => (
+            <div
+              key={label}
+              className="flex items-center gap-4 transition-all duration-150 cursor-default"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 14,
+                padding: '20px 24px',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.07)';
+                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(245,166,35,0.20)';
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)';
+                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.08)';
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+              }}
+            >
+              <div
+                className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: iconBg, border: `1px solid ${iconBorder}` }}
+              >
+                <Icon className="w-6 h-6" style={{ color: iconColor }} />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest font-semibold"
+                  style={{ color: 'rgba(255,255,255,0.50)' }}>
+                  {label}
+                </p>
+                <p style={{
+                  fontFamily: 'Barlow Condensed, sans-serif',
+                  fontWeight: 800,
+                  fontSize: 30,
+                  color: 'rgba(255,255,255,0.90)',
+                  lineHeight: 1,
+                  marginTop: 2,
+                }}>
+                  {stats === null ? (
+                    <span
+                      className="inline-block w-8 h-7 rounded animate-pulse"
+                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                    />
+                  ) : (
+                    stats[key]
+                  )}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Section label + filter-tabs */}
+        <div className="flex items-center gap-3 mb-4">
+          <span style={{
+            fontFamily: 'Barlow Condensed, sans-serif',
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: '0.10em',
+            textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.45)',
+            whiteSpace: 'nowrap',
+          }}>
+            Workspaces
+          </span>
+
+          {/* Filter-tabs */}
+          <div className="flex items-center gap-1.5">
+            {(['favoritter', 'alle'] as const).map((val) => (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
+                style={filter === val ? {
+                  background: 'rgba(245,166,35,0.12)',
+                  border: '1px solid rgba(245,166,35,0.25)',
+                  color: '#F5A623',
+                } : {
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.40)',
+                }}
+              >
+                {val === 'favoritter' ? 'Favoritter' : 'Alle'}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+
+        {/* Workspace-kort */}
+        {(() => {
+          const viserWorkspaces = workspaces.filter((w) =>
+            filter === 'alle' || favoritter.includes(w.id)
+          );
+
+          if (stats === null) {
+            // Loading-skjelett
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="animate-pulse" style={{
+                    height: 72,
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 14,
+                  }} />
+                ))}
+              </div>
+            );
+          }
+
+          if (viserWorkspaces.length === 0) {
+            return (
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.30)' }}>
+                {filter === 'favoritter'
+                  ? 'Du har ingen favoritter ennå. Klikk på stjernen på et workspace for å pinne det her.'
+                  : 'Ingen workspaces tilgjengelig.'}
+              </p>
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {viserWorkspaces.map((ws) => (
+                <div
+                  key={ws.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/dashboard/workspace/${ws.id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/dashboard/workspace/${ws.id}`); }}
+                  className="flex items-center gap-3 text-left w-full transition-all duration-150"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: 14,
+                    padding: '16px 18px',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(245,166,35,0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
+                  }}
+                >
+                  {/* Prosjektnummer-ikon */}
+                  <div
+                    className="flex items-center justify-center shrink-0"
+                    style={{
+                      width: 44, height: 44,
+                      background: 'linear-gradient(135deg, rgba(27,42,74,0.8), rgba(36,53,86,0.8))',
+                      border: '1px solid rgba(245,166,35,0.20)',
+                      borderRadius: 10,
+                      fontFamily: 'Barlow Condensed, sans-serif',
+                      fontWeight: 800, fontSize: 13, color: '#F5A623',
+                    }}
+                  >
+                    {projectCode(ws.navn)}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate" style={{ fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.95)' }}>
+                      {ws.navn}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', marginTop: 2 }}>
+                      {ws._count?.rapporter ?? 0} rapporter
+                      {ws.beskrivelse ? ` · ${ws.beskrivelse}` : ''}
+                    </div>
+                  </div>
+
+                  {/* Stjerne-favoritt */}
+                  <button
+                    type="button"
+                    onClick={(e) => void toggleFavoritt(e, ws.id)}
+                    title={favoritter.includes(ws.id) ? 'Fjern favoritt' : 'Legg til favoritt'}
+                    style={{
+                      flexShrink: 0,
+                      background: 'none',
+                      border: 'none',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      color: favoritter.includes(ws.id) ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                      transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!favoritter.includes(ws.id))
+                        (e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,166,35,0.60)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!favoritter.includes(ws.id))
+                        (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.25)';
+                    }}
+                  >
+                    <Star
+                      size={16}
+                      fill={favoritter.includes(ws.id) ? '#F5A623' : 'none'}
+                      stroke={favoritter.includes(ws.id) ? '#F5A623' : 'currentColor'}
+                    />
+                  </button>
+
+                  {/* Pil */}
+                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>
+                    ›
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+      </div>
+      <AIChat entraObjectId={entraObjectId} />
+    </>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <span style={{
+        fontFamily: 'Barlow Condensed, sans-serif',
+        fontWeight: 700,
+        fontSize: 12,
+        letterSpacing: '0.10em',
+        textTransform: 'uppercase' as const,
+        color: 'rgba(255,255,255,0.30)',
+        whiteSpace: 'nowrap' as const,
+      }}>
+        {children}
+      </span>
+      <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+    </div>
+  );
+}
