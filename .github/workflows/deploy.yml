@@ -3,6 +3,7 @@ name: Deploy til Azure
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -33,9 +34,16 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
-      - name: Deploy til Azure App Service
+      - name: Deploy API til Azure App Service
         uses: azure/webapps-deploy@v2
         with:
-          app-name: lns-dataportal
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+          app-name: lns-dataportal-api
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
+          package: .
+
+      - name: Deploy Portal til Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: lns-dataportal-portal
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
           package: .
