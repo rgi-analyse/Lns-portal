@@ -6,20 +6,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy-api:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: apps/api/package-lock.json
 
-      - name: Installer avhengigheter
-        run: npm ci
+      - name: Installer avhengigheter (API)
+        run: |
+          cd apps/api
+          npm ci
 
       - name: Generer Prisma-klient
         run: npx prisma generate
@@ -30,6 +33,32 @@ jobs:
           cd apps/api
           npm run build
 
+      - name: Deploy API til Azure
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: lns-dataportal-api
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
+          package: apps/api
+          startup-command: 'node dist/index.js'
+
+  deploy-portal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: apps/portal/package-lock.json
+
+      - name: Installer avhengigheter (Portal)
+        run: |
+          cd apps/portal
+          npm ci
+
       - name: Bygg Portal
         run: |
           cd apps/portal
@@ -38,17 +67,9 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
-      - name: Deploy API til Azure App Service
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: lns-dataportal-api
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
-          package: .
-          startup-command: 'node apps/api/dist/index.js'
-
-      - name: Deploy Portal til Azure App Service
-        uses: azure/webapps-deploy@v2
+      - name: Deploy Portal til Azure
+        uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-portal
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
-          package: .
+          package: apps/portal
