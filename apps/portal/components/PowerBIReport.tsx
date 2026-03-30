@@ -701,6 +701,41 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     }
   };
 
+  const parseCSV = (csvTekst: string): (string | number)[][] => {
+    const linjer = csvTekst.split('\n').filter((l) => l.trim());
+    return linjer.map((linje) => {
+      const celler: string[] = [];
+      let inAnførsel = false;
+      let gjeldendeCelle = '';
+      for (let i = 0; i < linje.length; i++) {
+        const tegn = linje[i];
+        if (tegn === '"') {
+          if (inAnførsel && linje[i + 1] === '"') {
+            gjeldendeCelle += '"';
+            i++;
+          } else {
+            inAnførsel = !inAnførsel;
+          }
+        } else if (tegn === ',' && !inAnførsel) {
+          celler.push(gjeldendeCelle.trim());
+          gjeldendeCelle = '';
+        } else {
+          gjeldendeCelle += tegn;
+        }
+      }
+      celler.push(gjeldendeCelle.trim());
+      return celler.map(konverterVerdi);
+    });
+  };
+
+  const konverterVerdi = (verdi: string): string | number => {
+    const renset = verdi.replace(/^"|"$/g, '').trim();
+    const tallStreng = renset.replace(/\s/g, '').replace(',', '.');
+    const tall = parseFloat(tallStreng);
+    if (!isNaN(tall) && tallStreng !== '') return tall;
+    return renset;
+  };
+
   const åpneExcelPicker = async () => {
     if (!reportRef.current || eksporterer) return;
     setExcelLaster(true);
@@ -728,10 +763,18 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       }
       const wb = XLSX.utils.book_new();
       for (const label of keys) {
-        const csv = allData[label];
-        const lines = csv.split('\n').filter((l) => l.trim() !== '');
-        const rows = lines.map((line) => line.split(','));
+        const rows = parseCSV(allData[label]);
         const ws = XLSX.utils.aoa_to_sheet(rows);
+        // Sett norsk tallformat på alle numeriske celler (hopp over headerrad)
+        const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1');
+        for (let R = range.s.r + 1; R <= range.e.r; R++) {
+          for (let C = range.s.c; C <= range.e.c; C++) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (ws[addr] && typeof ws[addr].v === 'number') {
+              ws[addr].z = '#,##0.00';
+            }
+          }
+        }
         const sheetName = label.slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
