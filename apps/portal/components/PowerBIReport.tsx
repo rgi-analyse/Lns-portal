@@ -148,13 +148,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   // Gjenkjenner alle slicer-varianter, inkl. custom visuals som advancedSlicerVisual
   const erSlicerType = (type: string) => type.toLowerCase().includes('slicer');
 
-  const eksporterbare = new Set([
-    'tableEx', 'table', 'pivotTable', 'matrix',
-    'barChart', 'lineChart', 'columnChart',
-    'clusteredBarChart', 'clusteredColumnChart', 'stackedBarChart', 'stackedColumnChart',
-    'pieChart', 'donutChart', 'scatterChart', 'areaChart', 'waterfallChart',
-    'card', 'multiRowCard',
+  // Ekskluder kjente ikke-eksporterbare typer. Alt annet (inkl. custom visuals) får prøve.
+  const ikkeEksporterbare = new Set([
+    'actionButton', 'pageNavigator', 'image', 'textbox', 'shape', 'basicShape', 'line',
+    'filledMap', 'map', 'card', 'multiRowCard',
   ]);
+
+  const erEksporterbar = (type: string): boolean => {
+    if (erSlicerType(type)) return false;
+    if (ikkeEksporterbare.has(type)) return false;
+    return true;
+  };
 
   interface ExcelKandidat {
     pageKey: string;
@@ -164,6 +168,19 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     type: string;
   }
 
+  const synligeSider = async () => {
+    if (!reportRef.current) return [];
+    const pages = await reportRef.current.getPages();
+    return pages.filter((p) => {
+      const name = p.displayName.toLowerCase();
+      if (name.includes('tooltip')) return false;
+      if (name.includes('hidden')) return false;
+      // visibility 1 = Hidden i PBI JS API
+      if ((p as unknown as Record<string, unknown>)['visibility'] === 1) return false;
+      return true;
+    });
+  };
+
   const getAllVisualsData = async (
     filter?: Set<string>, // Set av `${pageKey}::${visualKey}` — undefined = alle
   ): Promise<Record<string, string>> => {
@@ -171,8 +188,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     const result: Record<string, string> = {};
 
     try {
-      const pages = await reportRef.current.getPages();
-      console.log(`[PBI] Antall sider: ${pages.length}`);
+      const pages = await synligeSider();
+      console.log(`[PBI] Synlige sider: ${pages.length}`);
 
       for (const page of pages) {
         const visuals = await page.getVisuals();
@@ -181,12 +198,11 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         for (const visual of visuals) {
           const compositeKey = `${page.name}::${visual.name}`;
           if (filter && !filter.has(compositeKey)) continue;
-
-          if (!eksporterbare.has(visual.type)) {
-            const grunn = erSlicerType(visual.type) ? 'slicer' : 'ikke-eksporterbar type';
-            console.log(`[PBI] ⏭ skippet: "${visual.title || visual.name}" type: ${visual.type} ← ${grunn}`);
+          if (!erEksporterbar(visual.type)) {
+            console.log(`[PBI] ⏭ skippet: "${visual.title || visual.name}" (${visual.type})`);
             continue;
           }
+
           const label = `${page.displayName} - ${visual.title || visual.name}`;
           try {
             const exported = await visual.exportData(models.ExportDataType.Summarized, 10000);
@@ -203,7 +219,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               console.log(`[PBI] ✅ "${label}" (underlying): ${rowCount} rader`);
               if (rowCount > 0) result[label] = exported.data;
             } catch (e2) {
-              console.warn(`[PBI] ⚠️ "${label}" eksport feilet: ${(e2 as Error).message}`);
+              console.warn(`[PBI] ⚠️ "${label}" (${visual.type}) ikke eksporterbar: ${(e2 as Error).message}`);
             }
           }
         }
@@ -221,16 +237,18 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     if (!reportRef.current) return [];
     const kandidater: ExcelKandidat[] = [];
     try {
-      const pages = await reportRef.current.getPages();
+      const pages = await synligeSider();
       for (const page of pages) {
         const visuals = await page.getVisuals();
+        console.log('[PBI] Kandidater for eksport:', visuals.map((v) => `${v.title || v.name} (${v.type})`));
         for (const visual of visuals) {
-          if (!eksporterbare.has(visual.type)) continue;
+          if (!erEksporterbar(visual.type)) continue;
+          if (!visual.title?.trim()) continue; // hopp over visuals uten tittel
           kandidater.push({
             pageKey:     page.name,
             pageLabel:   page.displayName,
             visualKey:   visual.name,
-            visualLabel: visual.title?.trim() || visual.name,
+            visualLabel: visual.title.trim(),
             type:        visual.type,
           });
         }
