@@ -6,10 +6,11 @@ import { models, Report } from 'powerbi-client';
 import type { FilterConfig, SlicerConfig } from './AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
-  FileText, Presentation,
+  FileText, Presentation, Table,
   Maximize, RefreshCw, Bookmark, RotateCcw,
   ZoomIn, ZoomOut, Scan, Maximize2,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/toast';
 
 type ExportFormat = 'PDF' | 'PPTX';
@@ -57,6 +58,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<Report | null>(null);
   const [exporting, setExporting] = useState<ExportingState>({ PDF: false, PPTX: false });
+  const [eksporterer, setEksporterer] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
@@ -620,6 +622,42 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     }
   };
 
+  const exporterTilExcel = async () => {
+    if (!reportRef.current || eksporterer) return;
+    setEksporterer(true);
+    try {
+      const allData = await getAllVisualsData();
+      const keys = Object.keys(allData);
+      if (keys.length === 0) {
+        toast({ title: 'Ingen data å eksportere', variant: 'destructive' });
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      for (const label of keys) {
+        const csv = allData[label];
+        const lines = csv.split('\n').filter((l) => l.trim() !== '');
+        const rows = lines.map((line) => line.split(','));
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        // Max sheet name length is 31 chars
+        const sheetName = label.slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      }
+      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rapport.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[PBI] Excel-eksport feil:', err);
+      toast({ title: 'Excel-eksport feilet', variant: 'destructive' });
+    } finally {
+      setEksporterer(false);
+    }
+  };
+
   const handleRefresh = async () => {
     if (!report) return;
     setRefreshing(true);
@@ -783,6 +821,10 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             <ToolBtn onClick={() => handleExport('PPTX')} disabled={!report || anyExporting}>
               {exporting.PPTX ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Presentation className="w-3.5 h-3.5" />}
               {exporting.PPTX ? 'Eksporterer...' : 'PPT'}
+            </ToolBtn>
+            <ToolBtn onClick={exporterTilExcel} disabled={!report || eksporterer || anyExporting}>
+              {eksporterer ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Table className="w-3.5 h-3.5" />}
+              {eksporterer ? 'Eksporterer...' : 'Excel'}
             </ToolBtn>
             {refreshInfo && (
               <>
