@@ -1,7 +1,5 @@
 import 'dotenv/config';
 
-import fs from 'fs';
-import path from 'path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { embedTokenRoutes } from './routes/embedToken';
@@ -28,29 +26,12 @@ import { speechRoutes } from './routes/speech';
 import { megInnstillingerRoutes } from './routes/megInnstillinger';
 import { rapportDesignerRoutes } from './routes/rapportDesigner';
 
-// Azure App Service håndterer TLS via sin reverse-proxy.
-// HTTPS kun lokalt – produksjon kjører plain HTTP.
-const isProduction = process.env.NODE_ENV === 'production';
-
-const httpsOptions = isProduction ? undefined : (() => {
-  const certPath = path.join(__dirname, '..');
-  return {
-    key:  fs.readFileSync(path.join(certPath, '10.0.1.132+2-key.pem')),
-    cert: fs.readFileSync(path.join(certPath, '10.0.1.132+2.pem')),
-  };
-})();
-
+// Azure App Service håndterer TLS ved sin reverse-proxy – appen kjører alltid plain HTTP.
 const server = Fastify({
-  https: httpsOptions,
-  logger: isProduction
+  logger: process.env.NODE_ENV === 'production'
     ? true
-    : {
-        transport: {
-          target: 'pino-pretty',
-          options: { colorize: true },
-        },
-      },
-  bodyLimit: 50 * 1024 * 1024, // 50MB
+    : { transport: { target: 'pino-pretty', options: { colorize: true } } },
+  bodyLimit: 50 * 1024 * 1024,
 });
 
 const PORT = Number(process.env.PORT ?? 3001);

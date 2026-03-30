@@ -25,6 +25,9 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/mssql": "^9.1.9",
