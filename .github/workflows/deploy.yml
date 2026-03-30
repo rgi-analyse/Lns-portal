@@ -31,22 +31,27 @@ jobs:
         run: npm run build
         working-directory: apps/api
 
-      - name: Installer produksjonsavhengigheter i apps/api
-        run: npm install --omit=dev
-        working-directory: apps/api
-
-      - name: Verifiser deploy-innhold
+      - name: Pakk deploy-pakke (isolert fra workspace)
         run: |
-          echo "=== dist/ ===" && ls apps/api/dist/
-          echo "=== node_modules (antall pakker) ===" && ls apps/api/node_modules | wc -l
-          echo "=== dist/index.js (første 5 linjer) ===" && head -5 apps/api/dist/index.js
+          rm -rf /tmp/api-deploy
+          mkdir /tmp/api-deploy
+          cp -r apps/api/dist /tmp/api-deploy/
+          cp apps/api/package.json /tmp/api-deploy/
+          cd /tmp/api-deploy && npm install --omit=dev --no-package-lock
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Innhold ===" && ls /tmp/api-deploy/
+          echo "=== node_modules/fastify ===" && ls /tmp/api-deploy/node_modules/fastify 2>&1 | head -3
+          echo "=== node_modules (antall) ===" && ls /tmp/api-deploy/node_modules | wc -l
+          echo "=== dist/index.js (første 5 linjer) ===" && head -5 /tmp/api-deploy/dist/index.js
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-api
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
-          package: apps/api
+          package: /tmp/api-deploy
 
   deploy-portal:
     runs-on: ubuntu-latest
