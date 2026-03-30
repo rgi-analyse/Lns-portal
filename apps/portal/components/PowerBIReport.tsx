@@ -59,6 +59,10 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const [report, setReport] = useState<Report | null>(null);
   const [exporting, setExporting] = useState<ExportingState>({ PDF: false, PPTX: false });
   const [eksporterer, setEksporterer] = useState(false);
+  const [excelPickerOpen, setExcelPickerOpen] = useState(false);
+  const [excelKandidater, setExcelKandidater] = useState<{ pageKey: string; pageLabel: string; visualKey: string; visualLabel: string; type: string }[]>([]);
+  const [excelValgte, setExcelValgte] = useState<Set<string>>(new Set());
+  const [excelLaster, setExcelLaster] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
@@ -81,6 +85,16 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   useEffect(() => { reportRef.current = report; }, [report]);
   useEffect(() => { accountRef.current = entraObjectId ?? null; }, [entraObjectId]);
   useEffect(() => { onActiveStateChangeRef.current = onActiveStateChange; }, [onActiveStateChange]);
+
+  useEffect(() => {
+    if (!excelPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      const picker = document.getElementById('excel-picker-popover');
+      if (picker && !picker.contains(e.target as Node)) setExcelPickerOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [excelPickerOpen]);
 
   useEffect(() => {
     if (!pbiDatasetId || !pbiWorkspaceId) return;
@@ -134,11 +148,25 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   // Gjenkjenner alle slicer-varianter, inkl. custom visuals som advancedSlicerVisual
   const erSlicerType = (type: string) => type.toLowerCase().includes('slicer');
 
-  const eksporterbare = new Set(['tableEx', 'matrix', 'barChart', 'lineChart', 'columnChart',
+  const eksporterbare = new Set([
+    'tableEx', 'table', 'pivotTable', 'matrix',
+    'barChart', 'lineChart', 'columnChart',
     'clusteredBarChart', 'clusteredColumnChart', 'stackedBarChart', 'stackedColumnChart',
-    'pieChart', 'donutChart', 'scatterChart', 'areaChart', 'waterfallChart']);
+    'pieChart', 'donutChart', 'scatterChart', 'areaChart', 'waterfallChart',
+    'card', 'multiRowCard',
+  ]);
 
-  const getAllVisualsData = async (): Promise<Record<string, string>> => {
+  interface ExcelKandidat {
+    pageKey: string;
+    pageLabel: string;
+    visualKey: string;
+    visualLabel: string;
+    type: string;
+  }
+
+  const getAllVisualsData = async (
+    filter?: Set<string>, // Set av `${pageKey}::${visualKey}` — undefined = alle
+  ): Promise<Record<string, string>> => {
     if (!reportRef.current) return {};
     const result: Record<string, string> = {};
 
@@ -151,6 +179,9 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         console.log(`[PBI] Side "${page.displayName}": ${visuals.length} visuals`);
 
         for (const visual of visuals) {
+          const compositeKey = `${page.name}::${visual.name}`;
+          if (filter && !filter.has(compositeKey)) continue;
+
           if (!eksporterbare.has(visual.type)) {
             const grunn = erSlicerType(visual.type) ? 'slicer' : 'ikke-eksporterbar type';
             console.log(`[PBI] ⏭ skippet: "${visual.title || visual.name}" type: ${visual.type} ← ${grunn}`);
@@ -161,23 +192,53 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             const exported = await visual.exportData(models.ExportDataType.Summarized, 10000);
             const lines = exported.data?.split('\n') ?? [];
             const rowCount = lines.length - 1;
-            const cols = lines[0] ?? '';
-            console.log(`[PBI] ✅ "${label}": ${rowCount} rader | ${cols}`);
-            if (rowCount > 0) {
-              result[label] = exported.data;
+            console.log(`[PBI] ✅ "${label}" (summarized): ${rowCount} rader`);
+            if (rowCount > 0) result[label] = exported.data;
+          } catch {
+            // Prøv Underlying hvis Summarized feiler
+            try {
+              const exported = await visual.exportData(models.ExportDataType.Underlying, 10000);
+              const lines = exported.data?.split('\n') ?? [];
+              const rowCount = lines.length - 1;
+              console.log(`[PBI] ✅ "${label}" (underlying): ${rowCount} rader`);
+              if (rowCount > 0) result[label] = exported.data;
+            } catch (e2) {
+              console.warn(`[PBI] ⚠️ "${label}" eksport feilet: ${(e2 as Error).message}`);
             }
-          } catch (e) {
-            console.log(`[PBI] ❌ "${label}": ${(e as Error).message}`);
           }
         }
       }
 
-      console.log(`[PBI] Total data: ${Object.keys(result).length} visuals, ${JSON.stringify(result).length} tegn`);
+      console.log(`[PBI] Total data: ${Object.keys(result).length} visuals`);
     } catch (e) {
       console.error('[PBI] getAllVisualsData feil:', (e as Error).message);
     }
 
     return result;
+  };
+
+  const hentExcelKandidater = async (): Promise<ExcelKandidat[]> => {
+    if (!reportRef.current) return [];
+    const kandidater: ExcelKandidat[] = [];
+    try {
+      const pages = await reportRef.current.getPages();
+      for (const page of pages) {
+        const visuals = await page.getVisuals();
+        for (const visual of visuals) {
+          if (!eksporterbare.has(visual.type)) continue;
+          kandidater.push({
+            pageKey:     page.name,
+            pageLabel:   page.displayName,
+            visualKey:   visual.name,
+            visualLabel: visual.title?.trim() || visual.name,
+            type:        visual.type,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[PBI] hentExcelKandidater feil:', (e as Error).message);
+    }
+    return kandidater;
   };
 
   async function getSlicers(r: Report = reportRef.current!): Promise<string[]> {
@@ -622,11 +683,26 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     }
   };
 
-  const exporterTilExcel = async () => {
+  const åpneExcelPicker = async () => {
     if (!reportRef.current || eksporterer) return;
-    setEksporterer(true);
+    setExcelLaster(true);
+    setExcelPickerOpen(true);
     try {
-      const allData = await getAllVisualsData();
+      const kandidater = await hentExcelKandidater();
+      setExcelKandidater(kandidater);
+      // Merk alle som valgt som standard
+      setExcelValgte(new Set(kandidater.map((k) => `${k.pageKey}::${k.visualKey}`)));
+    } finally {
+      setExcelLaster(false);
+    }
+  };
+
+  const eksporterValgte = async () => {
+    if (eksporterer || excelValgte.size === 0) return;
+    setEksporterer(true);
+    setExcelPickerOpen(false);
+    try {
+      const allData = await getAllVisualsData(excelValgte);
       const keys = Object.keys(allData);
       if (keys.length === 0) {
         toast({ title: 'Ingen data å eksportere', variant: 'destructive' });
@@ -638,7 +714,6 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         const lines = csv.split('\n').filter((l) => l.trim() !== '');
         const rows = lines.map((line) => line.split(','));
         const ws = XLSX.utils.aoa_to_sheet(rows);
-        // Max sheet name length is 31 chars
         const sheetName = label.slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
@@ -656,6 +731,14 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     } finally {
       setEksporterer(false);
     }
+  };
+
+  const toggleExcelKandidat = (key: string) => {
+    setExcelValgte((prev) => {
+      const neste = new Set(prev);
+      if (neste.has(key)) neste.delete(key); else neste.add(key);
+      return neste;
+    });
   };
 
   const handleRefresh = async () => {
@@ -822,10 +905,85 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               {exporting.PPTX ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Presentation className="w-3.5 h-3.5" />}
               {exporting.PPTX ? 'Eksporterer...' : 'PPT'}
             </ToolBtn>
-            <ToolBtn onClick={exporterTilExcel} disabled={!report || eksporterer || anyExporting}>
-              {eksporterer ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Table className="w-3.5 h-3.5" />}
-              {eksporterer ? 'Eksporterer...' : 'Excel'}
-            </ToolBtn>
+            <div className="relative">
+              <ToolBtn onClick={åpneExcelPicker} disabled={!report || eksporterer || anyExporting}>
+                {eksporterer ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Table className="w-3.5 h-3.5" />}
+                {eksporterer ? 'Eksporterer...' : 'Excel'}
+              </ToolBtn>
+              {excelPickerOpen && (
+                <div
+                  id="excel-picker-popover"
+                  className="absolute top-full left-0 mt-1 z-50 rounded-lg overflow-hidden"
+                  style={{
+                    minWidth: 280,
+                    background: 'rgba(10,22,40,0.97)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                  }}
+                >
+                  <div className="px-3 pt-3 pb-2 text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.5)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    Velg visuals som skal eksporteres
+                  </div>
+                  <div className="max-h-60 overflow-y-auto py-1">
+                    {excelLaster ? (
+                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Laster visuals...</div>
+                    ) : excelKandidater.length === 0 ? (
+                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Ingen eksporterbare visuals funnet</div>
+                    ) : (
+                      excelKandidater.map((k) => {
+                        const key = `${k.pageKey}::${k.visualKey}`;
+                        const valgt = excelValgte.has(key);
+                        return (
+                          <div
+                            key={key}
+                            onClick={() => toggleExcelKandidat(key)}
+                            className="flex items-center gap-2.5 px-3 py-2 cursor-pointer select-none transition-colors"
+                            style={{ background: valgt ? 'rgba(245,166,35,0.08)' : 'transparent' }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'rgba(245,166,35,0.14)' : 'rgba(255,255,255,0.05)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'rgba(245,166,35,0.08)' : 'transparent'; }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={valgt}
+                              onChange={() => toggleExcelKandidat(key)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-3.5 h-3.5 flex-shrink-0 cursor-pointer"
+                              style={{ accentColor: '#F5A623' }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.88)' }}>{k.visualLabel}</p>
+                              <p className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{k.pageLabel} · {k.type}</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                      {excelValgte.size} / {excelKandidater.length} valgt
+                    </span>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setExcelPickerOpen(false)}
+                        className="px-2.5 py-1 text-xs rounded-md transition-colors"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.7)' }}
+                      >
+                        Avbryt
+                      </button>
+                      <button
+                        onClick={eksporterValgte}
+                        disabled={excelValgte.size === 0 || excelLaster}
+                        className="px-2.5 py-1 text-xs rounded-md font-semibold transition-colors disabled:opacity-40"
+                        style={{ background: 'rgba(245,166,35,0.20)', border: '1px solid rgba(245,166,35,0.40)', color: '#F5A623' }}
+                      >
+                        Eksporter
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             {refreshInfo && (
               <>
                 <Divider />
