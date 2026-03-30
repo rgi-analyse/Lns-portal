@@ -1,5 +1,19 @@
 import 'dotenv/config';
 
+// Startup-sjekk: logg manglende env-vars FØR noe annet lastes
+const påkrevde = [
+  'DATABASE_URL',
+  'PBI_TENANT_ID',
+  'PBI_CLIENT_ID',
+  'PBI_CLIENT_SECRET',
+];
+const mangler = påkrevde.filter(v => !process.env[v]);
+if (mangler.length > 0) {
+  console.error('❌ MANGLENDE MILJØVARIABLER:', mangler.join(', '));
+  console.error('   Legg til disse i Azure → App Service → Configuration → Application Settings');
+  process.exit(1);
+}
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { embedTokenRoutes } from './routes/embedToken';
