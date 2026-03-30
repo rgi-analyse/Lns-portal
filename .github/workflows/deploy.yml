@@ -18,19 +18,15 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Installer avhengigheter (API)
-        run: |
-          cd apps/api
-          npm install
+      - name: Installer avhengigheter (workspaces)
+        run: npm ci
 
       - name: Generer Prisma-klient
-        run: npx prisma generate
-        working-directory: apps/api
+        run: npm run --workspace=apps/api prisma generate || npx --prefix apps/api prisma generate
 
       - name: Bygg API
-        run: |
-          cd apps/api
-          npm run build
+        run: npm run build
+        working-directory: apps/api
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
@@ -51,18 +47,16 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Installer avhengigheter (Portal)
-        run: |
-          cd apps/portal
-          npm install
+      - name: Installer avhengigheter (workspaces)
+        run: npm ci
 
       - name: Bygg Portal
-        run: |
-          cd apps/portal
-          npm run build
+        run: npm run build
+        working-directory: apps/portal
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
       - name: Deploy Portal til Azure
         uses: azure/webapps-deploy@v3
