@@ -28,20 +28,28 @@ import { speechRoutes } from './routes/speech';
 import { megInnstillingerRoutes } from './routes/megInnstillinger';
 import { rapportDesignerRoutes } from './routes/rapportDesigner';
 
-const certPath = path.join(__dirname, '..');
-const https = {
-  key:  fs.readFileSync(path.join(certPath, '10.0.1.132+2-key.pem')),
-  cert: fs.readFileSync(path.join(certPath, '10.0.1.132+2.pem')),
-};
+// Azure App Service håndterer TLS via sin reverse-proxy.
+// HTTPS kun lokalt – produksjon kjører plain HTTP.
+const isProduction = process.env.NODE_ENV === 'production';
+
+const httpsOptions = isProduction ? undefined : (() => {
+  const certPath = path.join(__dirname, '..');
+  return {
+    key:  fs.readFileSync(path.join(certPath, '10.0.1.132+2-key.pem')),
+    cert: fs.readFileSync(path.join(certPath, '10.0.1.132+2.pem')),
+  };
+})();
 
 const server = Fastify({
-  https,
-  logger: {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    },
-  },
+  https: httpsOptions,
+  logger: isProduction
+    ? true
+    : {
+        transport: {
+          target: 'pino-pretty',
+          options: { colorize: true },
+        },
+      },
   bodyLimit: 50 * 1024 * 1024, // 50MB
 });
 

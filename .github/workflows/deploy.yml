@@ -44,6 +44,7 @@ jobs:
           app-name: lns-dataportal-api
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
           package: .
+          startup-command: 'node apps/api/dist/index.js'
 
       - name: Deploy Portal til Azure App Service
         uses: azure/webapps-deploy@v2
