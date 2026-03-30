@@ -22,7 +22,8 @@ jobs:
         run: npm ci
 
       - name: Generer Prisma-klient
-        run: npm run --workspace=apps/api prisma generate || npx --prefix apps/api prisma generate
+        run: npx prisma generate
+        working-directory: apps/api
 
       - name: Bygg API
         run: npm run build
