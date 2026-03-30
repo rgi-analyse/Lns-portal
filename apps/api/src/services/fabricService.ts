@@ -173,4 +173,4 @@ export async function getTableSchema(tableName?: string): Promise<TableInfo[]> {
   }
 }
 
-testConnection();
+// testConnection() er fjernet fra module-load – kalles ikke ved oppstart

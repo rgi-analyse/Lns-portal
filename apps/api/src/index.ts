@@ -1,17 +1,20 @@
 import 'dotenv/config';
 
-// Startup-sjekk: logg manglende env-vars FØR noe annet lastes
-const påkrevde = [
-  'DATABASE_URL',
-  'PBI_TENANT_ID',
-  'PBI_CLIENT_ID',
-  'PBI_CLIENT_SECRET',
-];
+// Startup-logging FØR noe annet lastes
+console.log('[Startup] Node.js prosess startet');
+console.log('[Startup] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Startup] PORT:', process.env.PORT);
+console.log('[Startup] DATABASE_URL satt:', !!process.env.DATABASE_URL);
+console.log('[Startup] PBI_TENANT_ID satt:', !!process.env.PBI_TENANT_ID);
+console.log('[Startup] PBI_CLIENT_ID satt:', !!process.env.PBI_CLIENT_ID);
+console.log('[Startup] PBI_CLIENT_SECRET satt:', !!process.env.PBI_CLIENT_SECRET);
+console.log('[Startup] AZURE_OPENAI_KEY satt:', !!process.env.AZURE_OPENAI_KEY);
+
+const påkrevde = ['DATABASE_URL', 'PBI_TENANT_ID', 'PBI_CLIENT_ID', 'PBI_CLIENT_SECRET'];
 const mangler = påkrevde.filter(v => !process.env[v]);
 if (mangler.length > 0) {
-  console.error('❌ MANGLENDE MILJØVARIABLER:', mangler.join(', '));
-  console.error('   Legg til disse i Azure → App Service → Configuration → Application Settings');
-  process.exit(1);
+  console.warn('[Startup] ⚠️  MANGLENDE MILJØVARIABLER:', mangler.join(', '));
+  console.warn('[Startup]    Legg til i Azure → App Service → Configuration → Application Settings');
 }
 
 import Fastify from 'fastify';
