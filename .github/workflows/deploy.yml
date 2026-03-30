@@ -31,20 +31,33 @@ jobs:
         run: npm run build
         working-directory: apps/api
 
-      - name: Pakk deploy-pakke (isolert fra workspace)
+      - name: Lag deploy-pakke (uten node_modules)
         run: |
           rm -rf /tmp/api-deploy
           mkdir /tmp/api-deploy
           cp -r apps/api/dist /tmp/api-deploy/
-          cp apps/api/package.json /tmp/api-deploy/
-          cd /tmp/api-deploy && npm install --omit=dev --no-package-lock
+          # Lag forenklet package.json: kun start-script + dependencies (ingen build/dev)
+          node -e "
+            const pkg = require('./apps/api/package.json');
+            const deploy = {
+              name: pkg.name,
+              version: pkg.version,
+              main: 'dist/index.js',
+              scripts: { start: 'node dist/index.js' },
+              engines: pkg.engines,
+              dependencies: pkg.dependencies
+            };
+            require('fs').writeFileSync('/tmp/api-deploy/package.json', JSON.stringify(deploy, null, 2));
+          "
+          # Generer package-lock.json isolert (ingen workspace-kontekst i /tmp)
+          cd /tmp/api-deploy && npm install --package-lock-only
 
       - name: Verifiser deploy-pakke
         run: |
           echo "=== Innhold ===" && ls /tmp/api-deploy/
-          echo "=== node_modules/fastify ===" && ls /tmp/api-deploy/node_modules/fastify 2>&1 | head -3
-          echo "=== node_modules (antall) ===" && ls /tmp/api-deploy/node_modules | wc -l
-          echo "=== dist/index.js (første 5 linjer) ===" && head -5 /tmp/api-deploy/dist/index.js
+          echo "=== package.json scripts ===" && node -e "console.log(JSON.stringify(require('/tmp/api-deploy/package.json').scripts,null,2))"
+          echo "=== package-lock.json finnes ===" && test -f /tmp/api-deploy/package-lock.json && echo "JA" || echo "NEI"
+          echo "=== dist/index.js (første 3 linjer) ===" && head -3 /tmp/api-deploy/dist/index.js
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
