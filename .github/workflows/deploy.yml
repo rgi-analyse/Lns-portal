@@ -31,6 +31,16 @@ jobs:
         run: npm run build
         working-directory: apps/api
 
+      - name: Installer produksjonsavhengigheter i apps/api
+        run: npm install --omit=dev
+        working-directory: apps/api
+
+      - name: Verifiser deploy-innhold
+        run: |
+          echo "=== dist/ ===" && ls apps/api/dist/
+          echo "=== node_modules (antall pakker) ===" && ls apps/api/node_modules | wc -l
+          echo "=== dist/index.js (første 5 linjer) ===" && head -5 apps/api/dist/index.js
+
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
         with:
