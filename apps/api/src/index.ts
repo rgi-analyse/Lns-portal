@@ -39,12 +39,26 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 
 async function start() {
   await server.register(cors, {
-    origin: [
-      'http://localhost:3000',
-      'https://localhost:3000',
-      'https://10.0.1.132:3000',
-    ],
+    origin: (origin, cb) => {
+      const tillatte = [
+        'http://localhost:3000',
+        'https://localhost:3000',
+        'https://10.0.1.132:3000',
+        'https://lns-dataportal-portal.azurewebsites.net',
+        process.env.CORS_ORIGIN,
+      ].filter(Boolean) as string[];
+
+      if (!origin || tillatte.includes(origin)) {
+        cb(null, true);
+      } else {
+        console.warn('[CORS] blokkert origin:', origin);
+        cb(new Error('Ikke tillatt av CORS'), false);
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   // Health check - alltid tilgjengelig uten auth:
