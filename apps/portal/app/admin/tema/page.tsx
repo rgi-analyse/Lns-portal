@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { apiFetch } from '@/lib/apiClient';
+import { applyTheme } from '@/components/ThemeProvider';
 
 interface Tema {
   id?: string;
@@ -99,7 +100,8 @@ export default function TemaAdminPage() {
       }
       const oppdatert = await res.json() as Tema;
       setTema(oppdatert);
-      setMelding({ type: 'ok', tekst: 'Tema lagret!' });
+      applyTheme(oppdatert);
+      setMelding({ type: 'ok', tekst: 'Tema lagret og aktivert!' });
     } catch (err: unknown) {
       setMelding({ type: 'feil', tekst: err instanceof Error ? err.message : 'Ukjent feil' });
     } finally {

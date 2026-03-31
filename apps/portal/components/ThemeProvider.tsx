@@ -30,7 +30,7 @@ function hexToHSL(hex: string): { h: number; s: number; l: number } {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-function applyTheme(tema: Tema) {
+export function applyTheme(tema: Tema) {
   const root = document.documentElement;
   const { h, s, l } = hexToHSL(tema.primaryColor);
 
@@ -51,10 +51,17 @@ function applyTheme(tema: Tema) {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    apiFetch('/api/tema', { cache: 'no-store' })
-      .then(res => res.ok ? res.json() as Promise<Tema> : null)
-      .then(tema => { if (tema) applyTheme(tema); })
-      .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });
+    const hentTema = () => {
+      apiFetch('/api/tema', { cache: 'no-store' })
+        .then(res => res.ok ? res.json() as Promise<Tema> : null)
+        .then(tema => { if (tema) applyTheme(tema); })
+        .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });
+    };
+
+    hentTema(); // hent umiddelbart ved oppstart
+
+    const intervall = setInterval(hentTema, 30_000); // poll hvert 30. sek
+    return () => clearInterval(intervall); // rydd opp ved unmount
   }, []);
 
   return <>{children}</>;
