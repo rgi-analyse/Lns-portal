@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import TilgangStyring from '@/components/TilgangStyring';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Workspace {
   id: string;
   navn: string;
 }
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function SikkerhetPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,11 +22,8 @@ export default function SikkerhetPage() {
   useEffect(() => {
     if (!id) return;
     const load = async () => {
-      console.log('[SikkerhetPage] API URL:', process.env.NEXT_PUBLIC_API_URL);
-      const url = `${API}/api/workspaces/${id}`;
-      console.log('[SikkerhetPage] Henter workspace:', url);
       try {
-        const r = await fetch(url);
+        const r = await apiFetch(`/api/workspaces/${id}`);
         console.log('[SikkerhetPage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
