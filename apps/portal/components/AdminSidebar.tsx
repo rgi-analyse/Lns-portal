@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Database, LayoutDashboard, Settings2, Users } from 'lucide-react';
+import { Building2, Database, LayoutDashboard, Palette, Settings2, Users } from 'lucide-react';
 
 const nav = [
   { href: '/admin',            label: 'Oversikt',   icon: Settings2, exact: true },
   { href: '/admin/workspaces', label: 'Workspaces', icon: Building2 },
   { href: '/admin/brukere',    label: 'Brukere',    icon: Users },
   { href: '/admin/metadata',   label: 'Metadata',   icon: Database },
+  { href: '/admin/tema',       label: 'Tema',       icon: Palette },
 ];
 
 export default function AdminSidebar() {

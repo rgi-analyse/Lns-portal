@@ -43,6 +43,7 @@ import { pbiCreateRoutes } from './routes/pbiCreate';
 import { speechRoutes } from './routes/speech';
 import { megInnstillingerRoutes } from './routes/megInnstillinger';
 import { rapportDesignerRoutes } from './routes/rapportDesigner';
+import { temaRoutes } from './routes/tema';
 
 // Azure App Service håndterer TLS ved sin reverse-proxy – appen kjører alltid plain HTTP.
 const server = Fastify({
@@ -112,6 +113,7 @@ async function start() {
   await server.register(speechRoutes);
   await server.register(megInnstillingerRoutes);
   await server.register(rapportDesignerRoutes);
+  await server.register(temaRoutes);
 
   try {
     await server.listen({ port: PORT, host: HOST });

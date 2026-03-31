@@ -95,3 +95,15 @@ model Bruker {
   opprettet         DateTime  @default(now())
   sistInnlogget     DateTime?
 }
+
+model OrganisasjonTema {
+  id               String   @id @default(uuid())
+  organisasjonNavn String   @unique @db.NVarChar(200)
+  primaryColor     String   @default("#F5A623") @db.NVarChar(20)
+  backgroundColor  String   @default("#0a1628") @db.NVarChar(20)
+  navyColor        String   @default("#1B2A4A") @db.NVarChar(20)
+  accentColor      String   @default("#243556") @db.NVarChar(20)
+  logoUrl          String?  @db.NVarChar(500)
+  oppdatert        DateTime @updatedAt
+  opprettet        DateTime @default(now())
+}
