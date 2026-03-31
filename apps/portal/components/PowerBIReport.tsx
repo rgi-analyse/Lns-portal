@@ -719,15 +719,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     // Tekst-kolonner basert på header — aldri konverter til tall
     if (erTekstKolonne(header)) return renset;
 
-    // Kun konverter hvis verdien ser ut som et norsk beløp:
-    // må inneholde komma (desimaltegn) OG kun bestå av siffer, mellomrom, komma, punktum og minus
-    const harKomma = renset.includes(',');
-    const harKunTallTegn = /^[\d\s\-.,]+$/.test(renset);
-
-    if (harKomma && harKunTallTegn) {
+    // Konverter hvis verdien ser numerisk ut (inkl. vitenskapelig notasjon)
+    const harKunTallTegn = /^[\d\s\-,\.eE\+]+$/.test(renset);
+    if (harKunTallTegn) {
       const tallStreng = renset.replace(/\s/g, '').replace(',', '.');
       const tall = parseFloat(tallStreng);
-      if (!isNaN(tall)) return tall;
+      if (!isNaN(tall)) {
+        // Svært små tall nær null (f.eks. 4.65e-10) → avrund til 0
+        if (Math.abs(tall) < 0.005) return 0;
+        // Avrund til 2 desimaler for å fjerne flytepunktfeil
+        return Math.round(tall * 100) / 100;
+      }
     }
 
     return renset;
@@ -797,6 +799,11 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         return;
       }
       const wb = XLSX.utils.book_new();
+      wb.Props = { Application: 'LNS Dataportal', AppVersion: '1.0' };
+      if (!wb.Workbook) wb.Workbook = {};
+      if (!wb.Workbook.WBView) wb.Workbook.WBView = [];
+      wb.Workbook.WBView[0] = { xWindow: 0, yWindow: 0, windowWidth: 19200, windowHeight: 10800, activeTab: 0 };
+
       for (const label of keys) {
         const rows = parseCSV(allData[label]);
         const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -807,6 +814,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             const addr = XLSX.utils.encode_cell({ r: R, c: C });
             if (ws[addr] && typeof ws[addr].v === 'number') {
               ws[addr].z = '#,##0.00';
+              ws[addr].t = 'n';
             }
           }
         }
