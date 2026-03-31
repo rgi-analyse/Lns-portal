@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LayoutDashboard, FileBarChart2, Users, Star } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Workspace {
   id: string;
@@ -71,7 +72,7 @@ export default function DashboardPage() {
     const url = new URL(`${API}/api/workspaces`);
     if (grupper.length > 0) url.searchParams.set('grupper', grupper.join(','));
 
-    fetch(url.toString(), { headers: authHeaders })
+    apiFetch(url.pathname + url.search, { headers: authHeaders })
       .then((r) => r.json())
       .then((data: Workspace[]) => {
         setWorkspaces(data);
@@ -89,7 +90,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!isAuthenticated || !entraObjectId) return;
-    fetch(`${API}/api/meg/favoritter`, { headers: authHeaders })
+    apiFetch('/api/meg/favoritter', { headers: authHeaders })
       .then((r) => r.json())
       .then((ids: string[]) => setFavoritter(ids))
       .catch(() => setFavoritter([]));
@@ -105,7 +106,7 @@ export default function DashboardPage() {
       erFavoritt ? prev.filter((id) => id !== workspaceId) : [...prev, workspaceId],
     );
     try {
-      await fetch(`${API}/api/meg/favoritter/${workspaceId}`, {
+      await apiFetch(`/api/meg/favoritter/${workspaceId}`, {
         method: erFavoritt ? 'DELETE' : 'POST',
         headers: authHeaders,
       });

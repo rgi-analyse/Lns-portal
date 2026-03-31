@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Report } from 'powerbi-client';
 import { ArrowLeft, Save, Trash2, Loader2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 // Visual type mapping: AI forslag → PBI visual type string
 const VISUAL_TYPE_MAP: Record<string, string> = {
@@ -51,7 +52,7 @@ export default function RapportPreviewPage() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
 
-    fetch(`${API}/api/pbi/create-token`, {
+    apiFetch('/api/pbi/create-token', {
       method: 'POST',
       headers,
       body: JSON.stringify({ pbiDatasetId, pbiWorkspaceId }),
@@ -128,7 +129,7 @@ export default function RapportPreviewPage() {
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
-        const res = await fetch(`${API}/api/pbi/register-rapport`, {
+        const res = await apiFetch('/api/pbi/register-rapport', {
           method: 'POST',
           headers,
           body: JSON.stringify({ pbiReportId, pbiDatasetId, pbiWorkspaceId, navn: reportNavn }),

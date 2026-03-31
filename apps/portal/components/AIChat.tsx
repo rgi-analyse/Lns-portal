@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settings } from 'lucide-react';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
+import { apiFetch } from '@/lib/apiClient';
 
 export interface FilterConfig {
   table: string;
@@ -154,7 +155,7 @@ export default function AIChat({
   useEffect(() => {
     if (!entraObjectId) return;
     const headers: Record<string, string> = { 'X-Entra-Object-Id': entraObjectId };
-    fetch(`${API}/api/meg/innstillinger`, { credentials: 'include', headers })
+    apiFetch('/api/meg/innstillinger', { credentials: 'include', headers })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.tts) {
@@ -176,7 +177,7 @@ export default function AIChat({
         'Content-Type': 'application/json',
         'X-Entra-Object-Id': entraObjectId,
       };
-      fetch(`${API}/api/meg/innstillinger`, {
+      apiFetch('/api/meg/innstillinger', {
         method: 'PUT',
         credentials: 'include',
         headers,
@@ -388,7 +389,7 @@ export default function AIChat({
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
-      const res = await fetch(`${API}/api/chat`, {
+      const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),

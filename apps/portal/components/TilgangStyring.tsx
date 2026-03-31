@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -76,7 +77,7 @@ export default function TilgangStyring({ entityType, entityId }: TilgangStyringP
 
   const fetchTilganger = useCallback(() => {
     setTilgangLoading(true);
-    fetch(tilgangBaseUrl, { headers: authHeaders })
+    apiFetch(tilgangBaseUrl.replace(API, ''), { headers: authHeaders })
       .then((r) => r.json())
       .then((data: unknown) => {
         const arr = Array.isArray(data)
@@ -97,7 +98,7 @@ export default function TilgangStyring({ entityType, entityId }: TilgangStyringP
     if (!groupQuery.trim()) { setGroupResults(null); return; }
     const timer = setTimeout(() => {
       setGroupLoading(true);
-      fetch(`${API}/api/graph/search/grupper?q=${encodeURIComponent(groupQuery.trim())}`, { headers: authHeaders })
+      apiFetch(`/api/graph/search/grupper?q=${encodeURIComponent(groupQuery.trim())}`, { headers: authHeaders })
         .then((r) => r.json() as Promise<GraphGroup[] | { value?: GraphGroup[] }>)
         .then((data) => {
           const results = Array.isArray(data) ? data : (data.value ?? []);
@@ -114,7 +115,7 @@ export default function TilgangStyring({ entityType, entityId }: TilgangStyringP
     if (!userQuery.trim()) { setUserResults(null); return; }
     const timer = setTimeout(() => {
       setUserLoading(true);
-      fetch(`${API}/api/admin/brukere?search=${encodeURIComponent(userQuery.trim())}`, { headers: authHeaders })
+      apiFetch(`/api/admin/brukere?search=${encodeURIComponent(userQuery.trim())}`, { headers: authHeaders })
         .then((r) => r.json() as Promise<PortalBruker[]>)
         .then((data) => setUserResults(Array.isArray(data) ? data : []))
         .catch(() => toast({ title: 'Bruker-søk feilet', variant: 'destructive' }))
@@ -136,7 +137,7 @@ export default function TilgangStyring({ entityType, entityId }: TilgangStyringP
   }) => {
     setAddingId(entry.entraId);
     try {
-      const r = await fetch(tilgangBaseUrl, {
+      const r = await apiFetch(tilgangBaseUrl.replace(API, ''), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ ...entry, rolle: getRolle(entry.entraId) }),
@@ -162,7 +163,7 @@ export default function TilgangStyring({ entityType, entityId }: TilgangStyringP
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const r = await fetch(`${tilgangBaseUrl}/${deleteId}`, { method: 'DELETE', headers: authHeaders });
+      const r = await apiFetch(`${tilgangBaseUrl.replace(API, '')}/${deleteId}`, { method: 'DELETE', headers: authHeaders });
       if (!r.ok && r.status !== 204) throw new Error();
       toast({ title: 'Tilgang fjernet', variant: 'success' });
       setDeleteId(null);

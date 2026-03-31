@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronDown, ChevronRight, LayoutDashboard, Building2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +49,7 @@ export default function Sidebar() {
     const url = new URL(`${API}/api/workspaces`);
     if (grupper.length > 0) url.searchParams.set('grupper', grupper.join(','));
 
-    fetch(url.toString(), { headers: authHeaders, cache: 'no-store' })
+    apiFetch(url.pathname + url.search, { headers: authHeaders, cache: 'no-store' })
       .then((r) => r.json())
       .then((data: Workspace[]) => {
         // Personlige workspaces øverst
@@ -72,7 +73,7 @@ export default function Sidebar() {
       try {
         const url = new URL(`${API}/api/workspaces/${wsId}/rapporter`);
         if (grupper.length > 0) url.searchParams.set('grupper', grupper.join(','));
-        const r = await fetch(url.toString(), { headers: authHeaders, cache: 'no-store' });
+        const r = await apiFetch(url.pathname + url.search, { headers: authHeaders, cache: 'no-store' });
         const data: Rapport[] = await r.json();
         setRapporter((prev) => ({ ...prev, [wsId]: data }));
       } catch {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/toast';
+import { apiFetch } from '@/lib/apiClient';
 
 type ExportFormat = 'PDF' | 'PPTX';
 
@@ -98,7 +99,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
   useEffect(() => {
     if (!pbiDatasetId || !pbiWorkspaceId) return;
-    fetch(`${API}/api/pbi/refresh-info?datasetId=${pbiDatasetId}&workspaceId=${pbiWorkspaceId}`)
+    apiFetch(`/api/pbi/refresh-info?datasetId=${pbiDatasetId}&workspaceId=${pbiWorkspaceId}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data) setRefreshInfo(data as RefreshInfo); })
       .catch(() => { /* ikke kritisk — vis bare ingenting */ });
@@ -532,7 +533,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       if (reportRef.current && accountRef.current && innstillingerKey) {
         reportRef.current.bookmarksManager.capture()
           .then(bookmark => {
-            fetch(`${API}/api/innstillinger/${innstillingerKey}`, {
+            apiFetch(`/api/innstillinger/${innstillingerKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -562,8 +563,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
           : {};
       console.log('[PBI] fetchToken body som sendes:', JSON.stringify(body));
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/embed-token`,
+        const response = await apiFetch(
+          '/api/embed-token',
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -588,7 +589,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     if (!report || !innstillingerKey || !entraObjectId) return;
     try {
       const bookmark = await report.bookmarksManager.capture();
-      await fetch(`${API}/api/innstillinger/${innstillingerKey}`, {
+      await apiFetch(`/api/innstillinger/${innstillingerKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -606,8 +607,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
   const handleResetBookmark = async () => {
     if (!report || !innstillingerKey || !entraObjectId) return;
-    await fetch(
-      `${API}/api/innstillinger/${innstillingerKey}?brukerId=${entraObjectId}&type=bookmark`,
+    await apiFetch(
+      `/api/innstillinger/${innstillingerKey}?brukerId=${entraObjectId}&type=bookmark`,
       { method: 'DELETE' },
     );
     await report.reload();
@@ -637,7 +638,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       const bookmark = await reportRef.current.bookmarksManager.capture();
       console.log('[PBI] bookmark captured:', bookmark?.name);
 
-      const response = await fetch(`${API}/api/innstillinger/${innstillingerKey}`, {
+      const response = await apiFetch(`/api/innstillinger/${innstillingerKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -674,8 +675,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const handleExport = async (format: ExportFormat) => {
     setExporting((prev) => ({ ...prev, [format]: true }));
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/export-report`,
+      const response = await apiFetch(
+        '/api/export-report',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1225,7 +1226,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               // Hent tilgjengelige tabeller fra Fabric
               try {
                 const tablesUrl = rapportId ? `${API}/api/tables?rapportId=${encodeURIComponent(rapportId)}` : `${API}/api/tables`;
-                const tablesRes = await fetch(tablesUrl);
+                const tablesRes = await apiFetch(tablesUrl.replace(API, ''));
                 if (tablesRes.ok) {
                   const { tables } = await tablesRes.json() as { tables: string[] };
                   console.log('[PBI] Tilgjengelige tabeller:', tables);
@@ -1247,8 +1248,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                   let innstilling: { verdi?: string } | null = null;
                   for (const key of keysToTry) {
                     if (!key) continue;
-                    const res = await fetch(
-                      `${API}/api/innstillinger/${key}?brukerId=${entraObjectId}`,
+                    const res = await apiFetch(
+                      `/api/innstillinger/${key}?brukerId=${entraObjectId}`,
                     );
                     if (res.ok) {
                       innstilling = await res.json() as { verdi?: string } | null;

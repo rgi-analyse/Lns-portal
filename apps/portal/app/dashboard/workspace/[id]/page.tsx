@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Rapport {
   id: string;
@@ -59,7 +60,7 @@ export default function WorkspacePage() {
     async function load() {
       const wsUrl = new URL(`${API}/api/workspaces/${id}`);
       if (grupper.length > 0) wsUrl.searchParams.set('grupper', grupper.join(','));
-      const wsRes = await fetch(wsUrl.toString(), { headers: authHeaders });
+      const wsRes = await apiFetch(wsUrl.pathname + wsUrl.search, { headers: authHeaders });
       if (!wsRes.ok) throw new Error(`HTTP ${wsRes.status}`);
       const ws = await wsRes.json() as WorkspaceDetail;
       setWorkspace(ws);
@@ -67,7 +68,7 @@ export default function WorkspacePage() {
       // Hent rapporter via dedikert rute (samme som sidebar bruker)
       const rUrl = new URL(`${API}/api/workspaces/${id}/rapporter`);
       if (grupper.length > 0) rUrl.searchParams.set('grupper', grupper.join(','));
-      const rRes = await fetch(rUrl.toString(), { headers: authHeaders });
+      const rRes = await apiFetch(rUrl.pathname + rUrl.search, { headers: authHeaders });
       if (rRes.ok) {
         const rapporter = await rRes.json() as Rapport[];
         setRapporter(rapporter);
@@ -93,7 +94,7 @@ export default function WorkspacePage() {
   const lagreNavn = async (rapportId: string) => {
     if (!redigererNavn.trim()) { avbrytRedigering(); return; }
     try {
-      const res = await fetch(`${API}/api/rapport-designer/${rapportId}/navn`, {
+      const res = await apiFetch(`/api/rapport-designer/${rapportId}/navn`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
@@ -119,7 +120,7 @@ export default function WorkspacePage() {
   const slettRapport = async (rapportId: string, navn: string) => {
     if (!confirm(`Slette "${navn}"? Dette kan ikke angres.`)) return;
     try {
-      const res = await fetch(`${API}/api/rapport-designer/${rapportId}`, {
+      const res = await apiFetch(`/api/rapport-designer/${rapportId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: authHeaders,

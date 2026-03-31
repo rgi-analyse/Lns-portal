@@ -10,8 +10,20 @@ function extractSlug(request: FastifyRequest): string {
   if (header) return header;
 
   const host = (request.headers['host'] as string | undefined) ?? '';
-  const sub = host.split('.')[0].toLowerCase();
-  if (sub && sub !== 'www' && !/^\d/.test(sub) && sub !== 'localhost') return sub;
+
+  // Aldri tolk subdomain fra Azure App Service, localhost eller IP-adresser
+  const isSystemHost =
+    host.includes('azurewebsites.net') ||
+    host.includes('azure.com') ||
+    host.includes('.azure.') ||
+    host.includes('localhost') ||
+    /^[\d.:]+$/.test(host) ||   // ren IP-adresse
+    !host.includes('.');         // enkelt hostname uten punktum
+
+  if (!isSystemHost) {
+    const sub = host.split('.')[0].toLowerCase();
+    if (sub && sub !== 'www') return sub;
+  }
 
   return 'lns';
 }

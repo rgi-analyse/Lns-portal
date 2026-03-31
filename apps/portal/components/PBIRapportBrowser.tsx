@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -42,7 +43,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
     setAlleRapporter([]);
     setValgteIds(new Set());
     try {
-      const wsRes = await fetch(`${API}/api/pbi/workspaces`);
+      const wsRes = await apiFetch('/api/pbi/workspaces');
       if (!wsRes.ok) throw new Error(`HTTP ${wsRes.status}`);
       const workspaces = await wsRes.json() as PbiWorkspace[];
 
@@ -50,7 +51,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
       await Promise.all(
         workspaces.map(async (ws) => {
           try {
-            const rapRes = await fetch(`${API}/api/pbi/workspaces/${ws.id}/rapporter`);
+            const rapRes = await apiFetch(`/api/pbi/workspaces/${ws.id}/rapporter`);
             if (!rapRes.ok) return;
             const rapporter = await rapRes.json() as Array<{ id: string; name: string; datasetId: string }>;
             for (const r of rapporter) {
@@ -110,7 +111,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
     await Promise.all(
       valgte.map(async (rapport) => {
         try {
-          const createRes = await fetch(`${API}/api/rapporter`, {
+          const createRes = await apiFetch('/api/rapporter', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
@@ -126,7 +127,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
           }
           const ny = await createRes.json() as { id: string };
 
-          const linkRes = await fetch(`${API}/api/workspaces/${workspaceId}/rapporter`, {
+          const linkRes = await apiFetch(`/api/workspaces/${workspaceId}/rapporter`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ rapportId: ny.id }),

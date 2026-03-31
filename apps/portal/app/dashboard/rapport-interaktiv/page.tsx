@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Download, FileSpreadsheet, Save } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -560,7 +561,7 @@ function FilterVerdiInput({
     setLaster(true);
     const params = new URLSearchParams({ viewNavn, kolonne });
     if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
-    fetch(`${API}/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' })
+    apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' })
       .then(async r => {
         if (!r.ok) {
           const body = await r.text().catch(() => '');
@@ -805,7 +806,7 @@ export default function RapportInteraktivPage() {
       } else {
         setTilgjengeligeKolonner(dataCols);
         if (f.viewNavn) {
-          fetch(`${API}/api/pbi/view-kolonner?viewNavn=${encodeURIComponent(f.viewNavn)}`)
+          apiFetch(`/api/pbi/view-kolonner?viewNavn=${encodeURIComponent(f.viewNavn)}`)
             .then(r => r.ok ? r.json() as Promise<{ kolonner: string[] }> : null)
             .then(d => { if (d?.kolonner?.length) setTilgjengeligeKolonner(d.kolonner); })
             .catch(() => {});
@@ -885,8 +886,8 @@ export default function RapportInteraktivPage() {
       let alleKolonner: { kolonne_navn: string; kolonne_type: string }[] = [];
       console.log('[Designer] henter kolonner for viewNavn:', viewNavn);
       try {
-        const r = await fetch(
-          `${API}/api/rapport-designer/view-kolonner?viewNavn=${encodeURIComponent(viewNavn)}`,
+        const r = await apiFetch(
+          `/api/rapport-designer/view-kolonner?viewNavn=${encodeURIComponent(viewNavn)}`,
           { credentials: 'include' },
         );
         console.log('[Designer] kolonner API status:', r.status);
@@ -962,7 +963,7 @@ export default function RapportInteraktivPage() {
         console.log('[Designer] initial SQL:', sql);
         setLasterData(true);
         try {
-          const res = await fetch(`${API}/api/pbi/query-sql`, {
+          const res = await apiFetch('/api/pbi/query-sql', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sql }),
@@ -1068,7 +1069,7 @@ export default function RapportInteraktivPage() {
         sql = byggSQL(cfg, vn, where);
       }
       console.log('[rapport-interaktiv] hentData SQL:', sql);
-      const res = await fetch(`${API}/api/pbi/query-sql`, {
+      const res = await apiFetch('/api/pbi/query-sql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql }),
@@ -1089,7 +1090,7 @@ export default function RapportInteraktivPage() {
   async function lastLagretRapport(rapportId: string, oid: string) {
     setEksisterendeRapportId(rapportId);
     try {
-      const res = await fetch(`${API}/api/rapport-designer/${rapportId}`, {
+      const res = await apiFetch(`/api/rapport-designer/${rapportId}`, {
         credentials: 'include',
         headers: { 'X-Entra-Object-Id': oid },
       });
@@ -1128,8 +1129,8 @@ export default function RapportInteraktivPage() {
       let alleViewKolonner = (cfg.alleViewKolonner as { kolonne_navn: string; kolonne_type: string }[]) ?? [];
       if (vn) {
         try {
-          const kolRes = await fetch(
-            `${API}/api/rapport-designer/view-kolonner?viewNavn=${encodeURIComponent(vn)}`,
+          const kolRes = await apiFetch(
+            `/api/rapport-designer/view-kolonner?viewNavn=${encodeURIComponent(vn)}`,
             { credentials: 'include' },
           );
           if (kolRes.ok) {
@@ -1521,7 +1522,7 @@ export default function RapportInteraktivPage() {
         ? `${API}/api/rapport-designer/${eksisterendeRapportId}`
         : `${API}/api/rapport-designer/lagre`;
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url.replace(API, ''), {
         method: erOppdatering ? 'PUT' : 'POST',
         credentials: 'include',
         headers,

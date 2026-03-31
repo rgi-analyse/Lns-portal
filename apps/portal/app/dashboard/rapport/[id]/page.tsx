@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 import dynamic from 'next/dynamic';
 import type { FilterConfig, SlicerConfig } from '@/components/AIChat';
 import LagRapportModal from '@/components/LagRapportModal';
@@ -50,7 +51,7 @@ export default function RapportPage() {
     async function load() {
       console.log('[RapportPage] laster rapport id:', id);
       // Hent rapport
-      const rapportRes = await fetch(`${API}/api/rapporter/${id}`);
+      const rapportRes = await apiFetch(`/api/rapporter/${id}`);
       if (!rapportRes.ok) throw new Error(`HTTP ${rapportRes.status}`);
       const loadedRapport = await rapportRes.json() as Rapport;
 
@@ -59,7 +60,7 @@ export default function RapportPage() {
         const url = new URL(`${API}/api/workspaces`);
         if (grupper.length > 0) url.searchParams.set('grupper', grupper.join(','));
 
-        const wsRes = await fetch(url.toString(), { headers: authHeaders });
+        const wsRes = await apiFetch(url.pathname + url.search, { headers: authHeaders });
         const accessible = await wsRes.json() as { id: string }[];
         const wsIds      = loadedRapport.workspaces.map((wr) => wr.workspace.id);
 
@@ -80,7 +81,7 @@ export default function RapportPage() {
       // Hent brukerens rolle for å avgjøre om "Lag rapport"-knappen skal vises
       if (entraObjectId) {
         try {
-          const megRes = await fetch(`${API}/api/meg`, { headers: authHeaders, credentials: 'include' });
+          const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string };
             setKanLageRapport(meg.rolle === 'admin' || meg.rolle === 'redaktør');

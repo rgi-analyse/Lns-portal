@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -33,7 +34,7 @@ export default function TopbarClient() {
     }
     // Entra-brukere: hent rolle fra /api/me
     if (!authHeaders['X-Entra-Object-Id']) return;
-    fetch(`${API}/api/me`, { headers: authHeaders })
+    apiFetch('/api/me', { headers: authHeaders })
       .then(async (r) => {
         if (!r.ok) return;
         const bruker = await r.json() as { rolle: string };

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/apiClient';
 import { X } from 'lucide-react';
 
 interface ViewInfo {
@@ -39,7 +40,7 @@ export default function LagRapportModal({
   const [fetchFeil, setFetchFeil] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/api/rapporter/${rapportId}/views`, {
+    apiFetch(`/api/rapporter/${rapportId}/views`, {
       credentials: 'include',
       headers: authHeaders,
     })
