@@ -799,11 +799,6 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         return;
       }
       const wb = XLSX.utils.book_new();
-      wb.Props = { Application: 'LNS Dataportal', AppVersion: '1.0' };
-      if (!wb.Workbook) wb.Workbook = {};
-      if (!wb.Workbook.WBView) wb.Workbook.WBView = [];
-      wb.Workbook.WBView[0] = { xWindow: 0, yWindow: 0, windowWidth: 19200, windowHeight: 10800, activeTab: 0 };
-
       for (const label of keys) {
         const rows = parseCSV(allData[label]);
         const ws = XLSX.utils.aoa_to_sheet(rows);
