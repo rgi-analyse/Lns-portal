@@ -787,11 +787,18 @@ export default function MetadataAdminPage() {
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Beskrivelse</label>
-            <input
+            <textarea
               value={kolForm.beskrivelse}
-              onChange={e => setKolForm(f => ({ ...f, beskrivelse: e.target.value }))}
+              onChange={e => {
+                setKolForm(f => ({ ...f, beskrivelse: e.target.value }));
+                e.target.style.height = 'auto';
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
+              ref={el => { if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; } }}
               placeholder="Forklaring av kolonnen til AI"
+              rows={1}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              style={{ resize: 'none', overflow: 'hidden', lineHeight: '1.5' }}
             />
           </div>
           <div>
