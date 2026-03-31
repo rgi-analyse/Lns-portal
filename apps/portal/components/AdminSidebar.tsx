@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Database, LayoutDashboard, Palette, Settings2, Users } from 'lucide-react';
+import { Building2, Database, LayoutDashboard, Palette, Settings2, Users, Globe } from 'lucide-react';
 
 const nav = [
   { href: '/admin',            label: 'Oversikt',   icon: Settings2, exact: true },
@@ -10,6 +10,7 @@ const nav = [
   { href: '/admin/brukere',    label: 'Brukere',    icon: Users },
   { href: '/admin/metadata',   label: 'Metadata',   icon: Database },
   { href: '/admin/tema',       label: 'Tema',       icon: Palette },
+  { href: '/admin/tenants',   label: 'Tenants',    icon: Globe },
 ];
 
 export default function AdminSidebar() {
