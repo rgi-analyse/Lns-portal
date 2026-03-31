@@ -190,7 +190,7 @@ export default function WorkspacePage() {
                   border: '1px solid rgba(245,166,35,0.25)',
                   borderRadius: 12,
                   fontFamily: 'Barlow Condensed, sans-serif',
-                  fontWeight: 800, fontSize: 15, color: '#F5A623',
+                  fontWeight: 800, fontSize: 15, color: 'var(--gold)',
                 }}
               >
                 {projectCode(workspace.navn)}
@@ -276,16 +276,16 @@ export default function WorkspacePage() {
                       width: 32, height: 32,
                       borderRadius: 7,
                       background: rapport.erDesignerRapport
-                        ? 'rgba(245,166,35,0.10)'
+                        ? 'var(--glass-gold-bg)'
                         : 'rgba(59,130,246,0.10)',
                       border: rapport.erDesignerRapport
-                        ? '1px solid rgba(245,166,35,0.20)'
+                        ? '1px solid var(--glass-gold-border)'
                         : '1px solid rgba(59,130,246,0.20)',
                       display: 'flex', alignItems: 'center',
                       justifyContent: 'center', flexShrink: 0,
                     }}>
                       {rapport.erDesignerRapport
-                        ? <BarChart2 className="w-3.5 h-3.5" style={{ color: '#F5A623' }} />
+                        ? <BarChart2 className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
                         : <FileBarChart2 className="w-3.5 h-3.5" style={{ color: '#60a5fa' }} />
                       }
                     </div>

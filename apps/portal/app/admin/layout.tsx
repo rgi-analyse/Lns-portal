@@ -32,9 +32,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <span
                   className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
                   style={{
-                    background: 'rgba(245,166,35,0.12)',
+                    background: 'var(--glass-gold-bg)',
                     border: '1px solid rgba(245,166,35,0.25)',
-                    color: '#F5A623',
+                    color: 'var(--gold)',
                   }}
                 >
                   Admin

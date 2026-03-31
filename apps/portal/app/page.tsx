@@ -197,7 +197,7 @@ export default function LoginPage() {
             style={{
               fontFamily:    'Barlow Condensed, sans-serif',
               fontWeight:    700,
-              color:         '#F5A623',
+              color:         'var(--gold)',
               fontSize:      11,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
@@ -236,7 +236,7 @@ export default function LoginPage() {
                   color:        'rgba(255,255,255,0.85)',
                   outline:      'none',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(245,166,35,0.12)'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                 onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
               />
             </div>
@@ -245,7 +245,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !email.trim()}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: '#F5A623', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: '#111D33' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fortsett'}
             </button>
@@ -324,7 +324,7 @@ export default function LoginPage() {
                     color:        'rgba(255,255,255,0.85)',
                     outline:      'none',
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(245,166,35,0.12)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                   onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
                 <button
@@ -343,7 +343,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !passord}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: '#F5A623', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: '#111D33' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Logg inn'}
             </button>
@@ -394,7 +394,7 @@ export default function LoginPage() {
                     color:        'rgba(255,255,255,0.85)',
                     outline:      'none',
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(245,166,35,0.12)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                   onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
               </div>
@@ -407,7 +407,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !nyttPassord || !bekreft}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: '#F5A623', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: '#111D33' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lagre og logg inn'}
             </button>

@@ -167,9 +167,9 @@ export default function TenantsAdminPage() {
           onClick={() => setNyOpen(true)}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-opacity"
           style={{
-            background: 'rgba(245,166,35,0.12)',
+            background: 'var(--glass-gold-bg)',
             border:     '1px solid rgba(245,166,35,0.30)',
-            color:      '#F5A623',
+            color:      'var(--gold)',
           }}
         >
           <Plus className="w-4 h-4" />
@@ -216,9 +216,9 @@ export default function TenantsAdminPage() {
                     <code
                       className="px-2 py-0.5 rounded text-xs font-mono"
                       style={{
-                        background: 'rgba(245,166,35,0.10)',
-                        border:     '1px solid rgba(245,166,35,0.20)',
-                        color:      '#F5A623',
+                        background: 'var(--glass-gold-bg)',
+                        border:     '1px solid var(--glass-gold-border)',
+                        color:      'var(--gold)',
                       }}
                     >
                       {t.slug}
@@ -352,7 +352,7 @@ export default function TenantsAdminPage() {
               type="submit"
               disabled={oppretter || !nyForm.slug || !nyForm.navn || !nyForm.databaseUrl}
               className="px-4 py-2 text-sm rounded-lg font-medium transition-opacity disabled:opacity-50"
-              style={{ background: 'rgba(245,166,35,0.15)', border: '1px solid rgba(245,166,35,0.35)', color: '#F5A623' }}
+              style={{ background: 'var(--gold-dim)', border: '1px solid rgba(245,166,35,0.35)', color: 'var(--gold)' }}
             >
               {oppretter ? 'Oppretter…' : 'Opprett tenant'}
             </button>
@@ -401,7 +401,7 @@ export default function TenantsAdminPage() {
               type="submit"
               disabled={lagrer || !editForm.navn.trim()}
               className="px-4 py-2 text-sm rounded-lg font-medium transition-opacity disabled:opacity-50"
-              style={{ background: 'rgba(245,166,35,0.15)', border: '1px solid rgba(245,166,35,0.35)', color: '#F5A623' }}
+              style={{ background: 'var(--gold-dim)', border: '1px solid rgba(245,166,35,0.35)', color: 'var(--gold)' }}
             >
               {lagrer ? 'Lagrer…' : 'Lagre'}
             </button>

@@ -37,7 +37,7 @@ export default function AdminSidebar() {
           alt="LNS"
           className="w-14 h-14 object-contain shrink-0"
         />
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, color: '#F5A623', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, color: 'var(--gold)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
           Analyseportal
         </div>
       </div>
@@ -72,10 +72,10 @@ export default function AdminSidebar() {
               href={href}
               className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
               style={active ? {
-                background: 'rgba(245,166,35,0.12)',
-                border: '1px solid rgba(245,166,35,0.20)',
+                background: 'var(--glass-gold-bg)',
+                border: '1px solid var(--glass-gold-border)',
                 color: '#FFFFFF',
-                borderLeft: '2px solid #F5A623',
+                borderLeft: '2px solid var(--gold)',
                 paddingLeft: 10,
               } : {
                 color: 'rgba(255,255,255,0.45)',

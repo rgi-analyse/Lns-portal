@@ -66,7 +66,7 @@ function NyRapportForm() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <div style={{
             width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-            background: 'rgba(245,166,35,0.12)',
+            background: 'var(--glass-gold-bg)',
             border: '1px solid rgba(245,166,35,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 20,
@@ -90,20 +90,20 @@ function NyRapportForm() {
         {/* Låst kontekst-info — ikke redigerbar */}
         <div style={{
           background: 'rgba(245,166,35,0.06)',
-          border: '1px solid rgba(245,166,35,0.15)',
+          border: '1px solid var(--gold-dim)',
           borderRadius: 8, padding: '10px 14px',
           marginBottom: 20,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
           <svg width="12" height="13" viewBox="0 0 12 13" fill="none" style={{ flexShrink: 0 }}>
-            <rect x="1" y="6" width="10" height="7" rx="1.5" stroke="#F5A623" strokeWidth="1.2"/>
-            <path d="M3.5 6V4a2.5 2.5 0 015 0v2" stroke="#F5A623" strokeWidth="1.2" strokeLinecap="round"/>
+            <rect x="1" y="6" width="10" height="7" rx="1.5" stroke="var(--gold)" strokeWidth="1.2"/>
+            <path d="M3.5 6V4a2.5 2.5 0 015 0v2" stroke="var(--gold)" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
             Data fra{' '}
-            <strong style={{ color: '#F5A623' }}>{visningsnavn}</strong>
+            <strong style={{ color: 'var(--gold)' }}>{visningsnavn}</strong>
             {prosjektNr && (
-              <> · Prosjekt <strong style={{ color: '#F5A623' }}>{prosjektNr}</strong></>
+              <> · Prosjekt <strong style={{ color: 'var(--gold)' }}>{prosjektNr}</strong></>
             )}
           </span>
         </div>
@@ -155,7 +155,7 @@ function NyRapportForm() {
             style={{
               padding: '8px 20px', fontSize: 13, borderRadius: 7,
               border: 'none',
-              background: kanStart ? '#F5A623' : 'rgba(245,166,35,0.25)',
+              background: kanStart ? 'var(--gold)' : 'rgba(245,166,35,0.25)',
               color: kanStart ? '#1a1a1a' : 'rgba(255,255,255,0.35)',
               cursor: kanStart ? 'pointer' : 'not-allowed',
               fontWeight: 700,

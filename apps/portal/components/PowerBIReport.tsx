@@ -911,7 +911,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       <div className="flex items-center justify-center h-screen">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 rounded-full animate-spin"
-            style={{ borderColor: 'rgba(245,166,35,0.20)', borderTopColor: '#F5A623' }} />
+            style={{ borderColor: 'var(--glass-gold-border)', borderTopColor: 'var(--gold)' }} />
           <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>Laster rapport...</p>
         </div>
       </div>
@@ -991,7 +991,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             </span>
           )}
           {autoSaveStatus === 'saved' && (
-            <span className="absolute left-1/2 -translate-x-1/2 text-xs font-medium pointer-events-none" style={{ color: '#F5A623' }}>
+            <span className="absolute left-1/2 -translate-x-1/2 text-xs font-medium pointer-events-none" style={{ color: 'var(--gold)' }}>
               ✓ Visning lagret
             </span>
           )}
@@ -1048,7 +1048,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                               onChange={() => toggleExcelKandidat(key)}
                               onClick={(e) => e.stopPropagation()}
                               className="w-3.5 h-3.5 flex-shrink-0 cursor-pointer"
-                              style={{ accentColor: '#F5A623' }}
+                              style={{ accentColor: 'var(--gold)' }}
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.88)' }}>{k.visualLabel}</p>
@@ -1075,7 +1075,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                         onClick={eksporterValgte}
                         disabled={excelValgte.size === 0 || excelLaster}
                         className="px-2.5 py-1 text-xs rounded-md font-semibold transition-colors disabled:opacity-40"
-                        style={{ background: 'rgba(245,166,35,0.20)', border: '1px solid rgba(245,166,35,0.40)', color: '#F5A623' }}
+                        style={{ background: 'var(--glass-gold-border)', border: '1px solid rgba(245,166,35,0.40)', color: 'var(--gold)' }}
                       >
                         Eksporter
                       </button>
@@ -1144,13 +1144,13 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               disabled={!report}
               className={btnTool}
               style={{
-                background: 'rgba(245,166,35,0.15)',
+                background: 'var(--gold-dim)',
                 border: '1px solid rgba(245,166,35,0.35)',
-                color: '#F5A623',
+                color: 'var(--gold)',
                 fontFamily: 'Barlow, system-ui, sans-serif',
               }}
               onMouseEnter={(e) => { if (report) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.25)'; } }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.15)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
             >
               <Maximize className="w-3.5 h-3.5" />
               Fullskjerm

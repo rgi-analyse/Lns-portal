@@ -24,9 +24,9 @@ export default function ProfilPage() {
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold select-none"
             style={{
-              background: 'rgba(245,166,35,0.15)',
+              background: 'var(--gold-dim)',
               border: '2px solid rgba(245,166,35,0.35)',
-              color: '#F5A623',
+              color: 'var(--gold)',
               fontFamily: 'Barlow Condensed, sans-serif',
               letterSpacing: '0.05em',
             }}

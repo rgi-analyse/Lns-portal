@@ -198,7 +198,7 @@ export default function RapportPreviewPage() {
           Tilbake
         </button>
 
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, color: '#F5A623', letterSpacing: '0.04em' }}>
+        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--gold)', letterSpacing: '0.04em' }}>
           ✏️ {tittel}
         </div>
 
@@ -217,7 +217,7 @@ export default function RapportPreviewPage() {
               onClick={lagreRapport}
               disabled={lagrer || laster}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'rgba(245,166,35,0.18)', border: '1px solid rgba(245,166,35,0.38)', color: '#F5A623' }}
+              style={{ background: 'rgba(245,166,35,0.18)', border: '1px solid rgba(245,166,35,0.38)', color: 'var(--gold)' }}
               onMouseEnter={(e) => { if (!lagrer && !laster) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.28)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.18)'; }}
             >
@@ -246,7 +246,7 @@ export default function RapportPreviewPage() {
         {laster && (
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(10,18,35,0.85)' }}>
             <div className="flex flex-col items-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#F5A623' }} />
+              <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--gold)' }} />
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>Kobler til datasett...</p>
             </div>
           </div>

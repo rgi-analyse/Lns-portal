@@ -48,7 +48,7 @@ interface AktivFilter {
 }
 
 const API    = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-const COLORS = ['#F5A623','#3B82F6','#10B981','#8B5CF6','#F43F5E','#06B6D4','#F97316','#84CC16'];
+const COLORS = ['var(--gold)','#3B82F6','#10B981','#8B5CF6','#F43F5E','#06B6D4','#F97316','#84CC16'];
 
 const VIS_TYPE_OPTIONS = [
   { type: 'bar',   ikon: '📊', navn: 'Stolpe' },
@@ -386,11 +386,11 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
           </g>
         );
       })}
-      {area && <path d={areaPath} fill="rgba(245,166,35,0.12)"/>}
-      <polyline points={polyline} fill="none" stroke="#F5A623" strokeWidth={2}/>
+      {area && <path d={areaPath} fill="var(--glass-gold-bg)"/>}
+      <polyline points={polyline} fill="none" stroke="var(--gold)" strokeWidth={2}/>
       {pts.map((p, i) => (
         <g key={i}>
-          <circle cx={p.x} cy={p.y} r={3} fill="#F5A623"/>
+          <circle cx={p.x} cy={p.y} r={3} fill="var(--gold)"/>
           {i%step===0 && <text x={p.x} y={padT+plotH+16} fontSize={10} textAnchor="middle" fill="rgba(255,255,255,0.40)">{p.label.slice(0,8)}</text>}
         </g>
       ))}
@@ -441,7 +441,7 @@ function CardChart({ data, yCol, yLabel }: { data: Record<string,unknown>[]; yCo
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220 }}>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:64, fontWeight:800, color:'#F5A623', fontFamily:'Barlow Condensed, sans-serif' }}>
+        <div style={{ fontSize:64, fontWeight:800, color:'var(--gold)', fontFamily:'Barlow Condensed, sans-serif' }}>
           {isNaN(num) ? String(val??'-') : num.toLocaleString('nb-NO')}
         </div>
         <div style={{ fontSize:15, color:'rgba(255,255,255,0.45)', marginTop:10 }}>{yLabel}</div>
@@ -681,7 +681,7 @@ function FilterVerdiInput({
               <div key={i} onClick={() => { onChange(v); setVisSok(false); setSok(''); }}
                 style={{
                   padding: '6px 10px', fontSize: 11, cursor: 'pointer',
-                  color: v === verdi ? '#F5A623' : 'rgba(255,255,255,0.7)',
+                  color: v === verdi ? 'var(--gold)' : 'rgba(255,255,255,0.7)',
                   background: v === verdi ? 'rgba(245,166,35,0.08)' : 'transparent',
                   borderBottom: '1px solid rgba(255,255,255,0.03)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -1586,7 +1586,7 @@ export default function RapportInteraktivPage() {
           <ArrowLeft style={{ width:14, height:14 }}/> Tilbake
         </button>
 
-        <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:15, color:'#F5A623', letterSpacing:'0.04em' }}>
+        <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:15, color:'var(--gold)', letterSpacing:'0.04em' }}>
           {forslag.tittel}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', flex:1, minWidth:0 }}>
@@ -1603,14 +1603,14 @@ export default function RapportInteraktivPage() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '3px 10px 3px 8px', borderRadius: 12,
-                background: 'rgba(245,166,35,0.10)',
+                background: 'var(--glass-gold-bg)',
                 border: '1px solid rgba(245,166,35,0.30)',
-                color: '#F5A623', fontSize: 11, fontWeight: 600,
+                color: 'var(--gold)', fontSize: 11, fontWeight: 600,
                 letterSpacing: '0.02em', userSelect: 'none', whiteSpace: 'nowrap',
               }}>
                 <svg width="10" height="11" viewBox="0 0 10 11" fill="none" style={{ flexShrink: 0 }}>
-                  <rect x="1.5" y="5" width="7" height="5.5" rx="1" stroke="#F5A623" strokeWidth="1.2"/>
-                  <path d="M3 5V3.5a2 2 0 014 0V5" stroke="#F5A623" strokeWidth="1.2" strokeLinecap="round"/>
+                  <rect x="1.5" y="5" width="7" height="5.5" rx="1" stroke="var(--gold)" strokeWidth="1.2"/>
+                  <path d="M3 5V3.5a2 2 0 014 0V5" stroke="var(--gold)" strokeWidth="1.2" strokeLinecap="round"/>
                 </svg>
                 {pKol && pNr
                   ? `${pKol} = ${pNr}`
@@ -1624,22 +1624,22 @@ export default function RapportInteraktivPage() {
             <span key={i} style={{
               fontSize: 11, fontWeight: 600,
               padding: '2px 8px', borderRadius: 12,
-              background: 'rgba(245,166,35,0.10)',
+              background: 'var(--glass-gold-bg)',
               border: '1px solid rgba(245,166,35,0.25)',
-              color: '#F5A623', letterSpacing: '0.02em',
+              color: 'var(--gold)', letterSpacing: '0.02em',
               whiteSpace: 'nowrap',
             }}>
               {badge}
             </span>
           ))}
-          {lasterData && <span style={{ fontSize:11, color:'#F5A623', whiteSpace:'nowrap' }}>↻ oppdaterer...</span>}
+          {lasterData && <span style={{ fontSize:11, color:'var(--gold)', whiteSpace:'nowrap' }}>↻ oppdaterer...</span>}
         </div>
 
         <button type="button" onClick={lagreRapport} disabled={lagrer}
           style={{ display:'flex', alignItems:'center', gap:6,
-            background: lagret ? 'rgba(34,197,94,0.12)' : 'rgba(245,166,35,0.12)',
+            background: lagret ? 'rgba(34,197,94,0.12)' : 'var(--glass-gold-bg)',
             border: lagret ? '1px solid rgba(34,197,94,0.30)' : '1px solid rgba(245,166,35,0.30)',
-            color: lagret ? '#4ade80' : '#F5A623',
+            color: lagret ? '#4ade80' : 'var(--gold)',
             padding:'7px 16px', borderRadius:8, fontSize:13, fontWeight:600,
             cursor: lagrer ? 'not-allowed' : 'pointer', opacity: lagrer ? 0.6 : 1,
           }}>
@@ -1648,13 +1648,13 @@ export default function RapportInteraktivPage() {
         </button>
 
         <button type="button" onClick={()=>setVisRediger(v=>!v)}
-          style={{ background:visRediger?'rgba(245,166,35,0.15)':'rgba(255,255,255,0.05)', border:visRediger?'1px solid rgba(245,166,35,0.3)':'1px solid rgba(255,255,255,0.10)', color:visRediger?'#F5A623':'rgba(255,255,255,0.6)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          style={{ background:visRediger?'var(--gold-dim)':'rgba(255,255,255,0.05)', border:visRediger?'1px solid rgba(245,166,35,0.3)':'1px solid rgba(255,255,255,0.10)', color:visRediger?'var(--gold)':'rgba(255,255,255,0.6)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
           ✏️ {visRediger ? 'Skjul rediger' : 'Rediger'}
         </button>
 
         {config.visualType!=='table' && (
           <button type="button" onClick={()=>setVisTabell(v=>!v)}
-            style={{ background:visTabell?'rgba(245,166,35,0.20)':'rgba(255,255,255,0.05)', border:`1px solid ${visTabell?'rgba(245,166,35,0.38)':'rgba(255,255,255,0.12)'}`, color:visTabell?'#F5A623':'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            style={{ background:visTabell?'var(--glass-gold-border)':'rgba(255,255,255,0.05)', border:`1px solid ${visTabell?'rgba(245,166,35,0.38)':'rgba(255,255,255,0.12)'}`, color:visTabell?'var(--gold)':'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
             {visTabell ? 'Skjul tabell' : 'Vis tabell'}
           </button>
         )}
@@ -1750,7 +1750,7 @@ export default function RapportInteraktivPage() {
           {/* ── Rediger-panel ── */}
           {visRediger && (
             <div className="rapport-rediger-panel" style={{ width:280, flexShrink:0, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:14, color:'#F5A623', letterSpacing:'0.06em', textTransform:'uppercase' }}>
+              <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:14, color:'var(--gold)', letterSpacing:'0.06em', textTransform:'uppercase' }}>
                 ⚙ Rediger rapport
               </div>
 
@@ -1760,7 +1760,7 @@ export default function RapportInteraktivPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                   {VIS_TYPE_OPTIONS.map(v => (
                     <button key={v.type} type="button" onClick={()=>setConfig(p=>p?{...p,visualType:v.type}:p)}
-                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid rgba(245,166,35,0.4)':'1px solid rgba(255,255,255,0.08)', background:config.visualType===v.type?'rgba(245,166,35,0.12)':'rgba(255,255,255,0.04)', color:config.visualType===v.type?'#F5A623':'rgba(255,255,255,0.5)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid rgba(245,166,35,0.4)':'1px solid rgba(255,255,255,0.08)', background:config.visualType===v.type?'var(--glass-gold-bg)':'rgba(255,255,255,0.04)', color:config.visualType===v.type?'var(--gold)':'rgba(255,255,255,0.5)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:18 }}>{v.ikon}</span><span>{v.navn}</span>
                     </button>
                   ))}
@@ -1831,8 +1831,8 @@ export default function RapportInteraktivPage() {
                         style={{
                           padding:'7px 6px', borderRadius:7, cursor:'pointer',
                           border: config.aggregering===a.verdi ? '1px solid rgba(245,166,35,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                          background: config.aggregering===a.verdi ? 'rgba(245,166,35,0.12)' : 'rgba(255,255,255,0.04)',
-                          color: config.aggregering===a.verdi ? '#F5A623' : 'rgba(255,255,255,0.5)',
+                          background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'rgba(255,255,255,0.04)',
+                          color: config.aggregering===a.verdi ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
                           fontSize:11, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
                           fontFamily:'Barlow, sans-serif',
                         }}>
@@ -1868,10 +1868,10 @@ export default function RapportInteraktivPage() {
                       const type      = kolonnTyper[kol] ?? 'dimensjon';
                       const checked   = valgteKolonner.includes(kol);
                       const typeIkon  = type==='measure' ? 'Σ' : type==='dato' ? '⌚' : type==='id' ? '#' : '≡';
-                      const typeColor = type==='measure' ? '#F5A623' : type==='dato' ? 'rgba(110,231,183,0.9)' : type==='id' ? 'rgba(200,200,200,0.5)' : 'rgba(147,197,253,0.9)';
+                      const typeColor = type==='measure' ? 'var(--gold)' : type==='dato' ? 'rgba(110,231,183,0.9)' : type==='id' ? 'rgba(200,200,200,0.5)' : 'rgba(147,197,253,0.9)';
                       return (
                         <label key={kol} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'rgba(255,255,255,0.65)', cursor:'pointer', padding:'2px 0' }}>
-                          <input type="checkbox" checked={checked} style={{ accentColor:'#F5A623', flexShrink:0 }}
+                          <input type="checkbox" checked={checked} style={{ accentColor:'var(--gold)', flexShrink:0 }}
                             onChange={e => {
                               setValgteKolonner(prev =>
                                 e.target.checked ? [...prev, kol] : prev.filter(k => k !== kol)
@@ -1910,7 +1910,7 @@ export default function RapportInteraktivPage() {
                 <label style={labelStyle}>Maks rader: {config.maksRader}</label>
                 <input type="range" min="5" max="200" step="5" value={config.maksRader}
                   onChange={e=>setConfig(p=>p?{...p,maksRader:parseInt(e.target.value)}:p)}
-                  style={{ width:'100%', accentColor:'#F5A623' }}/>
+                  style={{ width:'100%', accentColor:'var(--gold)' }}/>
                 <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:2 }}>
                   <span>5</span><span>200</span>
                 </div>

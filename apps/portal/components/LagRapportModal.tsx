@@ -215,7 +215,7 @@ export default function LagRapportModal({
                       value={v.id}
                       checked={valgtViewId === v.id}
                       onChange={() => setValgtViewId(v.id)}
-                      style={{ accentColor: '#F5A623' }}
+                      style={{ accentColor: 'var(--gold)' }}
                     />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
@@ -258,7 +258,7 @@ export default function LagRapportModal({
             style={{
               padding: '7px 16px', fontSize: 13, borderRadius: 7,
               border: 'none',
-              background: erDeaktivert ? 'rgba(245,166,35,0.25)' : '#F5A623',
+              background: erDeaktivert ? 'rgba(245,166,35,0.25)' : 'var(--gold)',
               color: erDeaktivert ? 'rgba(255,255,255,0.35)' : '#1a1a1a',
               cursor: erDeaktivert ? 'not-allowed' : 'pointer',
               fontWeight: 600,

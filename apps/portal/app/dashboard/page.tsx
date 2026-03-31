@@ -42,9 +42,9 @@ const statCards = [
     label: 'Rapporter',
     key: 'rapporter' as const,
     Icon: FileBarChart2,
-    iconBg: 'rgba(245,166,35,0.12)',
-    iconBorder: 'rgba(245,166,35,0.20)',
-    iconColor: '#F5A623',
+    iconBg: 'var(--glass-gold-bg)',
+    iconBorder: 'var(--glass-gold-border)',
+    iconColor: 'var(--gold)',
   },
   {
     label: 'Tilganger',
@@ -162,7 +162,7 @@ export default function DashboardPage() {
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.07)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(245,166,35,0.20)';
+                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
@@ -226,9 +226,9 @@ export default function DashboardPage() {
                 onClick={() => setFilter(val)}
                 className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
                 style={filter === val ? {
-                  background: 'rgba(245,166,35,0.12)',
+                  background: 'var(--glass-gold-bg)',
                   border: '1px solid rgba(245,166,35,0.25)',
-                  color: '#F5A623',
+                  color: 'var(--gold)',
                 } : {
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.08)',
@@ -309,10 +309,10 @@ export default function DashboardPage() {
                     style={{
                       width: 44, height: 44,
                       background: 'linear-gradient(135deg, rgba(27,42,74,0.8), rgba(36,53,86,0.8))',
-                      border: '1px solid rgba(245,166,35,0.20)',
+                      border: '1px solid var(--glass-gold-border)',
                       borderRadius: 10,
                       fontFamily: 'Barlow Condensed, sans-serif',
-                      fontWeight: 800, fontSize: 13, color: '#F5A623',
+                      fontWeight: 800, fontSize: 13, color: 'var(--gold)',
                     }}
                   >
                     {projectCode(ws.navn)}
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                       border: 'none',
                       padding: '4px',
                       cursor: 'pointer',
-                      color: favoritter.includes(ws.id) ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                      color: favoritter.includes(ws.id) ? 'var(--gold)' : 'rgba(255,255,255,0.25)',
                       transition: 'color 0.15s',
                     }}
                     onMouseEnter={(e) => {
@@ -354,8 +354,8 @@ export default function DashboardPage() {
                   >
                     <Star
                       size={16}
-                      fill={favoritter.includes(ws.id) ? '#F5A623' : 'none'}
-                      stroke={favoritter.includes(ws.id) ? '#F5A623' : 'currentColor'}
+                      fill={favoritter.includes(ws.id) ? 'var(--gold)' : 'none'}
+                      stroke={favoritter.includes(ws.id) ? 'var(--gold)' : 'currentColor'}
                     />
                   </button>
 

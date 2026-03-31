@@ -110,7 +110,7 @@ export default function Sidebar() {
           <div style={{
             fontFamily: 'Barlow Condensed, sans-serif',
             fontWeight: 700,
-            color: '#F5A623',
+            color: 'var(--gold)',
             fontSize: 9,
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
@@ -147,10 +147,10 @@ export default function Sidebar() {
           href="/dashboard"
           className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all relative', collapsed && 'justify-center')}
           style={isActive('/dashboard') ? {
-            background: 'rgba(245,166,35,0.12)',
-            border: '1px solid rgba(245,166,35,0.20)',
+            background: 'var(--glass-gold-bg)',
+            border: '1px solid var(--glass-gold-border)',
             color: '#FFFFFF',
-            borderLeft: '2px solid #F5A623',
+            borderLeft: '2px solid var(--gold)',
             paddingLeft: collapsed ? undefined : '10px',
           } : {
             color: 'rgba(255,255,255,0.65)',
@@ -216,7 +216,7 @@ export default function Sidebar() {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
                     style={wsActive ? {
                       background: 'rgba(245,166,35,0.06)',
-                      border: '1px solid rgba(245,166,35,0.12)',
+                      border: '1px solid var(--glass-gold-bg)',
                       color: 'rgba(255,255,255,0.8)',
                     } : {
                       color: 'rgba(255,255,255,0.65)',
@@ -242,9 +242,9 @@ export default function Sidebar() {
                       <span
                         className="w-7 h-6 rounded flex items-center justify-center text-[11px] shrink-0"
                         style={{
-                          background: ws.erPersonlig ? 'rgba(245,166,35,0.18)' : 'rgba(245,166,35,0.10)',
-                          border: ws.erPersonlig ? '1px solid rgba(245,166,35,0.35)' : '1px solid rgba(245,166,35,0.20)',
-                          color: '#F5A623',
+                          background: ws.erPersonlig ? 'rgba(245,166,35,0.18)' : 'var(--glass-gold-bg)',
+                          border: ws.erPersonlig ? '1px solid rgba(245,166,35,0.35)' : '1px solid var(--glass-gold-border)',
+                          color: 'var(--gold)',
                           fontFamily: 'Barlow Condensed',
                           fontWeight: 700,
                         }}
@@ -255,9 +255,9 @@ export default function Sidebar() {
                       {ws.erPersonlig && (
                         <span style={{
                           fontSize: 9, fontWeight: 700, letterSpacing: '0.10em',
-                          textTransform: 'uppercase', color: '#F5A623',
-                          background: 'rgba(245,166,35,0.10)',
-                          border: '1px solid rgba(245,166,35,0.2)',
+                          textTransform: 'uppercase', color: 'var(--gold)',
+                          background: 'var(--glass-gold-bg)',
+                          border: '1px solid var(--glass-gold-border)',
                           borderRadius: 4, padding: '1px 5px', flexShrink: 0,
                         }}>
                           Mine
@@ -305,9 +305,9 @@ export default function Sidebar() {
                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
                             style={active ? {
                               background: 'rgba(245,166,35,0.08)',
-                              border: '1px solid rgba(245,166,35,0.15)',
-                              color: '#F5A623',
-                              borderLeft: '2px solid #F5A623',
+                              border: '1px solid var(--gold-dim)',
+                              color: 'var(--gold)',
+                              borderLeft: '2px solid var(--gold)',
                               paddingLeft: '10px',
                             } : {
                               color: 'rgba(255,255,255,0.55)',
@@ -327,7 +327,7 @@ export default function Sidebar() {
                           >
                             <span
                               className="w-1 h-1 rounded-full shrink-0"
-                              style={{ background: active ? '#F5A623' : 'rgba(255,255,255,0.40)' }}
+                              style={{ background: active ? 'var(--gold)' : 'rgba(255,255,255,0.40)' }}
                             />
                             <span className="truncate">{rapport.navn}</span>
                           </Link>

@@ -658,7 +658,7 @@ export default function WorkspaceRapporterPage() {
                       <div className="flex-1 min-w-0">
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.90)' }}>{v.visningsnavn}</span>
                         {v.område && (
-                          <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(245,166,35,0.10)', border: '1px solid rgba(245,166,35,0.20)', color: '#F5A623', display: 'inline-block' }}>
+                          <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)', color: 'var(--gold)', display: 'inline-block' }}>
                             {v.område}
                           </span>
                         )}
@@ -709,9 +709,9 @@ export default function WorkspaceRapporterPage() {
                     disabled={!nyViewId}
                     style={{
                       padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, flexShrink: 0,
-                      background: nyViewId ? 'rgba(245,166,35,0.15)' : 'rgba(255,255,255,0.04)',
+                      background: nyViewId ? 'var(--gold-dim)' : 'rgba(255,255,255,0.04)',
                       border: nyViewId ? '1px solid rgba(245,166,35,0.30)' : '1px solid rgba(255,255,255,0.08)',
-                      color: nyViewId ? '#F5A623' : 'rgba(255,255,255,0.30)',
+                      color: nyViewId ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
                       cursor: nyViewId ? 'pointer' : 'not-allowed',
                       transition: 'all 0.15s',
                     }}

@@ -45,9 +45,9 @@ export default function AdminOverviewPage() {
       label: 'Rapporter',
       value: stats?.rapporter,
       icon: FileBarChart2,
-      iconBg: 'rgba(245,166,35,0.12)',
-      iconBorder: 'rgba(245,166,35,0.20)',
-      iconColor: '#F5A623',
+      iconBg: 'var(--glass-gold-bg)',
+      iconBorder: 'var(--glass-gold-border)',
+      iconColor: 'var(--gold)',
     },
     {
       label: 'Tilganger',
@@ -145,12 +145,12 @@ export default function AdminOverviewPage() {
             href="/admin/workspaces"
             className="inline-flex items-center gap-1 h-7 px-3 text-xs rounded-lg font-medium transition-colors"
             style={{
-              background: 'rgba(245,166,35,0.12)',
+              background: 'var(--glass-gold-bg)',
               border: '1px solid rgba(245,166,35,0.25)',
-              color: '#F5A623',
+              color: 'var(--gold)',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(245,166,35,0.20)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(245,166,35,0.12)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-gold-border)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-gold-bg)'; }}
           >
             Administrer <ArrowRight className="w-3 h-3" />
           </Link>

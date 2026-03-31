@@ -559,11 +559,11 @@ export default function AIChat({
               <div
                 className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
                 style={{
-                  background: 'rgba(245,166,35,0.12)',
+                  background: 'var(--glass-gold-bg)',
                   border: '1px solid rgba(245,166,35,0.25)',
                 }}
               >
-                <MessageCircle className="w-3.5 h-3.5" style={{ color: '#F5A623' }} />
+                <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
               </div>
               <div>
                 <div style={{
@@ -608,9 +608,9 @@ export default function AIChat({
                 title={autoOpplesing ? 'Slå av automatisk opplesing' : 'Slå på automatisk opplesing'}
                 className="rounded p-1 transition-colors"
                 style={{
-                  background: autoOpplesing ? 'rgba(245,166,35,0.12)' : 'transparent',
+                  background: autoOpplesing ? 'var(--glass-gold-bg)' : 'transparent',
                   border: autoOpplesing ? '1px solid rgba(245,166,35,0.25)' : '1px solid transparent',
-                  color: autoOpplesing ? '#F5A623' : 'rgba(255,255,255,0.30)',
+                  color: autoOpplesing ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
                 }}
               >
                 <Volume2 className="w-3.5 h-3.5" />
@@ -698,7 +698,7 @@ export default function AIChat({
                   setTtsInstillinger(ny);
                   lagreInnstillinger(ny); // debounced 1 sek
                 }}
-                style={{ width: '100%', marginBottom: 12, accentColor: '#F5A623' }}
+                style={{ width: '100%', marginBottom: 12, accentColor: 'var(--gold)' }}
               />
 
               {/* Test-knapp */}
@@ -706,7 +706,7 @@ export default function AIChat({
                 onClick={() => lesOppTekst('Hei! Dette er en test av tale-innstillingene.')}
                 style={{
                   width: '100%', padding: '7px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  background: 'rgba(245,166,35,0.12)', border: '1px solid rgba(245,166,35,0.30)', color: '#F5A623',
+                  background: 'var(--glass-gold-bg)', border: '1px solid rgba(245,166,35,0.30)', color: 'var(--gold)',
                 }}
               >
                 🔊 Test stemme
@@ -724,7 +724,7 @@ export default function AIChat({
                 className="rounded-lg px-3 py-2 text-xs"
                 style={{
                   background: 'rgba(245,166,35,0.08)',
-                  border: '1px solid rgba(245,166,35,0.20)',
+                  border: '1px solid var(--glass-gold-border)',
                   color: 'rgba(245,166,35,0.85)',
                 }}
               >
@@ -752,7 +752,7 @@ export default function AIChat({
                   const yCol = f.yAkse ?? Object.keys(f.data[0])[0];
                   const val  = f.data[0][yCol];
                   return (
-                    <div style={{ textAlign: 'center', padding: '8px 0', fontSize: 22, fontWeight: 700, color: '#F5A623' }}>
+                    <div style={{ textAlign: 'center', padding: '8px 0', fontSize: 22, fontWeight: 700, color: 'var(--gold)' }}>
                       {typeof val === 'number' ? val.toLocaleString('nb-NO') : String(val ?? '')}
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', fontWeight: 400 }}>{yCol}</div>
                     </div>
@@ -763,7 +763,7 @@ export default function AIChat({
                   const valCol   = f.yAkse ?? Object.keys(f.data[0])[1] ?? Object.keys(f.data[0])[0];
                   const slices   = f.data.slice(0, 6).map(r => ({ label: String(r[labelCol] ?? ''), val: Math.abs(Number(r[valCol]) || 0) }));
                   const total    = slices.reduce((s, x) => s + x.val, 0) || 1;
-                  const colors   = ['#F5A623','#3B82F6','#10B981','#8B5CF6','#F43F5E','#06B6D4'];
+                  const colors   = ['var(--gold)','#3B82F6','#10B981','#8B5CF6','#F43F5E','#06B6D4'];
                   let cumAngle = -Math.PI / 2;
                   const cx = 36, cy = 36, r = 30;
                   const paths = slices.map((s, idx) => {
@@ -802,11 +802,11 @@ export default function AIChat({
                   }).join(' ');
                   return (
                     <svg width={W} height={H} style={{ display: 'block' }}>
-                      <polyline points={pts} fill="none" stroke="#F5A623" strokeWidth={1.5} opacity={0.85} />
+                      <polyline points={pts} fill="none" stroke="var(--gold)" strokeWidth={1.5} opacity={0.85} />
                       {preview.map((r, idx) => {
                         const x = pad + idx * barW + barW / 2;
                         const y = pad + barH - (vals[idx] / maxVal) * barH;
-                        return <circle key={idx} cx={x} cy={y} r={2.5} fill="#F5A623" />;
+                        return <circle key={idx} cx={x} cy={y} r={2.5} fill="var(--gold)" />;
                       })}
                       {preview.map((r, idx) => (
                         <text key={`l${idx}`} x={pad + idx * barW + barW / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="rgba(255,255,255,0.35)">
@@ -825,7 +825,7 @@ export default function AIChat({
                       const y  = pad + barH - bh;
                       return (
                         <g key={idx}>
-                          <rect x={x} y={y} width={Math.max(1, barW - 2)} height={bh} fill="#F5A623" opacity={0.75} rx={1} />
+                          <rect x={x} y={y} width={Math.max(1, barW - 2)} height={bh} fill="var(--gold)" opacity={0.75} rx={1} />
                           <text x={x + (barW - 2) / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="rgba(255,255,255,0.35)">
                             {String(r[xCol] ?? '').slice(0, 6)}
                           </text>
@@ -842,10 +842,10 @@ export default function AIChat({
                     className="w-full max-w-[95%] rounded-xl p-3 text-sm"
                     style={{
                       background: 'rgba(245,166,35,0.07)',
-                      border: '1px solid rgba(245,166,35,0.22)',
+                      border: '1px solid var(--glass-gold-border)',
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: 13, color: '#F5A623', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--gold)', marginBottom: 4 }}>
                       📊 {f.tittel}
                     </div>
                     {f.beskrivelse && (
@@ -870,13 +870,13 @@ export default function AIChat({
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); visRapportFullskjerm(f); }}
                         className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                         style={{
-                          background: 'rgba(245,166,35,0.20)',
+                          background: 'var(--glass-gold-border)',
                           border: '1px solid rgba(245,166,35,0.40)',
-                          color: '#F5A623',
+                          color: 'var(--gold)',
                           cursor: 'pointer',
                         }}
                         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.30)'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.20)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                       >
                         Vis fullskjerm
                       </button>
@@ -922,12 +922,12 @@ export default function AIChat({
                       onClick={() => exportToCsv(msg.queryData!, `eksport-${new Date().toISOString().slice(0, 10)}`)}
                       className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors font-semibold"
                       style={{
-                        background: 'rgba(245,166,35,0.20)',
+                        background: 'var(--glass-gold-border)',
                         border: '1px solid rgba(245,166,35,0.35)',
-                        color: '#F5A623',
+                        color: 'var(--gold)',
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.30)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.20)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                     >
                       <Download className="w-3 h-3" />
                       Last ned Excel (CSV)
@@ -955,7 +955,7 @@ export default function AIChat({
                       style={
                         msg.role === 'user'
                           ? {
-                              background: 'rgba(245,166,35,0.15)',
+                              background: 'var(--gold-dim)',
                               border: '1px solid rgba(245,166,35,0.25)',
                               color: 'rgba(255,255,255,0.90)',
                               borderRadius: '10px 10px 3px 10px',
@@ -1081,9 +1081,9 @@ export default function AIChat({
               disabled={loading || !input.trim()}
               className="px-3 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: 'rgba(245,166,35,0.15)',
+                background: 'var(--gold-dim)',
                 border: '1px solid rgba(245,166,35,0.30)',
-                color: '#F5A623',
+                color: 'var(--gold)',
                 borderRadius: 7,
               }}
               onMouseEnter={(e) => {
@@ -1092,7 +1092,7 @@ export default function AIChat({
                 }
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.15)';
+                (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)';
               }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -1112,7 +1112,7 @@ export default function AIChat({
           boxShadow: '0 4px 20px rgba(245,166,35,0.35)',
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,1)';
+          (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
           (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 24px rgba(245,166,35,0.50)';
         }}
         onMouseLeave={(e) => {
