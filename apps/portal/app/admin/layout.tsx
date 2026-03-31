@@ -33,7 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
                   style={{
                     background: 'var(--glass-gold-bg)',
-                    border: '1px solid rgba(245,166,35,0.25)',
+                    border: '1px solid var(--glass-gold-border)',
                     color: 'var(--gold)',
                   }}
                 >

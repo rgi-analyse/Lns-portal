@@ -187,7 +187,7 @@ export default function WorkspacePage() {
                 style={{
                   width: 52, height: 52,
                   background: 'linear-gradient(135deg, rgba(27,42,74,0.8), rgba(36,53,86,0.8))',
-                  border: '1px solid rgba(245,166,35,0.25)',
+                  border: '1px solid var(--glass-gold-border)',
                   borderRadius: 12,
                   fontFamily: 'Barlow Condensed, sans-serif',
                   fontWeight: 800, fontSize: 15, color: 'var(--gold)',
@@ -303,7 +303,7 @@ export default function WorkspacePage() {
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             background: 'rgba(255,255,255,0.08)',
-                            border: '1px solid rgba(245,166,35,0.40)',
+                            border: '1px solid var(--gold-dim)',
                             borderRadius: 5,
                             padding: '3px 8px',
                             color: 'rgba(255,255,255,0.90)',

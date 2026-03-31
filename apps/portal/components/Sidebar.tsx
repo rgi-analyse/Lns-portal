@@ -215,7 +215,7 @@ export default function Sidebar() {
                   <div
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
                     style={wsActive ? {
-                      background: 'rgba(245,166,35,0.06)',
+                      background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-bg)',
                       color: 'rgba(255,255,255,0.8)',
                     } : {
@@ -242,8 +242,8 @@ export default function Sidebar() {
                       <span
                         className="w-7 h-6 rounded flex items-center justify-center text-[11px] shrink-0"
                         style={{
-                          background: ws.erPersonlig ? 'rgba(245,166,35,0.18)' : 'var(--glass-gold-bg)',
-                          border: ws.erPersonlig ? '1px solid rgba(245,166,35,0.35)' : '1px solid var(--glass-gold-border)',
+                          background: ws.erPersonlig ? 'var(--gold-dim)' : 'var(--glass-gold-bg)',
+                          border: ws.erPersonlig ? '1px solid var(--gold-dim)' : '1px solid var(--glass-gold-border)',
                           color: 'var(--gold)',
                           fontFamily: 'Barlow Condensed',
                           fontWeight: 700,
@@ -304,7 +304,7 @@ export default function Sidebar() {
                             href={href}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
                             style={active ? {
-                              background: 'rgba(245,166,35,0.08)',
+                              background: 'var(--gold-dim)',
                               border: '1px solid var(--gold-dim)',
                               color: 'var(--gold)',
                               borderLeft: '2px solid var(--gold)',

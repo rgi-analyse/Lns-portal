@@ -146,7 +146,7 @@ export default function AdminOverviewPage() {
             className="inline-flex items-center gap-1 h-7 px-3 text-xs rounded-lg font-medium transition-colors"
             style={{
               background: 'var(--glass-gold-bg)',
-              border: '1px solid rgba(245,166,35,0.25)',
+              border: '1px solid var(--glass-gold-border)',
               color: 'var(--gold)',
             }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-gold-border)'; }}

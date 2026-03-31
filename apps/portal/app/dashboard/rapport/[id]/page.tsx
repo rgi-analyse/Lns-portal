@@ -163,20 +163,20 @@ export default function RapportPage() {
             title="Lag rapport"
             style={{
               width: 48, height: 48, borderRadius: '50%',
-              background: 'rgba(245,166,35,0.90)',
+              background: 'var(--gold)',
               border: 'none', color: '#0a1628',
               fontSize: 24, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(245,166,35,0.40)',
+              boxShadow: '0 4px 16px var(--gold-dim)',
               transition: 'all 0.2s', lineHeight: 1,
             }}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.1)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px rgba(245,166,35,0.60)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 20px var(--gold-dim)';
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px rgba(245,166,35,0.40)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 16px var(--gold-dim)';
             }}
           >
             +

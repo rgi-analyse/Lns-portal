@@ -710,7 +710,7 @@ export default function WorkspaceRapporterPage() {
                     style={{
                       padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, flexShrink: 0,
                       background: nyViewId ? 'var(--gold-dim)' : 'rgba(255,255,255,0.04)',
-                      border: nyViewId ? '1px solid rgba(245,166,35,0.30)' : '1px solid rgba(255,255,255,0.08)',
+                      border: nyViewId ? '1px solid var(--gold-dim)' : '1px solid rgba(255,255,255,0.08)',
                       color: nyViewId ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
                       cursor: nyViewId ? 'pointer' : 'not-allowed',
                       transition: 'all 0.15s',

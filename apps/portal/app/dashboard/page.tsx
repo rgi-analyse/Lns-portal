@@ -227,7 +227,7 @@ export default function DashboardPage() {
                 className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
                 style={filter === val ? {
                   background: 'var(--glass-gold-bg)',
-                  border: '1px solid rgba(245,166,35,0.25)',
+                  border: '1px solid var(--glass-gold-border)',
                   color: 'var(--gold)',
                 } : {
                   background: 'rgba(255,255,255,0.04)',
@@ -296,7 +296,7 @@ export default function DashboardPage() {
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
-                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(245,166,35,0.25)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
@@ -345,7 +345,7 @@ export default function DashboardPage() {
                     }}
                     onMouseEnter={(e) => {
                       if (!favoritter.includes(ws.id))
-                        (e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,166,35,0.60)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--gold-dim)';
                     }}
                     onMouseLeave={(e) => {
                       if (!favoritter.includes(ws.id))

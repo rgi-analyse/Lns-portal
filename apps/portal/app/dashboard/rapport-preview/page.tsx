@@ -182,8 +182,8 @@ export default function RapportPreviewPage() {
       <div
         className="shrink-0 flex items-center gap-3 px-5 py-2.5"
         style={{
-          background: 'rgba(245,166,35,0.06)',
-          borderBottom: '1px solid rgba(245,166,35,0.18)',
+          background: 'var(--gold-dim)',
+          borderBottom: '1px solid var(--gold-dim)',
         }}
       >
         <button
@@ -217,9 +217,9 @@ export default function RapportPreviewPage() {
               onClick={lagreRapport}
               disabled={lagrer || laster}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'rgba(245,166,35,0.18)', border: '1px solid rgba(245,166,35,0.38)', color: 'var(--gold)' }}
-              onMouseEnter={(e) => { if (!lagrer && !laster) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.28)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.18)'; }}
+              style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold-dim)', color: 'var(--gold)' }}
+              onMouseEnter={(e) => { if (!lagrer && !laster) (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
             >
               {lagrer ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {lagrer ? 'Lagrer...' : 'Lagre rapport'}

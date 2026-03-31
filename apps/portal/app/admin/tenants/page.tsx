@@ -168,7 +168,7 @@ export default function TenantsAdminPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-opacity"
           style={{
             background: 'var(--glass-gold-bg)',
-            border:     '1px solid rgba(245,166,35,0.30)',
+            border:     '1px solid var(--gold-dim)',
             color:      'var(--gold)',
           }}
         >
@@ -352,7 +352,7 @@ export default function TenantsAdminPage() {
               type="submit"
               disabled={oppretter || !nyForm.slug || !nyForm.navn || !nyForm.databaseUrl}
               className="px-4 py-2 text-sm rounded-lg font-medium transition-opacity disabled:opacity-50"
-              style={{ background: 'var(--gold-dim)', border: '1px solid rgba(245,166,35,0.35)', color: 'var(--gold)' }}
+              style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold-dim)', color: 'var(--gold)' }}
             >
               {oppretter ? 'Oppretter…' : 'Opprett tenant'}
             </button>
@@ -401,7 +401,7 @@ export default function TenantsAdminPage() {
               type="submit"
               disabled={lagrer || !editForm.navn.trim()}
               className="px-4 py-2 text-sm rounded-lg font-medium transition-opacity disabled:opacity-50"
-              style={{ background: 'var(--gold-dim)', border: '1px solid rgba(245,166,35,0.35)', color: 'var(--gold)' }}
+              style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold-dim)', color: 'var(--gold)' }}
             >
               {lagrer ? 'Lagrer…' : 'Lagre'}
             </button>

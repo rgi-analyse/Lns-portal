@@ -67,7 +67,7 @@ function NyRapportForm() {
           <div style={{
             width: 44, height: 44, borderRadius: 10, flexShrink: 0,
             background: 'var(--glass-gold-bg)',
-            border: '1px solid rgba(245,166,35,0.25)',
+            border: '1px solid var(--glass-gold-border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 20,
           }}>
@@ -89,7 +89,7 @@ function NyRapportForm() {
 
         {/* Låst kontekst-info — ikke redigerbar */}
         <div style={{
-          background: 'rgba(245,166,35,0.06)',
+          background: 'var(--gold-dim)',
           border: '1px solid var(--gold-dim)',
           borderRadius: 8, padding: '10px 14px',
           marginBottom: 20,
@@ -155,7 +155,7 @@ function NyRapportForm() {
             style={{
               padding: '8px 20px', fontSize: 13, borderRadius: 7,
               border: 'none',
-              background: kanStart ? 'var(--gold)' : 'rgba(245,166,35,0.25)',
+              background: kanStart ? 'var(--gold)' : 'var(--glass-gold-border)',
               color: kanStart ? '#1a1a1a' : 'rgba(255,255,255,0.35)',
               cursor: kanStart ? 'pointer' : 'not-allowed',
               fontWeight: 700,

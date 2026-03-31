@@ -159,7 +159,7 @@ export default function TopbarClient() {
           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none shrink-0"
           style={{
             background: 'var(--glass-gold-bg)',
-            border: '1px solid rgba(245,166,35,0.25)',
+            border: '1px solid var(--glass-gold-border)',
             color: 'var(--gold)',
           }}
         >

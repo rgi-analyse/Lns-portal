@@ -24,7 +24,7 @@ interface Kolonne {
 
 const KOLONNE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   measure:  { label: 'Mål',       color: 'rgba(59,130,246,0.80)' },
-  dimensjon:{ label: 'Dimensjon', color: 'rgba(245,166,35,0.80)' },
+  dimensjon:{ label: 'Dimensjon', color: 'var(--gold-dim)' },
   dato:     { label: 'Dato',      color: 'rgba(16,185,129,0.80)' },
   id:       { label: 'ID',        color: 'rgba(139,92,246,0.80)' },
   url:      { label: 'URL',       color: 'rgba(239,68,68,0.80)'  },

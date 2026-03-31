@@ -1038,9 +1038,9 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                             key={key}
                             onClick={() => toggleExcelKandidat(key)}
                             className="flex items-center gap-2.5 px-3 py-2 cursor-pointer select-none transition-colors"
-                            style={{ background: valgt ? 'rgba(245,166,35,0.08)' : 'transparent' }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'rgba(245,166,35,0.14)' : 'rgba(255,255,255,0.05)'; }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'rgba(245,166,35,0.08)' : 'transparent'; }}
+                            style={{ background: valgt ? 'var(--gold-dim)' : 'transparent' }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'var(--gold-dim)' : 'rgba(255,255,255,0.05)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'var(--gold-dim)' : 'transparent'; }}
                           >
                             <input
                               type="checkbox"
@@ -1075,7 +1075,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                         onClick={eksporterValgte}
                         disabled={excelValgte.size === 0 || excelLaster}
                         className="px-2.5 py-1 text-xs rounded-md font-semibold transition-colors disabled:opacity-40"
-                        style={{ background: 'var(--glass-gold-border)', border: '1px solid rgba(245,166,35,0.40)', color: 'var(--gold)' }}
+                        style={{ background: 'var(--glass-gold-border)', border: '1px solid var(--gold-dim)', color: 'var(--gold)' }}
                       >
                         Eksporter
                       </button>
@@ -1145,11 +1145,11 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               className={btnTool}
               style={{
                 background: 'var(--gold-dim)',
-                border: '1px solid rgba(245,166,35,0.35)',
+                border: '1px solid var(--gold-dim)',
                 color: 'var(--gold)',
                 fontFamily: 'Barlow, system-ui, sans-serif',
               }}
-              onMouseEnter={(e) => { if (report) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.25)'; } }}
+              onMouseEnter={(e) => { if (report) { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; } }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
             >
               <Maximize className="w-3.5 h-3.5" />

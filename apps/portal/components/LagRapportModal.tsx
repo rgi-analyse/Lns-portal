@@ -205,8 +205,8 @@ export default function LagRapportModal({
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                      border: `1px solid ${valgtViewId === v.id ? 'rgba(245,166,35,0.40)' : 'rgba(255,255,255,0.07)'}`,
-                      background: valgtViewId === v.id ? 'rgba(245,166,35,0.06)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${valgtViewId === v.id ? 'var(--gold-dim)' : 'rgba(255,255,255,0.07)'}`,
+                      background: valgtViewId === v.id ? 'var(--gold-dim)' : 'rgba(255,255,255,0.02)',
                     }}
                   >
                     <input
@@ -258,7 +258,7 @@ export default function LagRapportModal({
             style={{
               padding: '7px 16px', fontSize: 13, borderRadius: 7,
               border: 'none',
-              background: erDeaktivert ? 'rgba(245,166,35,0.25)' : 'var(--gold)',
+              background: erDeaktivert ? 'var(--glass-gold-border)' : 'var(--gold)',
               color: erDeaktivert ? 'rgba(255,255,255,0.35)' : '#1a1a1a',
               cursor: erDeaktivert ? 'not-allowed' : 'pointer',
               fontWeight: 600,

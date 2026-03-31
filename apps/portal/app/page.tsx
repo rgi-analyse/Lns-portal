@@ -173,7 +173,7 @@ export default function LoginPage() {
       <div
         style={{
           position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-          background: 'radial-gradient(ellipse at 15% 20%, rgba(245,166,35,0.08) 0%, transparent 50%), radial-gradient(ellipse at 85% 80%, rgba(27,42,74,0.6) 0%, transparent 50%)',
+          background: 'radial-gradient(ellipse at 15% 20%, var(--gold-dim) 0%, transparent 50%), radial-gradient(ellipse at 85% 80%, rgba(27,42,74,0.6) 0%, transparent 50%)',
         }}
       />
 
@@ -236,7 +236,7 @@ export default function LoginPage() {
                   color:        'rgba(255,255,255,0.85)',
                   outline:      'none',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                 onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
               />
             </div>
@@ -324,7 +324,7 @@ export default function LoginPage() {
                     color:        'rgba(255,255,255,0.85)',
                     outline:      'none',
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                   onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
                 <button
@@ -394,7 +394,7 @@ export default function LoginPage() {
                     color:        'rgba(255,255,255,0.85)',
                     outline:      'none',
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(245,166,35,0.40)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
                   onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
               </div>

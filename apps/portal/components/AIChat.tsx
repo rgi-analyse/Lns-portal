@@ -560,7 +560,7 @@ export default function AIChat({
                 className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
                 style={{
                   background: 'var(--glass-gold-bg)',
-                  border: '1px solid rgba(245,166,35,0.25)',
+                  border: '1px solid var(--glass-gold-border)',
                 }}
               >
                 <MessageCircle className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
@@ -609,7 +609,7 @@ export default function AIChat({
                 className="rounded p-1 transition-colors"
                 style={{
                   background: autoOpplesing ? 'var(--glass-gold-bg)' : 'transparent',
-                  border: autoOpplesing ? '1px solid rgba(245,166,35,0.25)' : '1px solid transparent',
+                  border: autoOpplesing ? '1px solid var(--glass-gold-border)' : '1px solid transparent',
                   color: autoOpplesing ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
                 }}
               >
@@ -706,7 +706,7 @@ export default function AIChat({
                 onClick={() => lesOppTekst('Hei! Dette er en test av tale-innstillingene.')}
                 style={{
                   width: '100%', padding: '7px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  background: 'var(--glass-gold-bg)', border: '1px solid rgba(245,166,35,0.30)', color: 'var(--gold)',
+                  background: 'var(--glass-gold-bg)', border: '1px solid var(--gold-dim)', color: 'var(--gold)',
                 }}
               >
                 🔊 Test stemme
@@ -723,9 +723,9 @@ export default function AIChat({
               <div
                 className="rounded-lg px-3 py-2 text-xs"
                 style={{
-                  background: 'rgba(245,166,35,0.08)',
+                  background: 'var(--gold-dim)',
                   border: '1px solid var(--glass-gold-border)',
-                  color: 'rgba(245,166,35,0.85)',
+                  color: 'var(--gold-dim)',
                 }}
               >
                 Ingen rapport er åpen. Spør meg hvilke rapporter som finnes, eller åpne en rapport fra sidemenyen.
@@ -841,7 +841,7 @@ export default function AIChat({
                   <div
                     className="w-full max-w-[95%] rounded-xl p-3 text-sm"
                     style={{
-                      background: 'rgba(245,166,35,0.07)',
+                      background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-border)',
                     }}
                   >
@@ -871,11 +871,11 @@ export default function AIChat({
                         className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                         style={{
                           background: 'var(--glass-gold-border)',
-                          border: '1px solid rgba(245,166,35,0.40)',
+                          border: '1px solid var(--gold-dim)',
                           color: 'var(--gold)',
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.30)'; }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                       >
                         Vis fullskjerm
@@ -923,10 +923,10 @@ export default function AIChat({
                       className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors font-semibold"
                       style={{
                         background: 'var(--glass-gold-border)',
-                        border: '1px solid rgba(245,166,35,0.35)',
+                        border: '1px solid var(--gold-dim)',
                         color: 'var(--gold)',
                       }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.30)'; }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                     >
                       <Download className="w-3 h-3" />
@@ -956,7 +956,7 @@ export default function AIChat({
                         msg.role === 'user'
                           ? {
                               background: 'var(--gold-dim)',
-                              border: '1px solid rgba(245,166,35,0.25)',
+                              border: '1px solid var(--glass-gold-border)',
                               color: 'rgba(255,255,255,0.90)',
                               borderRadius: '10px 10px 3px 10px',
                             }
@@ -1046,7 +1046,7 @@ export default function AIChat({
                 color: 'rgba(255,255,255,0.85)',
                 transition: 'height 0.1s ease, border-color 0.15s',
               }}
-              onFocus={(e) => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'rgba(245,166,35,0.30)'; }}
+              onFocus={(e) => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'var(--gold-dim)'; }}
               onBlur={(e)  => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.12)'; }}
             />
             {/* STEG 2 – Mikrofon-knapp */}
@@ -1082,13 +1082,13 @@ export default function AIChat({
               className="px-3 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: 'var(--gold-dim)',
-                border: '1px solid rgba(245,166,35,0.30)',
+                border: '1px solid var(--gold-dim)',
                 color: 'var(--gold)',
                 borderRadius: 7,
               }}
               onMouseEnter={(e) => {
                 if (!loading && input.trim()) {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.25)';
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)';
                 }
               }}
               onMouseLeave={(e) => {
@@ -1106,18 +1106,18 @@ export default function AIChat({
         onClick={() => setOpen((v) => !v)}
         className="w-12 h-12 rounded-full shadow-lg transition-all flex items-center justify-center"
         style={{
-          background: 'rgba(245,166,35,0.90)',
+          background: 'var(--gold)',
           border: 'none',
           color: '#111D33',
-          boxShadow: '0 4px 20px rgba(245,166,35,0.35)',
+          boxShadow: '0 4px 20px var(--gold-dim)',
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 24px rgba(245,166,35,0.50)';
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 24px var(--gold-dim)';
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.90)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(245,166,35,0.35)';
+          (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px var(--gold-dim)';
         }}
         aria-label="Åpne AI-assistent"
       >

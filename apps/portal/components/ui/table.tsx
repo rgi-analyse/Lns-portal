@@ -20,7 +20,7 @@ export function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTable
   return (
     <tr
       className={cn('border-b border-gray-100 transition-colors', className)}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(245,166,35,0.06)'; }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--gold-dim)'; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ''; }}
       {...props}
     />

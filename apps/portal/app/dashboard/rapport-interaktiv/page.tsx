@@ -648,7 +648,7 @@ function FilterVerdiInput({
           position: 'absolute', top: '100%',
           ...(dropdownRetning === 'right' ? { right: 0 } : { left: 0 }),
           minWidth: 220, width: 'max-content', maxWidth: 320,
-          background: '#0f1c30', border: '1px solid rgba(245,166,35,0.3)',
+          background: '#0f1c30', border: '1px solid var(--gold-dim)',
           borderRadius: 6, zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
           overflow: 'hidden',
         }}>
@@ -682,7 +682,7 @@ function FilterVerdiInput({
                 style={{
                   padding: '6px 10px', fontSize: 11, cursor: 'pointer',
                   color: v === verdi ? 'var(--gold)' : 'rgba(255,255,255,0.7)',
-                  background: v === verdi ? 'rgba(245,166,35,0.08)' : 'transparent',
+                  background: v === verdi ? 'var(--gold-dim)' : 'transparent',
                   borderBottom: '1px solid rgba(255,255,255,0.03)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
@@ -1578,7 +1578,7 @@ export default function RapportInteraktivPage() {
     <div className="rapport-fullskjerm" style={{ display:'flex', flexDirection:'column', height:'100%', overflow:'hidden' }}>
 
       {/* ── Topbar ── */}
-      <div className="rapport-topbar" style={{ flexShrink:0, display:'flex', alignItems:'center', gap:12, padding:'10px 20px', background:'rgba(245,166,35,0.06)', borderBottom:'1px solid rgba(245,166,35,0.18)' }}>
+      <div className="rapport-topbar" style={{ flexShrink:0, display:'flex', alignItems:'center', gap:12, padding:'10px 20px', background:'var(--gold-dim)', borderBottom:'1px solid var(--gold-dim)' }}>
         <button type="button" onClick={()=>router.back()}
           style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'rgba(255,255,255,0.35)', background:'none', border:'none', cursor:'pointer' }}
           onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.70)';}}
@@ -1604,7 +1604,7 @@ export default function RapportInteraktivPage() {
                 display: 'flex', alignItems: 'center', gap: 5,
                 padding: '3px 10px 3px 8px', borderRadius: 12,
                 background: 'var(--glass-gold-bg)',
-                border: '1px solid rgba(245,166,35,0.30)',
+                border: '1px solid var(--gold-dim)',
                 color: 'var(--gold)', fontSize: 11, fontWeight: 600,
                 letterSpacing: '0.02em', userSelect: 'none', whiteSpace: 'nowrap',
               }}>
@@ -1625,7 +1625,7 @@ export default function RapportInteraktivPage() {
               fontSize: 11, fontWeight: 600,
               padding: '2px 8px', borderRadius: 12,
               background: 'var(--glass-gold-bg)',
-              border: '1px solid rgba(245,166,35,0.25)',
+              border: '1px solid var(--glass-gold-border)',
               color: 'var(--gold)', letterSpacing: '0.02em',
               whiteSpace: 'nowrap',
             }}>
@@ -1638,7 +1638,7 @@ export default function RapportInteraktivPage() {
         <button type="button" onClick={lagreRapport} disabled={lagrer}
           style={{ display:'flex', alignItems:'center', gap:6,
             background: lagret ? 'rgba(34,197,94,0.12)' : 'var(--glass-gold-bg)',
-            border: lagret ? '1px solid rgba(34,197,94,0.30)' : '1px solid rgba(245,166,35,0.30)',
+            border: lagret ? '1px solid rgba(34,197,94,0.30)' : '1px solid var(--gold-dim)',
             color: lagret ? '#4ade80' : 'var(--gold)',
             padding:'7px 16px', borderRadius:8, fontSize:13, fontWeight:600,
             cursor: lagrer ? 'not-allowed' : 'pointer', opacity: lagrer ? 0.6 : 1,
@@ -1648,13 +1648,13 @@ export default function RapportInteraktivPage() {
         </button>
 
         <button type="button" onClick={()=>setVisRediger(v=>!v)}
-          style={{ background:visRediger?'var(--gold-dim)':'rgba(255,255,255,0.05)', border:visRediger?'1px solid rgba(245,166,35,0.3)':'1px solid rgba(255,255,255,0.10)', color:visRediger?'var(--gold)':'rgba(255,255,255,0.6)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          style={{ background:visRediger?'var(--gold-dim)':'rgba(255,255,255,0.05)', border:visRediger?'1px solid var(--gold-dim)':'1px solid rgba(255,255,255,0.10)', color:visRediger?'var(--gold)':'rgba(255,255,255,0.6)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
           ✏️ {visRediger ? 'Skjul rediger' : 'Rediger'}
         </button>
 
         {config.visualType!=='table' && (
           <button type="button" onClick={()=>setVisTabell(v=>!v)}
-            style={{ background:visTabell?'var(--glass-gold-border)':'rgba(255,255,255,0.05)', border:`1px solid ${visTabell?'rgba(245,166,35,0.38)':'rgba(255,255,255,0.12)'}`, color:visTabell?'var(--gold)':'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            style={{ background:visTabell?'var(--glass-gold-border)':'rgba(255,255,255,0.05)', border:`1px solid ${visTabell?'var(--gold-dim)':'rgba(255,255,255,0.12)'}`, color:visTabell?'var(--gold)':'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
             {visTabell ? 'Skjul tabell' : 'Vis tabell'}
           </button>
         )}
@@ -1680,7 +1680,7 @@ export default function RapportInteraktivPage() {
       </div>
 
       {/* ── Filter-rad (topbar linje 2) ── */}
-      <div style={{ flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'8px 20px', borderBottom:'1px solid rgba(255,255,255,0.05)', flexWrap:'wrap', minHeight:44, background:'rgba(245,166,35,0.03)' }}>
+      <div style={{ flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'8px 20px', borderBottom:'1px solid rgba(255,255,255,0.05)', flexWrap:'wrap', minHeight:44, background:'var(--gold-dim)' }}>
         <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.30)', flexShrink:0 }}>
           Filter
         </span>
@@ -1760,7 +1760,7 @@ export default function RapportInteraktivPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                   {VIS_TYPE_OPTIONS.map(v => (
                     <button key={v.type} type="button" onClick={()=>setConfig(p=>p?{...p,visualType:v.type}:p)}
-                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid rgba(245,166,35,0.4)':'1px solid rgba(255,255,255,0.08)', background:config.visualType===v.type?'var(--glass-gold-bg)':'rgba(255,255,255,0.04)', color:config.visualType===v.type?'var(--gold)':'rgba(255,255,255,0.5)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid var(--gold-dim)':'1px solid rgba(255,255,255,0.08)', background:config.visualType===v.type?'var(--glass-gold-bg)':'rgba(255,255,255,0.04)', color:config.visualType===v.type?'var(--gold)':'rgba(255,255,255,0.5)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:18 }}>{v.ikon}</span><span>{v.navn}</span>
                     </button>
                   ))}
@@ -1830,7 +1830,7 @@ export default function RapportInteraktivPage() {
                         onClick={()=>setConfig(p=>p?{...p,aggregering:a.verdi}:p)}
                         style={{
                           padding:'7px 6px', borderRadius:7, cursor:'pointer',
-                          border: config.aggregering===a.verdi ? '1px solid rgba(245,166,35,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                          border: config.aggregering===a.verdi ? '1px solid var(--gold-dim)' : '1px solid rgba(255,255,255,0.08)',
                           background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'rgba(255,255,255,0.04)',
                           color: config.aggregering===a.verdi ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
                           fontSize:11, display:'flex', flexDirection:'column', alignItems:'center', gap:2,

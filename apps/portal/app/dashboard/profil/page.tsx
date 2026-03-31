@@ -25,7 +25,7 @@ export default function ProfilPage() {
             className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold select-none"
             style={{
               background: 'var(--gold-dim)',
-              border: '2px solid rgba(245,166,35,0.35)',
+              border: '2px solid var(--gold-dim)',
               color: 'var(--gold)',
               fontFamily: 'Barlow Condensed, sans-serif',
               letterSpacing: '0.05em',
