@@ -701,9 +701,43 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     }
   };
 
+  const TEKST_KOLONNER = [
+    'kunde', 'konto', 'navn', 'id', 'beskrivelse', 'tekst',
+    'leverandør', 'avdeling', 'prosjekt', 'type', 'kategori',
+    'kode', 'nummer', 'nr', 'ref', 'bilag', 'periode',
+  ];
+
+  const erTekstKolonne = (header: string): boolean => {
+    const lower = header.toLowerCase();
+    return TEKST_KOLONNER.some((k) => lower.includes(k));
+  };
+
+  const konverterVerdi = (verdi: string, header = ''): string | number => {
+    const renset = verdi.replace(/^"|"$/g, '').trim();
+    if (renset === '') return renset;
+
+    // Tekst-kolonner basert på header — aldri konverter til tall
+    if (erTekstKolonne(header)) return renset;
+
+    // Kun konverter hvis verdien ser ut som et norsk beløp:
+    // må inneholde komma (desimaltegn) OG kun bestå av siffer, mellomrom, komma, punktum og minus
+    const harKomma = renset.includes(',');
+    const harKunTallTegn = /^[\d\s\-.,]+$/.test(renset);
+
+    if (harKomma && harKunTallTegn) {
+      const tallStreng = renset.replace(/\s/g, '').replace(',', '.');
+      const tall = parseFloat(tallStreng);
+      if (!isNaN(tall)) return tall;
+    }
+
+    return renset;
+  };
+
   const parseCSV = (csvTekst: string): (string | number)[][] => {
     const linjer = csvTekst.split('\n').filter((l) => l.trim());
-    return linjer.map((linje) => {
+
+    // Parse råstrenger uten typekonvertering for å hente headers først
+    const råRader: string[][] = linjer.map((linje) => {
       const celler: string[] = [];
       let inAnførsel = false;
       let gjeldendeCelle = '';
@@ -724,16 +758,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         }
       }
       celler.push(gjeldendeCelle.trim());
-      return celler.map(konverterVerdi);
+      return celler;
     });
-  };
 
-  const konverterVerdi = (verdi: string): string | number => {
-    const renset = verdi.replace(/^"|"$/g, '').trim();
-    const tallStreng = renset.replace(/\s/g, '').replace(',', '.');
-    const tall = parseFloat(tallStreng);
-    if (!isNaN(tall) && tallStreng !== '') return tall;
-    return renset;
+    if (råRader.length === 0) return [];
+
+    const headers = råRader[0].map((h) => h.replace(/^"|"$/g, '').trim());
+
+    return råRader.map((rad, radIndex) => {
+      if (radIndex === 0) return headers; // header-rad alltid som tekst
+      return rad.map((celle, kolIndex) => konverterVerdi(celle, headers[kolIndex] ?? ''));
+    });
   };
 
   const åpneExcelPicker = async () => {
