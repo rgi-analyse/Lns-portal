@@ -84,6 +84,7 @@ async function start() {
       'x-entra-object-id',
       'x-entra-token',
       'x-user-id',
+      'x-tenant-id',
     ],
     exposedHeaders: ['Set-Cookie'],
   });
