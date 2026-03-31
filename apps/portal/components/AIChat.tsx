@@ -510,6 +510,28 @@ export default function AIChat({
     }
   }
 
+  const renderMedLenker = (tekst: string | null) => {
+    if (!tekst) return null;
+    const deler = tekst.split(/(\[[^\]]+\]\(https?:\/\/[^)]+\))/g);
+    return deler.map((del, i) => {
+      const match = del.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+      if (match) {
+        return (
+          <a
+            key={i}
+            href={match[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#f59e0b', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            {match[1]}
+          </a>
+        );
+      }
+      return <span key={i}>{del}</span>;
+    });
+  };
+
   return (
     <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3" style={{ zIndex: 10000 }}>
       {/* Chat panel */}
@@ -952,7 +974,7 @@ export default function AIChat({
                             }
                       }
                     >
-                      {msg.content}
+                      {renderMedLenker(msg.content)}
                     </div>
                     {/* Les opp / Stopp per AI-melding */}
                     {msg.role === 'assistant' && msg.content && (

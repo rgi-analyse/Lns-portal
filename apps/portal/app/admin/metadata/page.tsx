@@ -18,6 +18,7 @@ interface Kolonne {
   er_filtrerbar: boolean;
   sort_order: number;
   kolonne_type: string;
+  lenketekst: string | null;
 }
 
 const KOLONNE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -25,6 +26,7 @@ const KOLONNE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   dimensjon:{ label: 'Dimensjon', color: 'rgba(245,166,35,0.80)' },
   dato:     { label: 'Dato',      color: 'rgba(16,185,129,0.80)' },
   id:       { label: 'ID',        color: 'rgba(139,92,246,0.80)' },
+  url:      { label: 'URL',       color: 'rgba(239,68,68,0.80)'  },
 };
 
 interface Eksempel {
@@ -95,7 +97,7 @@ export default function MetadataAdminPage() {
 
   // Dialog: edit kolonne
   const [editKolonne, setEditKolonne] = useState<{ viewId: string; kol: Kolonne } | null>(null);
-  const [kolForm, setKolForm] = useState({ beskrivelse: '', eksempel_verdier: '' });
+  const [kolForm, setKolForm] = useState({ beskrivelse: '', eksempel_verdier: '', lenketekst: '' });
 
   // Dialog: legg til eksempel
   const [addEksempelViewId, setAddEksempelViewId] = useState<string | null>(null);
@@ -285,7 +287,7 @@ export default function MetadataAdminPage() {
   // ── Edit kolonne ──
   const åpneEditKolonne = (viewId: string, kol: Kolonne) => {
     setEditKolonne({ viewId, kol });
-    setKolForm({ beskrivelse: kol.beskrivelse ?? '', eksempel_verdier: kol.eksempel_verdier ?? '' });
+    setKolForm({ beskrivelse: kol.beskrivelse ?? '', eksempel_verdier: kol.eksempel_verdier ?? '', lenketekst: kol.lenketekst ?? '' });
   };
 
   const oppdaterKolonneType = async (viewId: string, kol: Kolonne, kolonne_type: string) => {
@@ -548,6 +550,7 @@ export default function MetadataAdminPage() {
                                         <option value="measure">Mål</option>
                                         <option value="dato">Dato</option>
                                         <option value="id">ID</option>
+                                        <option value="url">URL</option>
                                       </select>
                                     </div>
                                     {kol.beskrivelse && <span className="text-gray-600 mt-0.5 block">— {kol.beskrivelse}</span>}
@@ -801,6 +804,18 @@ export default function MetadataAdminPage() {
             />
             <p className="text-xs text-gray-400 mt-1">Kommaseparert liste. Fylles automatisk ved synkronisering for kolonner med færre enn 20 unike verdier.</p>
           </div>
+          {editKolonne?.kol.kolonne_type === 'url' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Lenketekst</label>
+              <input
+                value={kolForm.lenketekst}
+                onChange={e => setKolForm(f => ({ ...f, lenketekst: e.target.value }))}
+                placeholder="f.eks. Åpne dokument"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Tekst som vises i stedet for rå URL i AI-chat.</p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <button onClick={() => setEditKolonne(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">Avbryt</button>

@@ -244,7 +244,7 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
     `),
     queryAzureSQL(`
       SELECT k.view_id, k.kolonne_navn, k.kolonne_type, k.datatype,
-             k.beskrivelse, k.eksempel_verdier
+             k.beskrivelse, k.eksempel_verdier, k.lenketekst
       FROM ai_metadata_kolonner k
       JOIN ai_metadata_views v ON k.view_id = v.id
       ${viewsFilter}
@@ -327,6 +327,18 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
       }
     }
 
+    viewsPrompt += '\n';
+  }
+
+  // Legg til instruksjoner for URL-kolonner
+  const urlKolonner = kolonner.filter(k => k['kolonne_type'] === 'url');
+  if (urlKolonner.length > 0) {
+    viewsPrompt += 'URL-KOLONNER (VIKTIG):\n';
+    viewsPrompt += 'Følgende kolonner inneholder URL-er. Vis dem ALLTID som klikkbare markdown-lenker, aldri som rå URL-streng.\n';
+    for (const k of urlKolonner) {
+      const lenketekst = k['lenketekst'] || k['kolonne_navn'];
+      viewsPrompt += `  - ${k['kolonne_navn']}: vis som [${lenketekst}](url-verdien)\n`;
+    }
     viewsPrompt += '\n';
   }
 

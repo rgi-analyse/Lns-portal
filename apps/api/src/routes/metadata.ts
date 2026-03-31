@@ -19,7 +19,8 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       `),
       queryAzureSQL(`
         SELECT id, view_id, kolonne_navn, datatype, beskrivelse, eksempel_verdier,
-               er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type
+               er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type,
+               lenketekst
         FROM ai_metadata_kolonner
         ORDER BY view_id, sort_order
       `),
@@ -61,7 +62,8 @@ export async function metadataRoutes(fastify: FastifyInstance) {
         `, 1),
         queryAzureSQL(`
           SELECT id, view_id, kolonne_navn, datatype, beskrivelse, eksempel_verdier,
-                 er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type
+                 er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type,
+                 lenketekst
           FROM ai_metadata_kolonner
           WHERE view_id = '${esc(id)}'
           ORDER BY sort_order
@@ -206,18 +208,19 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   );
 
   // PUT /api/admin/metadata/views/:id/kolonner/:kolId — oppdater kolonne manuelt
-  fastify.put<{ Params: { id: string; kolId: string }; Body: { beskrivelse?: string; eksempel_verdier?: string; kolonne_type?: string } }>(
+  fastify.put<{ Params: { id: string; kolId: string }; Body: { beskrivelse?: string; eksempel_verdier?: string; kolonne_type?: string; lenketekst?: string } }>(
     '/api/admin/metadata/views/:id/kolonner/:kolId',
     { preHandler: [requireBruker, requireAdmin] },
     async (request, reply) => {
       const { kolId } = request.params;
-      const { beskrivelse, eksempel_verdier, kolonne_type } = request.body;
+      const { beskrivelse, eksempel_verdier, kolonne_type, lenketekst } = request.body;
 
-      const validTyper = ['dimensjon', 'measure', 'dato', 'id'];
+      const validTyper = ['dimensjon', 'measure', 'dato', 'id', 'url'];
       const setParts: string[] = [];
       if (beskrivelse !== undefined) setParts.push(`beskrivelse = ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}`);
       if (eksempel_verdier !== undefined) setParts.push(`eksempel_verdier = ${eksempel_verdier ? `'${esc(eksempel_verdier)}'` : 'NULL'}`);
       if (kolonne_type !== undefined && validTyper.includes(kolonne_type)) setParts.push(`kolonne_type = '${esc(kolonne_type)}'`);
+      if (lenketekst !== undefined) setParts.push(`lenketekst = ${lenketekst ? `'${esc(lenketekst)}'` : 'NULL'}`);
 
       if (setParts.length === 0) return reply.status(400).send({ error: 'Ingen felter å oppdatere' });
 
@@ -229,7 +232,8 @@ export async function metadataRoutes(fastify: FastifyInstance) {
 
       const rows = await queryAzureSQL(`
         SELECT id, view_id, kolonne_navn, datatype, beskrivelse, eksempel_verdier,
-               er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type
+               er_filtrerbar, sort_order, COALESCE(kolonne_type, 'dimensjon') as kolonne_type,
+               lenketekst
         FROM ai_metadata_kolonner WHERE id = '${esc(kolId)}'
       `, 1);
 
