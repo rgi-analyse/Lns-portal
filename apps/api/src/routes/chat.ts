@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { chat, type ChatMessage, type ChatContext } from '../services/openaiService';
 import { queryAzureSQL } from '../services/azureSqlService';
 import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 // ── Statisk tillegg som alltid er med (analyse-instruksjoner og generelle regler) ──
 const STATIC_APPENDIX = `
@@ -438,6 +439,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: ChatBody }>(
     '/api/chat',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -614,8 +616,9 @@ Tilgjengelige visualiseringstyper:
       let workspaceNavn: string | null = null;
 
       try {
+        const db = (request as TenantRequest).tenantPrisma;
         const rapport = rapportId
-          ? await prisma.rapport.findUnique({
+          ? await db.rapport.findUnique({
               where: { id: rapportId },
               select: {
                 område: true, beskrivelse: true, nøkkelord: true,

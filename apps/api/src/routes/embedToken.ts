@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 export { getAzureToken };
 
@@ -44,6 +44,7 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: EmbedTokenBody }>(
     '/api/embed-token',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -76,7 +77,8 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
     console.log('[embedToken] body mottatt:', JSON.stringify(request.body));
 
     if (request.body?.rapportId) {
-      const dbRapport = await prisma.rapport.findUnique({
+      const db = (request as TenantRequest).tenantPrisma;
+      const dbRapport = await db.rapport.findUnique({
         where: { id: request.body.rapportId },
         select: { pbiReportId: true, pbiDatasetId: true, pbiWorkspaceId: true },
       });

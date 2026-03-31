@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 interface UpsertBody {
   brukerId: string;
@@ -8,10 +8,13 @@ interface UpsertBody {
 }
 
 export async function brukerInnstillingerRoutes(fastify: FastifyInstance) {
+  fastify.addHook('preHandler', resolveTenant);
+
   // GET /api/innstillinger/:rapportId?brukerId=&type=
   fastify.get<{ Params: { rapportId: string }; Querystring: { brukerId?: string; type?: string } }>(
     '/api/innstillinger/:rapportId',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { rapportId } = request.params;
       const { brukerId, type = 'bookmark' } = request.query;
 
@@ -20,7 +23,7 @@ export async function brukerInnstillingerRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        const innstilling = await prisma.brukerInnstilling.findUnique({
+        const innstilling = await db.brukerInnstilling.findUnique({
           where: { brukerId_rapportId_type: { brukerId, rapportId, type } },
         });
         return reply.send(innstilling ?? null);
@@ -49,11 +52,12 @@ export async function brukerInnstillingerRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { rapportId } = request.params;
       const { brukerId, type, verdi } = request.body;
 
       try {
-        const innstilling = await prisma.brukerInnstilling.upsert({
+        const innstilling = await db.brukerInnstilling.upsert({
           where: { brukerId_rapportId_type: { brukerId, rapportId, type } },
           update: { verdi },
           create: { brukerId, rapportId, type, verdi },
@@ -70,6 +74,7 @@ export async function brukerInnstillingerRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { rapportId: string }; Querystring: { brukerId?: string; type?: string } }>(
     '/api/innstillinger/:rapportId',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { rapportId } = request.params;
       const { brukerId, type = 'bookmark' } = request.query;
 
@@ -78,7 +83,7 @@ export async function brukerInnstillingerRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        await prisma.brukerInnstilling.delete({
+        await db.brukerInnstilling.delete({
           where: { brukerId_rapportId_type: { brukerId, rapportId, type } },
         });
         return reply.status(204).send();

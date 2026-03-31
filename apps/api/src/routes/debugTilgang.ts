@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 export async function debugTilgangRoutes(fastify: FastifyInstance) {
   if (process.env.NODE_ENV === 'production') return;
@@ -7,7 +7,9 @@ export async function debugTilgangRoutes(fastify: FastifyInstance) {
   // GET /api/debug/tilgang?brukerId=&grupper=id1,id2,id3
   fastify.get<{ Querystring: { brukerId?: string; grupper?: string } }>(
     '/api/debug/tilgang',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { brukerId, grupper } = request.query;
       const grupperArray = grupper ? grupper.split(',').filter(Boolean) : [];
 
@@ -21,7 +23,7 @@ export async function debugTilgangRoutes(fastify: FastifyInstance) {
       if (brukerId) orConditions.push({ entraId: brukerId });
       if (grupperArray.length > 0) orConditions.push({ entraId: { in: grupperArray } });
 
-      const workspaces = await prisma.workspace.findMany({
+      const workspaces = await db.workspace.findMany({
         where: {
           tilgang: { some: { OR: orConditions } },
         },
@@ -60,10 +62,12 @@ export async function debugTilgangRoutes(fastify: FastifyInstance) {
   // GET /api/debug/min-tilgang/:brukerId
   fastify.get<{ Params: { brukerId: string } }>(
     '/api/debug/min-tilgang/:brukerId',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { brukerId } = request.params;
 
-      const tilganger = await prisma.tilgang.findMany({
+      const tilganger = await db.tilgang.findMany({
         where: { entraId: brukerId },
         select: {
           id:           true,

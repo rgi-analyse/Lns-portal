@@ -33,6 +33,15 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('Starter seeding...');
 
+  // 0. Opprett standard LNS-tenant (peker på same DB som master)
+  const connectionString = process.env.DATABASE_URL!;
+  await prisma.tenant.upsert({
+    where: { slug: 'lns' },
+    update: {},
+    create: { slug: 'lns', navn: 'LNS', databaseUrl: connectionString },
+  });
+  console.log('Tenant "lns" klar.');
+
   // 1. Opprett rapport globalt (uavhengig av workspace)
   const rapport = await prisma.rapport.upsert({
     where: { id: 'seed-rapport-01' },

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { searchGroups, searchUsers } from '../services/graphService';
 
 function isNotFound(error: unknown): boolean {
@@ -59,15 +59,17 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
   // GET /api/workspaces/:id/tilgang
   fastify.get<{ Params: { id: string } }>(
     '/api/workspaces/:id/tilgang',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.findUnique({
+        const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           select: { id: true },
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
-        const tilganger = await prisma.tilgang.findMany({
+        const tilganger = await db.tilgang.findMany({
           where: { workspaceId: request.params.id },
           orderBy: { lagtTilDato: 'desc' },
         });
@@ -83,6 +85,7 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: { id: string }; Body: CreateTilgangBody }>(
     '/api/workspaces/:id/tilgang',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -99,15 +102,15 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.findUnique({
+        const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           select: { id: true },
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
-        // Duplikat-sjekk
-        const existing = await prisma.tilgang.findFirst({
+        const existing = await db.tilgang.findFirst({
           where: { workspaceId: request.params.id, entraId: request.body.entraId },
           select: { id: true },
         });
@@ -117,7 +120,7 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
             .send({ error: 'Denne gruppen/brukeren har allerede tilgang til dette workspacet.' });
         }
 
-        const tilgang = await prisma.tilgang.create({
+        const tilgang = await db.tilgang.create({
           data: { ...request.body, workspaceId: request.params.id },
         });
         return reply.status(201).send(tilgang);
@@ -131,9 +134,11 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
   // DELETE /api/workspaces/:id/tilgang/:tilgangId
   fastify.delete<{ Params: { id: string; tilgangId: string } }>(
     '/api/workspaces/:id/tilgang/:tilgangId',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        await prisma.tilgang.delete({
+        await db.tilgang.delete({
           where: { id: request.params.tilgangId, workspaceId: request.params.id },
         });
         return reply.status(204).send();

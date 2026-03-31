@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker } from '../middleware/auth';
 import { queryAzureSQL } from '../services/azureSqlService';
 
@@ -27,12 +27,15 @@ interface LinkRapportBody {
 const workspaceSelect = { select: { id: true, navn: true } };
 
 export async function rapportRoutes(fastify: FastifyInstance) {
+  fastify.addHook('preHandler', resolveTenant);
+
   // ── Globale rapport-ruter ──────────────────────────────────────────────────
 
   // GET /api/rapporter
-  fastify.get('/api/rapporter', async (_request, reply) => {
+  fastify.get('/api/rapporter', async (request, reply) => {
+    const db = (request as TenantRequest).tenantPrisma;
     try {
-      const rapporter = await prisma.rapport.findMany({
+      const rapporter = await db.rapport.findMany({
         where: { erAktiv: true },
         include: {
           workspaces: { include: { workspace: workspaceSelect } },
@@ -50,9 +53,10 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
         const id = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
-        const rapport = await prisma.rapport.findUnique({
+        const rapport = await db.rapport.findUnique({
           where: { id },
           include: {
             workspaces: { include: { workspace: workspaceSelect } },
@@ -60,7 +64,6 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         });
         if (!rapport) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
 
-        // Hent erDesignerRapport via raw SQL (kolonnen finnes ikke i Prisma-schema)
         let erDesignerRapport = false;
         try {
           const rows = await queryAzureSQL(`SELECT erDesignerRapport FROM Rapport WHERE id = '${id}'`);
@@ -95,8 +98,9 @@ export async function rapportRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const rapport = await prisma.rapport.create({ data: request.body });
+        const rapport = await db.rapport.create({ data: request.body });
         return reply.status(201).send(rapport);
       } catch (error) {
         fastify.log.error(error);
@@ -105,7 +109,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // PUT /api/rapporter/:id  (oppdater rapportnavn og metadata)
+  // PUT /api/rapporter/:id
   fastify.put<{
     Params: { id: string };
     Body: { navn: string; område?: string | null; beskrivelse?: string | null; nøkkelord?: string | null };
@@ -127,9 +131,10 @@ export async function rapportRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
         const { navn, område, beskrivelse, nøkkelord } = request.body;
-        const rapport = await prisma.rapport.update({
+        const rapport = await db.rapport.update({
           where: { id: request.params.id },
           data: {
             navn:        navn.trim(),
@@ -147,12 +152,13 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE /api/rapporter/:id  (sletter rapporten globalt, WorkspaceRapport-koblinger følger via cascade)
+  // DELETE /api/rapporter/:id
   fastify.delete<{ Params: { id: string } }>(
     '/api/rapporter/:id',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        await prisma.rapport.delete({ where: { id: request.params.id } });
+        await db.rapport.delete({ where: { id: request.params.id } });
         return reply.status(204).send();
       } catch (error) {
         if (isNotFound(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
@@ -162,8 +168,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // GET /api/rapporter/:id/views — views koblet til rapporten (for designer-opprettelse)
-  // Returnerer KUN views eksplisitt koblet til denne rapporten — aldri fallback til alle views.
+  // GET /api/rapporter/:id/views
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id/views',
     { preHandler: [requireBruker] },
@@ -190,13 +195,14 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // GET /api/admin/rapporter/alle — alle aktive rapporter med workspace-navn (for admin dropdowns)
+  // GET /api/admin/rapporter/alle
   fastify.get(
     '/api/admin/rapporter/alle',
     { preHandler: [requireBruker, requireAdmin] },
-    async (_request, reply) => {
+    async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const rapporter = await prisma.rapport.findMany({
+        const rapporter = await db.rapport.findMany({
           where: { erAktiv: true },
           select: {
             id: true,
@@ -219,12 +225,13 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // DELETE /api/admin/rapporter/:id  (soft delete — setter erAktiv = false, bevarer historikk)
+  // DELETE /api/admin/rapporter/:id  (soft delete)
   fastify.delete<{ Params: { id: string } }>(
     '/api/admin/rapporter/:id',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        await prisma.rapport.update({
+        await db.rapport.update({
           where: { id: request.params.id },
           data:  { erAktiv: false },
         });
@@ -243,8 +250,9 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string }; Querystring: { grupper?: string } }>(
     '/api/workspaces/:id/rapporter',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.findUnique({
+        const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           select: { id: true, opprettetAv: true },
         });
@@ -256,7 +264,6 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];
 
-        // Hjelpefunksjon: legg til erDesignerRapport på rapporter
         async function medDesignerFlagg(rapporter: { id: string }[]): Promise<object[]> {
           if (rapporter.length === 0) return rapporter;
           const ids = rapporter.map((r) => `'${r.id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
@@ -268,9 +275,8 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           return rapporter.map((r) => ({ ...r, erDesignerRapport: flagMap.get(r.id.toLowerCase()) ?? false }));
         }
 
-        // Admin eller ingen identitet → returner alle (admin-verktøy o.l.)
         if (isAdmin || identities.length === 0) {
-          const links = await prisma.workspaceRapport.findMany({
+          const links = await db.workspaceRapport.findMany({
             where: { workspaceId: request.params.id, rapport: { erAktiv: true } },
             include: { rapport: true },
             orderBy: { rekkefølge: 'asc' },
@@ -278,7 +284,6 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           return reply.send(await medDesignerFlagg(links.map((l) => l.rapport)));
         }
 
-        // Sjekk tilgang via råSQL — dekker Tilgang-tabell, workspace-eier og personlig workspace
         const safeWsId    = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
         const inClause    = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
         let harTilgang    = false;
@@ -296,8 +301,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           `);
           harTilgang = tilgangRows.length > 0;
         } catch (err) {
-          // Fallback: Prisma-sjekk
-          const p = await prisma.tilgang.findFirst({
+          const p = await db.tilgang.findFirst({
             where: { workspaceId: request.params.id, entraId: { in: identities } },
             select: { id: true },
           });
@@ -310,8 +314,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         );
 
         if (harTilgang) {
-          // Direkte workspace-tilgang: vis alle rapporter uten begrensning + eksplisitt tillatte
-          const links = await prisma.workspaceRapport.findMany({
+          const links = await db.workspaceRapport.findMany({
             where: { workspaceId: request.params.id, rapport: { erAktiv: true } },
             include: { rapport: { include: { tilgang: { select: { entraId: true } } } } },
             orderBy: { rekkefølge: 'asc' },
@@ -319,7 +322,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           const filtrerte = links
             .filter((l) => {
               const t = l.rapport.tilgang ?? [];
-              if (t.length === 0) return true; // arver workspace-tilgang
+              if (t.length === 0) return true;
               return t.some((r) => identities.includes(r.entraId));
             })
             .map((l) => {
@@ -330,8 +333,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           return reply.send(await medDesignerFlagg(filtrerte));
         }
 
-        // Kun rapport-tilgang: vis bare rapporter med eksplisitt tilgang
-        const links = await prisma.workspaceRapport.findMany({
+        const links = await db.workspaceRapport.findMany({
           where: {
             workspaceId: request.params.id,
             rapport: {
@@ -351,7 +353,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // POST /api/workspaces/:id/rapporter  (koble eksisterende rapport til workspace)
+  // POST /api/workspaces/:id/rapporter
   fastify.post<{ Params: { id: string }; Body: LinkRapportBody }>(
     '/api/workspaces/:id/rapporter',
     {
@@ -367,20 +369,21 @@ export async function rapportRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.findUnique({
+        const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           select: { id: true },
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
-        const rapport = await prisma.rapport.findUnique({
+        const rapport = await db.rapport.findUnique({
           where: { id: request.body.rapportId, erAktiv: true },
           select: { id: true },
         });
         if (!rapport) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
 
-        const link = await prisma.workspaceRapport.create({
+        const link = await db.workspaceRapport.create({
           data: { workspaceId: request.params.id, rapportId: request.body.rapportId },
           include: { rapport: true },
         });
@@ -392,12 +395,13 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     }
   );
 
-  // DELETE /api/workspaces/:id/rapporter/:rapportId  (fjerner KUN koblingen, ikke selve rapporten)
+  // DELETE /api/workspaces/:id/rapporter/:rapportId
   fastify.delete<{ Params: { id: string; rapportId: string } }>(
     '/api/workspaces/:id/rapporter/:rapportId',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        await prisma.workspaceRapport.delete({
+        await db.workspaceRapport.delete({
           where: {
             workspaceId_rapportId: {
               workspaceId: request.params.id,

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 interface CreateBody {
   type: string;
@@ -10,18 +10,21 @@ interface CreateBody {
 }
 
 export async function rapportTilgangRoutes(fastify: FastifyInstance) {
+  fastify.addHook('preHandler', resolveTenant);
+
   // GET /api/rapporter/:id/tilgang
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id/tilgang',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const rapport = await prisma.rapport.findUnique({
+        const rapport = await db.rapport.findUnique({
           where: { id: request.params.id },
           select: { id: true },
         });
         if (!rapport) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
 
-        const tilganger = await prisma.rapportTilgang.findMany({
+        const tilganger = await db.rapportTilgang.findMany({
           where: { rapportId: request.params.id },
           orderBy: { lagtTilDato: 'desc' },
         });
@@ -53,15 +56,15 @@ export async function rapportTilgangRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const rapport = await prisma.rapport.findUnique({
+        const rapport = await db.rapport.findUnique({
           where: { id: request.params.id },
           select: { id: true },
         });
         if (!rapport) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
 
-        // Duplikat-sjekk
-        const existing = await prisma.rapportTilgang.findFirst({
+        const existing = await db.rapportTilgang.findFirst({
           where: { rapportId: request.params.id, entraId: request.body.entraId },
           select: { id: true },
         });
@@ -71,7 +74,7 @@ export async function rapportTilgangRoutes(fastify: FastifyInstance) {
             .send({ error: 'Denne gruppen/brukeren har allerede tilgang til denne rapporten.' });
         }
 
-        const tilgang = await prisma.rapportTilgang.create({
+        const tilgang = await db.rapportTilgang.create({
           data: { ...request.body, rapportId: request.params.id },
         });
         return reply.status(201).send(tilgang);
@@ -86,14 +89,15 @@ export async function rapportTilgangRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string; tilgangId: string } }>(
     '/api/rapporter/:id/tilgang/:tilgangId',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const existing = await prisma.rapportTilgang.findFirst({
+        const existing = await db.rapportTilgang.findFirst({
           where: { id: request.params.tilgangId, rapportId: request.params.id },
           select: { id: true },
         });
         if (!existing) return reply.status(404).send({ error: 'Tilgang ikke funnet.' });
 
-        await prisma.rapportTilgang.delete({ where: { id: request.params.tilgangId } });
+        await db.rapportTilgang.delete({ where: { id: request.params.tilgangId } });
         return reply.status(204).send();
       } catch (error) {
         fastify.log.error(error);

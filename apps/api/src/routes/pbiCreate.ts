@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 import { queryAzureSQL } from '../services/azureSqlService';
 
@@ -66,6 +66,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: { pbiReportId: string; pbiDatasetId: string; pbiWorkspaceId: string; navn: string; beskrivelse?: string } }>(
     '/api/pbi/register-rapport',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -82,14 +83,14 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { pbiReportId, pbiDatasetId, pbiWorkspaceId, navn, beskrivelse } = request.body;
       try {
-        // Unngå duplikater — sjekk om rapporten allerede er registrert
-        const eksisterende = await prisma.rapport.findFirst({ where: { pbiReportId } });
+        const eksisterende = await db.rapport.findFirst({ where: { pbiReportId } });
         if (eksisterende) {
           return reply.send({ id: eksisterende.id, navn: eksisterende.navn });
         }
-        const rapport = await prisma.rapport.create({
+        const rapport = await db.rapport.create({
           data: { pbiReportId, pbiDatasetId, pbiWorkspaceId, navn, beskrivelse: beskrivelse ?? null },
         });
         console.log('[pbiRegister] Ny rapport registrert i DB:', rapport.id, rapport.navn);
@@ -105,6 +106,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Body: { rapportId: string; pbiReportId: string; pbiWorkspaceId: string } }>(
     '/api/pbi/slett-rapport',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -119,6 +121,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const { rapportId, pbiReportId, pbiWorkspaceId } = request.body;
 
       const tenantId     = process.env.PBI_TENANT_ID;
@@ -148,7 +151,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         }
 
         // Slett fra portal DB
-        await prisma.rapport.delete({ where: { id: rapportId } });
+        await db.rapport.delete({ where: { id: rapportId } });
         console.log('[pbiSlett] Slettet fra DB:', rapportId);
 
         return reply.status(204).send();

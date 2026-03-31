@@ -96,6 +96,16 @@ model Bruker {
   sistInnlogget     DateTime?
 }
 
+model Tenant {
+  id          String   @id @default(uuid())
+  slug        String   @unique @db.NVarChar(100)
+  navn        String   @db.NVarChar(200)
+  databaseUrl String   @db.NVarChar(500)
+  erAktiv     Boolean  @default(true)
+  opprettet   DateTime @default(now())
+  oppdatert   DateTime @updatedAt
+}
+
 model OrganisasjonTema {
   id               String   @id @default(uuid())
   organisasjonNavn String   @unique @db.NVarChar(200)

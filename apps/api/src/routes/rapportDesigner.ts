@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import type { PrismaClient } from '../generated/prisma/client';
 import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
 
 function safeId(id: string): string {
@@ -39,16 +40,15 @@ async function hentEllerOpprettMittWorkspace(
   brukerId: string,
   entraObjectId: string,
   displayName: string,
+  db: PrismaClient,
 ): Promise<string> {
-  // Sjekk om bruker allerede har et personlig workspace
   const rows = await queryAzureSQL(
     `SELECT mittWorkspaceId FROM bruker WHERE id = '${safeId(brukerId)}'`,
   );
   const existing = (rows[0] as { mittWorkspaceId?: string } | undefined)?.mittWorkspaceId;
   if (existing) return existing;
 
-  // Opprett nytt workspace via Prisma (erPersonlig settes via raw SQL etterpå)
-  const workspace = await prisma.workspace.create({
+  const workspace = await db.workspace.create({
     data: {
       navn: `Mine rapporter – ${displayName}`,
       beskrivelse: `Personlig arbeidsområde for ${displayName}`,
@@ -56,13 +56,11 @@ async function hentEllerOpprettMittWorkspace(
     },
   });
 
-  // Sett erPersonlig-flagget (kolonnen finnes ikke i Prisma-schema)
   await executeAzureSQL(
     `UPDATE Workspace SET erPersonlig = 1 WHERE id = '${safeId(workspace.id)}'`,
   );
 
-  // Gi bruker eier-tilgang til eget workspace
-  await prisma.tilgang.create({
+  await db.tilgang.create({
     data: {
       workspaceId: workspace.id,
       type: 'bruker',
@@ -72,7 +70,6 @@ async function hentEllerOpprettMittWorkspace(
     },
   });
 
-  // Lagre workspace-id på brukeren (raw SQL – feltet finnes ikke i Prisma-schema)
   await executeAzureSQL(
     `UPDATE bruker SET mittWorkspaceId = '${safeId(workspace.id)}' WHERE id = '${safeId(brukerId)}'`,
   );
@@ -85,8 +82,9 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
   // POST /api/rapport-designer/lagre
   fastify.post<{ Body: LagreBody }>(
     '/api/rapport-designer/lagre',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const bruker = (request as AuthRequest).bruker;
       const { tittel, beskrivelse, fraRapportId, config } = request.body;
 
@@ -94,7 +92,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Tittel er påkrevd.' });
       }
 
-      // Server-side validering: hent prosjektNr fra databasen — aldri stol på frontend
       if (fraRapportId) {
         const safeFraId = safeId(fraRapportId);
         try {
@@ -108,7 +105,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           const match = wsNavn.match(/\b(\d{4,5})\b/);
           if (match) {
             const prosjektNrFromDb = match[1];
-            // Override alle prosjekt-felter med DB-hentet verdi
             config.prosjektNr = prosjektNrFromDb;
             if (config.prosjektKolonne) {
               const isNum = config.prosjektKolonneType !== 'string';
@@ -124,15 +120,14 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
 
       const displayName = bruker.displayName ?? bruker.email ?? 'Ukjent';
 
-      // Hent eller opprett personlig workspace
       const wsId = await hentEllerOpprettMittWorkspace(
         bruker.id,
         bruker.entraObjectId,
         displayName,
+        db,
       );
 
-      // Opprett designer-rapport via Prisma (nye kolonner settes via raw SQL etterpå)
-      const rapport = await prisma.rapport.create({
+      const rapport = await db.rapport.create({
         data: {
           navn: tittel.trim(),
           beskrivelse: beskrivelse ?? '',
@@ -142,14 +137,12 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // Sett designer-kolonner (finnes ikke i Prisma-schema)
       const configJson = JSON.stringify(config).replace(/'/g, "''");
       await executeAzureSQL(
         `UPDATE Rapport SET erDesignerRapport = 1, designerConfig = '${configJson}' WHERE id = '${safeId(rapport.id)}'`,
       );
 
-      // Koble rapport til personlig workspace
-      await prisma.workspaceRapport.create({
+      await db.workspaceRapport.create({
         data: { workspaceId: wsId, rapportId: rapport.id, rekkefølge: 0 },
       });
 
@@ -158,11 +151,12 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // PUT /api/rapport-designer/:id  (oppdater eksisterende designer-rapport)
+  // PUT /api/rapport-designer/:id
   fastify.put<{ Params: { id: string }; Body: LagreBody }>(
     '/api/rapport-designer/:id',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const bruker = (request as AuthRequest).bruker;
       const id = safeId(request.params.id);
       const { tittel, beskrivelse, config } = request.body;
@@ -171,7 +165,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Tittel er påkrevd.' });
       }
 
-      // Verifiser at dette er en designer-rapport og at bruker har tilgang
       const flagRows = await queryAzureSQL(
         `SELECT erDesignerRapport FROM Rapport WHERE id = '${id}' AND erAktiv = 1`,
       );
@@ -179,7 +172,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Kun designer-rapporter kan oppdateres.' });
       }
 
-      const access = await prisma.workspaceRapport.findFirst({
+      const access = await db.workspaceRapport.findFirst({
         where: {
           rapportId: id,
           workspace: { tilgang: { some: { entraId: bruker.entraObjectId } } },
@@ -190,13 +183,11 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Ikke tilgang til denne rapporten.' });
       }
 
-      // Oppdater navn og beskrivelse via Prisma
-      await prisma.rapport.update({
+      await db.rapport.update({
         where: { id },
         data: { navn: tittel.trim(), beskrivelse: beskrivelse ?? '' },
       });
 
-      // Oppdater designerConfig via raw SQL
       const configJson = JSON.stringify(config).replace(/'/g, "''");
       await executeAzureSQL(
         `UPDATE Rapport SET designerConfig = '${configJson}' WHERE id = '${id}'`,
@@ -210,8 +201,9 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
   // PATCH /api/rapport-designer/:id/navn
   fastify.patch<{ Params: { id: string }; Body: { navn: string } }>(
     '/api/rapport-designer/:id/navn',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const bruker = (request as AuthRequest).bruker;
       const id = request.params.id;
       const { navn } = request.body;
@@ -220,8 +212,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Navn kan ikke være tomt.' });
       }
 
-      // Verifiser tilgang: bruker må ha tilgang til workspacet rapporten tilhører
-      const access = await prisma.workspaceRapport.findFirst({
+      const access = await db.workspaceRapport.findFirst({
         where: {
           rapportId: id,
           workspace: { tilgang: { some: { entraId: bruker.entraObjectId } } },
@@ -232,21 +223,21 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Ikke tilgang til denne rapporten.' });
       }
 
-      await prisma.rapport.update({ where: { id }, data: { navn: navn.trim() } });
+      await db.rapport.update({ where: { id }, data: { navn: navn.trim() } });
       console.log('[Designer] rapport omdøpt:', id, '→', navn.trim());
       return reply.send({ success: true, navn: navn.trim() });
     },
   );
 
-  // DELETE /api/rapport-designer/:id  (soft-delete — setter erAktiv = false)
+  // DELETE /api/rapport-designer/:id
   fastify.delete<{ Params: { id: string } }>(
     '/api/rapport-designer/:id',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       const bruker = (request as AuthRequest).bruker;
       const id = safeId(request.params.id);
 
-      // Verifiser at det er en designer-rapport
       const flagRows = await queryAzureSQL(
         `SELECT erDesignerRapport FROM Rapport WHERE id = '${id}' AND erAktiv = 1`,
       );
@@ -254,8 +245,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Kun designer-rapporter kan slettes.' });
       }
 
-      // Verifiser eierskap
-      const access = await prisma.workspaceRapport.findFirst({
+      const access = await db.workspaceRapport.findFirst({
         where: {
           rapportId: id,
           workspace: { tilgang: { some: { entraId: bruker.entraObjectId } } },
@@ -266,13 +256,13 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Ikke tilgang til denne rapporten.' });
       }
 
-      await prisma.rapport.update({ where: { id }, data: { erAktiv: false } });
+      await db.rapport.update({ where: { id }, data: { erAktiv: false } });
       console.log('[Designer] rapport slettet (soft):', id);
       return reply.status(204).send();
     },
   );
 
-  // GET /api/rapport-designer/view-kolonner  (kolonner + typer — metadata-katalog først, INFORMATION_SCHEMA som fallback)
+  // GET /api/rapport-designer/view-kolonner
   fastify.get<{ Querystring: { viewNavn: string } }>(
     '/api/rapport-designer/view-kolonner',
     async (request, reply) => {
@@ -289,7 +279,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       if (!schema || !view) return reply.status(400).send({ error: 'Ugyldig viewNavn.' });
 
       try {
-        // Diagnostikk: vis hva som faktisk finnes i ai_metadata_views for dette viewet
         const viewDiag = await queryAzureSQL(
           `SELECT id, schema_name, view_name, er_aktiv
            FROM ai_metadata_views
@@ -298,7 +287,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         );
         console.log('[view-kolonner] ai_metadata_views treff for view:', viewDiag.length, viewDiag);
 
-        // Prøv metadata-katalogen — admin-definerte kolonnetyper er autoritære
         const metaRows = await queryAzureSQL(
           `SELECT k.kolonne_navn, k.datatype, k.kolonne_type, k.sort_order
            FROM ai_metadata_kolonner k
@@ -311,7 +299,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         );
         console.log('[view-kolonner] metadata-treff (med er_aktiv=1):', metaRows.length);
 
-        // Prøv uten er_aktiv-filter om første spørring ga 0 — for diagnostikk
         if (metaRows.length === 0 && viewDiag.length > 0) {
           const metaAlle = await queryAzureSQL(
             `SELECT k.kolonne_navn, k.datatype, k.kolonne_type, k.sort_order
@@ -333,7 +320,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           return reply.send({ kolonner: metaRows, kilde: 'metadata' });
         }
 
-        // Fallback: auto-deteksjon fra INFORMATION_SCHEMA
         console.warn('[view-kolonner] ingen metadata funnet — fallback til INFORMATION_SCHEMA');
         const rows = await queryAzureSQL(
           `SELECT
@@ -364,7 +350,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // GET /api/rapport-designer/kolonneverdier  (ingen auth-preHandler — read-only, beskyttet av ai_gold.-sjekk)
+  // GET /api/rapport-designer/kolonneverdier
   fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string } }>(
     '/api/rapport-designer/kolonneverdier',
     async (request, reply) => {
@@ -409,7 +395,6 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const id = safeId(request.params.id);
 
-      // Hent designer-felter via raw SQL (finnes ikke i Prisma-schema)
       const rows = await queryAzureSQL(
         `SELECT r.id, r.navn, r.beskrivelse, r.erDesignerRapport, r.designerConfig
          FROM Rapport r WHERE r.id = '${id}' AND r.erAktiv = 1`,

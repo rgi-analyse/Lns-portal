@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../lib/prisma';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker } from '../middleware/auth';
 import { queryAzureSQL } from '../services/azureSqlService';
 
@@ -30,8 +30,6 @@ async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
     const rows = await queryAzureSQL(
       `SELECT id, erDesignerRapport FROM Rapport WHERE id IN (${safeIds})`,
     );
-    // SQL Server returnerer UNIQUEIDENTIFIER i uppercase; Prisma bruker lowercase.
-    // Bruk toLowerCase() på begge sider for å unngå case-sensitiv Map-oppslag.
     return new Map(
       rows.map((r) => [
         (r as { id: string }).id.toLowerCase(),
@@ -44,7 +42,6 @@ async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
 }
 
 // Slår opp erPersonlig via raw SQL og fletter inn i workspace-listen.
-// erPersonlig-kolonnen finnes ikke i Prisma-schema (migrert separat).
 async function slåSammenErPersonlig<T extends { id: string }>(
   workspaces: T[],
 ): Promise<(T & { erPersonlig: boolean })[]> {
@@ -57,20 +54,18 @@ async function slåSammenErPersonlig<T extends { id: string }>(
     );
     return workspaces.map((w) => ({ ...w, erPersonlig: flagMap.get(w.id) ?? false }));
   } catch {
-    // erPersonlig-kolonnen finnes ikke ennå (migrasjon ikke kjørt) — returner false for alle
     return workspaces.map((w) => ({ ...w, erPersonlig: false }));
   }
 }
 
 export async function workspaceRoutes(fastify: FastifyInstance) {
+  fastify.addHook('preHandler', resolveTenant);
+
   // GET /api/workspaces
-  // Identity: X-Entra-Object-Id header (brukes til å slå opp DB-rolle)
-  // Grupper: ?grupper=id1,id2 (Entra-grupper fra MSAL-claims, for gruppe-tilgang)
-  // Admin (rolle='admin' i DB) → ser alle workspaces
-  // Øvrige → ser kun workspaces de har Tilgang til
   fastify.get<{ Querystring: { grupper?: string } }>(
     '/api/workspaces',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
         const grupper      = request.query.grupper;
         const grupperArray = grupper ? grupper.split(',').filter(Boolean) : [];
@@ -79,9 +74,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const isAdmin  = bruker?.rolle === 'admin';
         const entraId  = bruker?.entraObjectId;
 
-        // Admin → returnerer alle workspaces med _count og rapporter
         if (isAdmin) {
-          const workspaces = await prisma.workspace.findMany({
+          const workspaces = await db.workspace.findMany({
             select: {
               id: true,
               navn: true,
@@ -105,7 +99,6 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           return reply.send(merged);
         }
 
-        // Bygg liste av identiteter (bruker + grupper)
         const identities = [
           ...(entraId ? [entraId] : []),
           ...grupperArray,
@@ -139,8 +132,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           },
         } as const;
 
-        // STEG 1a: Workspaces med direkte workspace-tilgang
-        const direkteWorkspacesRaw = await prisma.workspace.findMany({
+        const direkteWorkspacesRaw = await db.workspace.findMany({
           where: { tilgang: { some: { entraId: { in: identities } } } },
           select: workspaceSelect,
           orderBy: { opprettetDato: 'desc' },
@@ -148,9 +140,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
 
         const direkteIds = new Set(direkteWorkspacesRaw.map((w) => w.id));
 
-        // STEG 1b: Workspaces brukeren ikke har workspace-tilgang til,
-        // men der de har tilgang til minst én aktiv rapport
-        const rapportWorkspacesRaw = await prisma.workspace.findMany({
+        const rapportWorkspacesRaw = await db.workspace.findMany({
           where: {
             id: { notIn: [...direkteIds] },
             rapporter: {
@@ -166,19 +156,15 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           orderBy: { opprettetDato: 'desc' },
         });
 
-        // STEG 2: Filtrer rapporter basert på tilgangstype
-
-        // Direkte workspace-tilgang: vis rapporter uten spesifikk tilgang (arv) + egne
         const direkteWorkspaces = direkteWorkspacesRaw.map((ws) => ({
           ...ws,
           rapporter: ws.rapporter.filter((wr) => {
             const t = wr.rapport.tilgang ?? [];
-            if (t.length === 0) return true; // ingen rapport-begrensning → arver workspace-tilgang
+            if (t.length === 0) return true;
             return t.some((r) => identities.includes(r.entraId));
           }),
         }));
 
-        // Kun rapport-tilgang: vis bare rapporter brukeren eksplisitt har tilgang til
         const rapportWorkspaces = rapportWorkspacesRaw.map((ws) => ({
           ...ws,
           rapporter: ws.rapporter.filter((wr) =>
@@ -216,8 +202,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.create({
+        const workspace = await db.workspace.create({
           data: { ...request.body, opprettetAv: 'api' },
         });
         return reply.status(201).send(workspace);
@@ -232,6 +219,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string }; Querystring: { grupper?: string } }>(
     '/api/workspaces/:id',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
         const bruker = await resolveBruker(request);
         const isAdmin = bruker?.rolle === 'admin';
@@ -239,7 +227,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];
 
-        const workspace = await prisma.workspace.findUnique({
+        const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           include: {
             rapporter: {
@@ -252,7 +240,6 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
-        // Admin eller ingen identitet → returner alt ufiltrert (med erDesignerRapport)
         if (isAdmin || identities.length === 0) {
           const ids = workspace.rapporter.map((wr) => wr.rapport.id);
           const designerMap = await hentDesignerFlagg(ids);
@@ -265,7 +252,6 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           });
         }
 
-        // Sjekk tilgang via råSQL — dekker Tilgang-tabell, workspace-eier og personlig workspace
         const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
         const inClause  = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
         let harTilgang  = false;
@@ -283,7 +269,6 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           `);
           harTilgang = tilgangRows.length > 0;
         } catch {
-          // Fallback: Prisma-sjekk
           harTilgang = workspace.tilgang.some((t) => identities.includes(t.entraId))
             || (bruker !== null && workspace.opprettetAv === bruker.id);
         }
@@ -298,10 +283,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const filtrerteRapporter = workspace.rapporter.filter((wr) => {
           const t = wr.rapport.tilgang ?? [];
           if (harTilgang) {
-            if (t.length === 0) return true; // arver workspace-tilgang
+            if (t.length === 0) return true;
             return t.some((r) => identities.includes(r.entraId));
           }
-          // Kun rapport-tilgang
           return t.some((r) => identities.includes(r.entraId));
         });
 
@@ -343,8 +327,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await prisma.workspace.update({
+        const workspace = await db.workspace.update({
           where: { id: request.params.id },
           data: request.body,
         });
@@ -361,8 +346,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string } }>(
     '/api/workspaces/:id',
     async (request, reply) => {
+      const db = (request as TenantRequest).tenantPrisma;
       try {
-        await prisma.workspace.delete({ where: { id: request.params.id } });
+        await db.workspace.delete({ where: { id: request.params.id } });
         return reply.status(204).send();
       } catch (error) {
         if (isNotFound(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
