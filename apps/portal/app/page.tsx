@@ -6,6 +6,7 @@ import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
 import { getLocalSession, setLocalSession } from '@/lib/localAuth';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -41,7 +42,7 @@ export default function LoginPage() {
     if (!q) return;
     setLaster(true);
     try {
-      const res  = await fetch(`${API}/api/auth/login-check`, {
+      const res  = await apiFetch('/api/auth/login-check', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email: q }),
@@ -72,7 +73,7 @@ export default function LoginPage() {
     setFeil(null);
     setLaster(true);
     try {
-      const res  = await fetch(`${API}/api/auth/login-lokal`, {
+      const res  = await apiFetch('/api/auth/login-lokal', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email: email.trim().toLowerCase(), passord }),
@@ -121,7 +122,7 @@ export default function LoginPage() {
     if (!pendingEntraOid) return;
     setLaster(true);
     try {
-      const res = await fetch(`${API}/api/auth/bytt-passord`, {
+      const res = await apiFetch('/api/auth/bytt-passord', {
         method:  'POST',
         headers: {
           'Content-Type':      'application/json',
@@ -135,7 +136,7 @@ export default function LoginPage() {
         return;
       }
       // Etter bytte: logg inn på nytt for å hente fersk sesjon
-      const loginRes = await fetch(`${API}/api/auth/login-lokal`, {
+      const loginRes = await apiFetch('/api/auth/login-lokal', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email: email.trim().toLowerCase(), passord: nyttPassord }),

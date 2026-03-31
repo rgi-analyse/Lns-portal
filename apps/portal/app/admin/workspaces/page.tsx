@@ -11,6 +11,7 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { toast } from '@/components/ui/toast';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Workspace {
   id: string;
@@ -33,7 +34,7 @@ export default function WorkspacesPage() {
 
   const fetch_ = useCallback(() => {
     setLoading(true);
-    fetch(`${API}/api/workspaces`, {
+    apiFetch('/api/workspaces', {
       headers: entraObjectId ? { 'X-Entra-Object-Id': entraObjectId } : {},
     })
       .then((r) => r.json())
@@ -48,7 +49,7 @@ export default function WorkspacesPage() {
     if (!deleteId) return;
     setDeleting(true);
     try {
-      const r = await fetch(`${API}/api/workspaces/${deleteId}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/workspaces/${deleteId}`, { method: 'DELETE' });
       if (!r.ok) throw new Error();
       toast({ title: 'Workspace slettet', variant: 'success' });
       setDeleteId(null);

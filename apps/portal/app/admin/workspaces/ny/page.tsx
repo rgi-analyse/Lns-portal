@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
+import { apiFetch } from '@/lib/apiClient';
 
 interface FormState {
   navn: string;
@@ -39,7 +40,7 @@ export default function NyttWorkspacePage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const r = await fetch(`${API}/api/workspaces`, {
+      const r = await apiFetch('/api/workspaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

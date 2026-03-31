@@ -15,6 +15,7 @@ import PBIRapportBrowser from '@/components/PBIRapportBrowser';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import TilgangStyring from '@/components/TilgangStyring';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Rapport {
   id: string;
@@ -86,9 +87,9 @@ export default function WorkspaceRapporterPage() {
     console.log('[RapporterPage] API URL:', process.env.NEXT_PUBLIC_API_URL);
     setLoading(true);
     try {
-      const wsUrl = `${API}/api/workspaces/${id}`;
+      const wsUrl = `/api/workspaces/${id}`;
       console.log('[RapporterPage] Henter workspace:', wsUrl);
-      const wsRes = await fetch(wsUrl);
+      const wsRes = await apiFetch(wsUrl);
       console.log('[RapporterPage] Workspace response status:', wsRes.status);
       if (!wsRes.ok) {
         const body = await wsRes.text();
@@ -97,9 +98,9 @@ export default function WorkspaceRapporterPage() {
       }
       const ws = await wsRes.json() as Workspace;
 
-      const rapUrl = `${API}/api/workspaces/${id}/rapporter`;
+      const rapUrl = `/api/workspaces/${id}/rapporter`;
       console.log('[RapporterPage] Henter rapporter:', rapUrl);
-      const rapRes = await fetch(rapUrl);
+      const rapRes = await apiFetch(rapUrl);
       console.log('[RapporterPage] Rapporter response status:', rapRes.status);
       if (!rapRes.ok) {
         const body = await rapRes.text();
@@ -130,7 +131,7 @@ export default function WorkspaceRapporterPage() {
     if (!unlinkId) return;
     setUnlinking(true);
     try {
-      const r = await fetch(`${API}/api/workspaces/${id}/rapporter/${unlinkId}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/workspaces/${id}/rapporter/${unlinkId}`, { method: 'DELETE' });
       if (!r.ok && r.status !== 204) throw new Error();
       toast({ title: 'Rapport fjernet fra workspace', variant: 'success' });
       setUnlinkId(null);
@@ -150,7 +151,7 @@ export default function WorkspaceRapporterPage() {
     if (!deaktiverId) return;
     setDeaktiverer(true);
     try {
-      const r = await fetch(`${API}/api/admin/rapporter/${deaktiverId}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/admin/rapporter/${deaktiverId}`, { method: 'DELETE' });
       if (!r.ok && r.status !== 204) throw new Error();
       toast({ title: 'Rapport fjernet fra portalen', variant: 'success' });
       setDeaktiverLId(null);
@@ -178,7 +179,7 @@ export default function WorkspaceRapporterPage() {
     if (!editRapport || !editForm.navn.trim() || saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API}/api/rapporter/${editRapport.id}`, {
+      const res = await apiFetch(`/api/rapporter/${editRapport.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -207,8 +208,8 @@ export default function WorkspaceRapporterPage() {
     setAiLoadingKobling(true);
     try {
       const [viewsRes, koblingRes] = await Promise.all([
-        fetch(`${API}/api/admin/metadata/views`, { headers: metaHeaders }),
-        fetch(`${API}/api/admin/metadata/rapport/${rapport.id}/views`, { headers: metaHeaders }),
+        apiFetch('/api/admin/metadata/views', { headers: metaHeaders }),
+        apiFetch(`/api/admin/metadata/rapport/${rapport.id}/views`, { headers: metaHeaders }),
       ]);
       const [views, koblinger] = await Promise.all([viewsRes.json(), koblingRes.json()]);
       setAiViews(Array.isArray(views) ? views : []);
@@ -224,7 +225,7 @@ export default function WorkspaceRapporterPage() {
     if (!aiKoblingRapport || !nyViewId) return;
     console.log('[AiKobling] POST rapport:', aiKoblingRapport.id, 'view:', nyViewId, 'prioritet:', nyPrioritet);
     try {
-      const res = await fetch(`${API}/api/admin/metadata/rapport/${aiKoblingRapport.id}/views`, {
+      const res = await apiFetch(`/api/admin/metadata/rapport/${aiKoblingRapport.id}/views`, {
         method: 'POST',
         headers: metaJsonHeaders,
         body: JSON.stringify({ viewId: nyViewId, prioritet: nyPrioritet }),
@@ -249,7 +250,7 @@ export default function WorkspaceRapporterPage() {
     if (!aiKoblingRapport) return;
     console.log('[AiKobling] DELETE rapport:', aiKoblingRapport.id, 'view:', viewId);
     try {
-      const res = await fetch(`${API}/api/admin/metadata/rapport/${aiKoblingRapport.id}/views/${viewId}`, { method: 'DELETE', headers: metaHeaders });
+      const res = await apiFetch(`/api/admin/metadata/rapport/${aiKoblingRapport.id}/views/${viewId}`, { method: 'DELETE', headers: metaHeaders });
       console.log('[AiKobling] DELETE svar:', res.status);
       if (!res.ok) {
         toast({ title: `Kunne ikke fjerne kobling (${res.status})`, variant: 'destructive' });
@@ -266,7 +267,7 @@ export default function WorkspaceRapporterPage() {
     setPickerOpen(true);
     setPickerSøk('');
     setAlleLoading(true);
-    fetch(`${API}/api/rapporter`)
+    apiFetch('/api/rapporter')
       .then((r) => r.json() as Promise<AlleRapporter[]>)
       .then((data) => setAlleRapporter(Array.isArray(data) ? data : []))
       .catch(() => toast({ title: 'Kunne ikke hente rapporter', variant: 'destructive' }))
@@ -276,7 +277,7 @@ export default function WorkspaceRapporterPage() {
   const handleLinkRapport = async (rapportId: string) => {
     setLinkingId(rapportId);
     try {
-      const r = await fetch(`${API}/api/workspaces/${id}/rapporter`, {
+      const r = await apiFetch(`/api/workspaces/${id}/rapporter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rapportId }),

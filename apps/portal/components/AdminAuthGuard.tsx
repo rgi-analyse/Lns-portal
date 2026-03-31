@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -23,7 +24,7 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
       return;
     }
 
-    fetch(`${API}/api/me`, {
+    apiFetch('/api/me', {
       headers: { 'X-Entra-Object-Id': account.localAccountId },
     })
       .then(async (r) => {

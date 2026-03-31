@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Building2, FileBarChart2, Users, ArrowRight } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
+import { apiFetch } from '@/lib/apiClient';
 
 interface WorkspaceCount {
   _count: { rapporter: number; tilgang: number };
@@ -19,7 +20,7 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     if (!entraObjectId) return;
-    fetch(`${API}/api/workspaces`, { headers: { 'X-Entra-Object-Id': entraObjectId } })
+    apiFetch('/api/workspaces', { headers: { 'X-Entra-Object-Id': entraObjectId } })
       .then((r) => r.json())
       .then((data: WorkspaceCount[]) =>
         setStats({

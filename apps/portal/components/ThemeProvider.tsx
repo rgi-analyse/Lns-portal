@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Tema {
   primaryColor: string;
@@ -50,9 +51,7 @@ function applyTheme(tema: Tema) {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) return;
-    fetch(`${apiUrl}/api/tema`, { cache: 'no-store' })
+    apiFetch('/api/tema', { cache: 'no-store' })
       .then(res => res.ok ? res.json() as Promise<Tema> : null)
       .then(tema => { if (tema) applyTheme(tema); })
       .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });

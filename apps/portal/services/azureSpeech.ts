@@ -1,4 +1,5 @@
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -27,7 +28,7 @@ async function hentToken(): Promise<TokenCache> {
   const headers: Record<string, string> = {};
   if (_entraObjectId) headers['X-Entra-Object-Id'] = _entraObjectId;
 
-  const res = await fetch(`${API}/api/speech/token`, {
+  const res = await apiFetch('/api/speech/token', {
     credentials: 'include',
     headers,
   });

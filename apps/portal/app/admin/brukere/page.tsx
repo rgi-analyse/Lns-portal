@@ -7,6 +7,7 @@ import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { Tooltip } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -80,7 +81,7 @@ export default function BrukerAdminPage() {
   const [resetter,       setResetter]       = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/api/admin/brukere`, { headers: authHeaders })
+    apiFetch('/api/admin/brukere', { headers: authHeaders })
       .then((r) => r.json())
       .then((data: Bruker[]) => setBrukere(data))
       .catch(() => setBrukere([]))
@@ -92,7 +93,7 @@ export default function BrukerAdminPage() {
     const snapshot = { ...bruker };
     setBrukere((prev) => prev.map((b) => (b.id === bruker.id ? { ...b, ...data } : b)));
     try {
-      const res = await fetch(`${API}/api/admin/brukere/${bruker.id}`, {
+      const res = await apiFetch(`/api/admin/brukere/${bruker.id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify(data),
@@ -113,7 +114,7 @@ export default function BrukerAdminPage() {
     debounceRef.current = setTimeout(async () => {
       setSøkLaster(true);
       try {
-        const res = await fetch(`${API}/api/graph/search/brukere?q=${encodeURIComponent(søk.trim())}`, { headers: authHeaders });
+        const res = await apiFetch(`/api/graph/search/brukere?q=${encodeURIComponent(søk.trim())}`, { headers: authHeaders });
         const data: GraphUser[] = await res.json();
         setSøkResultater(data);
       } catch {
@@ -146,7 +147,7 @@ export default function BrukerAdminPage() {
     if (valgte.size === 0) return;
     setImporterer(true);
     try {
-      const res = await fetch(`${API}/api/admin/brukere/importer`, {
+      const res = await apiFetch('/api/admin/brukere/importer', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify({
@@ -176,7 +177,7 @@ export default function BrukerAdminPage() {
     setLokalFeil(null);
     setOppretter(true);
     try {
-      const res = await fetch(`${API}/api/admin/brukere/lokal`, {
+      const res = await apiFetch('/api/admin/brukere/lokal', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify({
@@ -212,7 +213,7 @@ export default function BrukerAdminPage() {
     setResetFeil(null);
     setResetter(true);
     try {
-      const res = await fetch(`${API}/api/admin/brukere/${resetBruker.id}/reset-passord`, {
+      const res = await apiFetch(`/api/admin/brukere/${resetBruker.id}/reset-passord`, {
         method:  'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify({ nyttPassord: resetPassord }),

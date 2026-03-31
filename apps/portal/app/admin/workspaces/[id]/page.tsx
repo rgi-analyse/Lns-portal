@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Workspace {
   id: string;
@@ -37,10 +38,9 @@ export default function RedigerWorkspacePage() {
     if (!id) return;
     const load = async () => {
       console.log('[RedigerWorkspacePage] API URL:', process.env.NEXT_PUBLIC_API_URL);
-      const url = `${API}/api/workspaces/${id}`;
-      console.log('[RedigerWorkspacePage] Henter workspace:', url);
+      console.log('[RedigerWorkspacePage] Henter workspace:', `/api/workspaces/${id}`);
       try {
-        const r = await fetch(url);
+        const r = await apiFetch(`/api/workspaces/${id}`);
         console.log('[RedigerWorkspacePage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
@@ -73,7 +73,7 @@ export default function RedigerWorkspacePage() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      const r = await fetch(`${API}/api/workspaces/${id}`, {
+      const r = await apiFetch(`/api/workspaces/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

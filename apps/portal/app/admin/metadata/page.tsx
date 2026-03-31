@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Database, Plus, RefreshCw, Search, Trash2 } 
 import { useMsal } from '@azure/msal-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'https://localhost:3001';
 
@@ -119,7 +120,7 @@ export default function MetadataAdminPage() {
   const hentViews = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/admin/metadata/views`, { headers: authHeaders });
+      const res = await apiFetch('/api/admin/metadata/views', { headers: authHeaders });
       const data: unknown = await res.json();
       console.log('[Metadata] API respons:', data);
       setViews(Array.isArray(data) ? data : []);
@@ -133,7 +134,7 @@ export default function MetadataAdminPage() {
 
   useEffect(() => {
     hentViews();
-    fetch(`${API}/api/admin/rapporter/alle`, { headers: authHeaders })
+    apiFetch('/api/admin/rapporter/alle', { headers: authHeaders })
       .then(r => r.json())
       .then((data: unknown) => setAlleRapporter(Array.isArray(data) ? data : []))
       .catch(() => {});
@@ -143,7 +144,7 @@ export default function MetadataAdminPage() {
   const hentKobletRapporter = async (viewId: string) => {
     setLoadingKoblinger(prev => new Set(prev).add(viewId));
     try {
-      const res = await fetch(`${API}/api/admin/metadata/views/${viewId}/rapporter`, { headers: authHeaders });
+      const res = await apiFetch(`/api/admin/metadata/views/${viewId}/rapporter`, { headers: authHeaders });
       const data = await res.json();
       setKobletRapporter(prev => ({ ...prev, [viewId]: Array.isArray(data) ? data : [] }));
     } catch {
@@ -170,7 +171,7 @@ export default function MetadataAdminPage() {
     setSyncingId(view.id);
     setStatusMsg('');
     try {
-      const res = await fetch(`${API}/api/admin/metadata/views/${view.id}/sync`, {
+      const res = await apiFetch(`/api/admin/metadata/views/${view.id}/sync`, {
         method: 'POST',
         headers: authHeaders,
       });
@@ -189,7 +190,7 @@ export default function MetadataAdminPage() {
     setSyncingAll(true);
     setStatusMsg('');
     try {
-      const res = await fetch(`${API}/api/admin/metadata/sync-all`, { method: 'POST', headers: authHeaders });
+      const res = await apiFetch('/api/admin/metadata/sync-all', { method: 'POST', headers: authHeaders });
       const data = await res.json();
       setStatusMsg(`Synkronisert ${data.synkronisert} views`);
       await hentViews();
@@ -204,7 +205,7 @@ export default function MetadataAdminPage() {
     setDiscovering(true);
     setStatusMsg('');
     try {
-      const res = await fetch(`${API}/api/admin/metadata/discover`, { headers: authHeaders });
+      const res = await apiFetch('/api/admin/metadata/discover', { headers: authHeaders });
       const data = await res.json();
       setNewViews(data.views ?? []);
       setStatusMsg(data.antall === 0 ? 'Ingen nye views funnet' : `${data.antall} nye views funnet`);
@@ -221,7 +222,7 @@ export default function MetadataAdminPage() {
     try {
       // Lag visningsnavn: fjern "vw_"-prefiks og erstatt _ med mellomrom
       const visningsnavn = view_name.replace(/^vw_/i, '').replace(/_/g, ' ');
-      const res = await fetch(`${API}/api/admin/metadata/views`, {
+      const res = await apiFetch('/api/admin/metadata/views', {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify({ schema_name, view_name, visningsnavn, beskrivelse: '', område: '', prosjekter: 'alle' }),
@@ -234,7 +235,7 @@ export default function MetadataAdminPage() {
       }
       const data = await res.json();
       // Auto-sync for å hente kolonner automatisk
-      await fetch(`${API}/api/admin/metadata/views/${data.id}/sync`, {
+      await apiFetch(`/api/admin/metadata/views/${data.id}/sync`, {
         method: 'POST',
         headers: authHeaders,
       });
@@ -252,7 +253,7 @@ export default function MetadataAdminPage() {
 
   const deaktiverView = async (id: string) => {
     if (!confirm('Deaktiver dette viewet?')) return;
-    await fetch(`${API}/api/admin/metadata/views/${id}`, { method: 'DELETE', headers: authHeaders });
+    await apiFetch(`/api/admin/metadata/views/${id}`, { method: 'DELETE', headers: authHeaders });
     setViews(prev => prev.map(v => v.id === id ? { ...v, er_aktiv: false } : v));
   };
 
@@ -271,7 +272,7 @@ export default function MetadataAdminPage() {
 
   const lagreView = async () => {
     if (!editView) return;
-    const res = await fetch(`${API}/api/admin/metadata/views/${editView.id}`, {
+    const res = await apiFetch(`/api/admin/metadata/views/${editView.id}`, {
       method: 'PUT',
       headers: jsonHeaders,
       body: JSON.stringify({
@@ -297,7 +298,7 @@ export default function MetadataAdminPage() {
       : v,
     ));
     try {
-      await fetch(`${API}/api/admin/metadata/views/${viewId}/kolonner/${kol.id}`, {
+      await apiFetch(`/api/admin/metadata/views/${viewId}/kolonner/${kol.id}`, {
         method: 'PUT',
         headers: jsonHeaders,
         body: JSON.stringify({ kolonne_type }),
@@ -309,7 +310,7 @@ export default function MetadataAdminPage() {
 
   const lagreKolonne = async () => {
     if (!editKolonne) return;
-    const res = await fetch(`${API}/api/admin/metadata/views/${editKolonne.viewId}/kolonner/${editKolonne.kol.id}`, {
+    const res = await apiFetch(`/api/admin/metadata/views/${editKolonne.viewId}/kolonner/${editKolonne.kol.id}`, {
       method: 'PUT',
       headers: jsonHeaders,
       body: JSON.stringify(kolForm),
@@ -325,7 +326,7 @@ export default function MetadataAdminPage() {
   // ── Eksempler ──
   const leggTilEksempel = async () => {
     if (!addEksempelViewId) return;
-    const res = await fetch(`${API}/api/admin/metadata/views/${addEksempelViewId}/eksempler`, {
+    const res = await apiFetch(`/api/admin/metadata/views/${addEksempelViewId}/eksempler`, {
       method: 'POST',
       headers: jsonHeaders,
       body: JSON.stringify(eksempelForm),
@@ -337,14 +338,14 @@ export default function MetadataAdminPage() {
   };
 
   const slettEksempel = async (viewId: string, eksId: string) => {
-    await fetch(`${API}/api/admin/metadata/views/${viewId}/eksempler/${eksId}`, { method: 'DELETE', headers: authHeaders });
+    await apiFetch(`/api/admin/metadata/views/${viewId}/eksempler/${eksId}`, { method: 'DELETE', headers: authHeaders });
     setViews(prev => prev.map(v => v.id === viewId ? { ...v, eksempler: v.eksempler.filter(e => e.id !== eksId) } : v));
   };
 
   // ── Regler ──
   const leggTilRegel = async () => {
     if (!addRegelViewId || !regelForm.regel.trim()) return;
-    const res = await fetch(`${API}/api/admin/metadata/views/${addRegelViewId}/regler`, {
+    const res = await apiFetch(`/api/admin/metadata/views/${addRegelViewId}/regler`, {
       method: 'POST',
       headers: jsonHeaders,
       body: JSON.stringify(regelForm),
@@ -356,7 +357,7 @@ export default function MetadataAdminPage() {
   };
 
   const slettRegel = async (viewId: string, regelId: string) => {
-    await fetch(`${API}/api/admin/metadata/views/${viewId}/regler/${regelId}`, { method: 'DELETE', headers: authHeaders });
+    await apiFetch(`/api/admin/metadata/views/${viewId}/regler/${regelId}`, { method: 'DELETE', headers: authHeaders });
     setViews(prev => prev.map(v => v.id === viewId ? { ...v, regler: v.regler.filter(r => r.id !== regelId) } : v));
   };
 
@@ -364,7 +365,7 @@ export default function MetadataAdminPage() {
   const leggTilKobling = async () => {
     if (!addKoblingViewId || !koblingForm.rapportId.trim()) return;
     const rapportId = koblingForm.rapportId.trim();
-    await fetch(`${API}/api/admin/metadata/rapport/${rapportId}/views`, {
+    await apiFetch(`/api/admin/metadata/rapport/${rapportId}/views`, {
       method: 'POST',
       headers: jsonHeaders,
       body: JSON.stringify({ viewId: addKoblingViewId, prioritet: Number(koblingForm.prioritet) }),
@@ -378,7 +379,7 @@ export default function MetadataAdminPage() {
   };
 
   const fjernKobling = async (viewId: string, rapportId: string) => {
-    await fetch(`${API}/api/admin/metadata/rapport/${rapportId}/views/${viewId}`, { method: 'DELETE', headers: authHeaders });
+    await apiFetch(`/api/admin/metadata/rapport/${rapportId}/views/${viewId}`, { method: 'DELETE', headers: authHeaders });
     setKobletRapporter(prev => ({ ...prev, [viewId]: (prev[viewId] ?? []).filter(k => k.rapport_id !== rapportId) }));
   };
 

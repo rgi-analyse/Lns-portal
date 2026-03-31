@@ -5,6 +5,7 @@ import { Building, Plus, Pencil, CheckCircle, XCircle } from 'lucide-react';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -57,7 +58,7 @@ export default function TenantsAdminPage() {
   const lastTenants = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/admin/tenants`, { headers: authHeaders });
+      const res = await apiFetch('/api/admin/tenants', { headers: authHeaders });
       if (res.ok) setTenants(await res.json() as Tenant[]);
     } catch { /* ignore */ }
     finally { setLoading(false); }
@@ -72,7 +73,7 @@ export default function TenantsAdminPage() {
     setNyFeil(null);
     setOppretter(true);
     try {
-      const res = await fetch(`${API}/api/admin/tenants`, {
+      const res = await apiFetch('/api/admin/tenants', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify({
@@ -111,7 +112,7 @@ export default function TenantsAdminPage() {
       const body: Record<string, unknown> = { navn: editForm.navn.trim() };
       if (editForm.databaseUrl.trim()) body.databaseUrl = editForm.databaseUrl.trim();
 
-      const res = await fetch(`${API}/api/admin/tenants/${editTenant.id}`, {
+      const res = await apiFetch(`/api/admin/tenants/${editTenant.id}`, {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body:    JSON.stringify(body),
@@ -136,13 +137,13 @@ export default function TenantsAdminPage() {
     setTenants((prev) => prev.map((x) => (x.id === t.id ? { ...x, erAktiv: nyStatus } : x)));
     try {
       if (nyStatus) {
-        await fetch(`${API}/api/admin/tenants/${t.id}`, {
+        await apiFetch(`/api/admin/tenants/${t.id}`, {
           method:  'PATCH',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
           body:    JSON.stringify({ erAktiv: true }),
         });
       } else {
-        await fetch(`${API}/api/admin/tenants/${t.id}`, {
+        await apiFetch(`/api/admin/tenants/${t.id}`, {
           method:  'DELETE',
           headers: authHeaders,
         });

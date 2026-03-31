@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
+import { apiFetch } from '@/lib/apiClient';
 
 interface Tema {
   id?: string;
@@ -59,7 +60,7 @@ export default function TemaAdminPage() {
   const [melding, setMelding] = useState<{ type: 'ok' | 'feil'; tekst: string } | null>(null);
 
   const lastTema = useCallback(async () => {
-    const res = await fetch(`${apiUrl}/api/admin/tema`, {
+    const res = await apiFetch('/api/admin/tema', {
       headers: { 'x-entra-object-id': entraId },
     });
     if (res.ok) {
@@ -86,8 +87,8 @@ export default function TemaAdminPage() {
     setMelding(null);
     try {
       const method = tema.id ? 'PATCH' : 'POST';
-      const url = tema.id ? `${apiUrl}/api/admin/tema/${tema.id}` : `${apiUrl}/api/admin/tema`;
-      const res = await fetch(url, {
+      const url = tema.id ? `/api/admin/tema/${tema.id}` : '/api/admin/tema';
+      const res = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', 'x-entra-object-id': entraId },
         body: JSON.stringify(tema),
