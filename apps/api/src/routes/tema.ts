@@ -8,6 +8,8 @@ interface TemaBody {
   backgroundColor?: string;
   navyColor?: string;
   accentColor?: string;
+  textColor?: string;
+  textMutedColor?: string;
   logoUrl?: string | null;
 }
 
@@ -24,6 +26,8 @@ export async function temaRoutes(fastify: FastifyInstance) {
           backgroundColor: '#0a1628',
           navyColor: '#1B2A4A',
           accentColor: '#243556',
+          textColor: '#FFFFFF',
+          textMutedColor: 'rgba(255,255,255,0.65)',
           logoUrl: null,
           organisasjonNavn: 'LNS',
         });

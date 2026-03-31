@@ -8,6 +8,8 @@ interface Tema {
   backgroundColor: string;
   navyColor: string;
   accentColor: string;
+  textColor?: string;
+  textMutedColor?: string;
   logoUrl?: string | null;
 }
 
@@ -47,6 +49,13 @@ export function applyTheme(tema: Tema) {
   root.style.setProperty('--navy', tema.accentColor);
   root.style.setProperty('--navy-mid', tema.accentColor);
   document.body.style.setProperty('background', tema.backgroundColor);
+  if (tema.textColor) {
+    root.style.setProperty('--text-primary', tema.textColor);
+  }
+  if (tema.textMutedColor) {
+    root.style.setProperty('--text-secondary', tema.textMutedColor);
+    root.style.setProperty('--text-muted', tema.textMutedColor);
+  }
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {

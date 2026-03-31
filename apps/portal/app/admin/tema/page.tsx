@@ -12,6 +12,8 @@ interface Tema {
   backgroundColor: string;
   navyColor: string;
   accentColor: string;
+  textColor: string;
+  textMutedColor: string;
   logoUrl?: string | null;
 }
 
@@ -21,6 +23,8 @@ const STANDARD_TEMA: Tema = {
   backgroundColor: '#0a1628',
   navyColor: '#1B2A4A',
   accentColor: '#243556',
+  textColor: '#FFFFFF',
+  textMutedColor: 'rgba(255,255,255,0.65)',
   logoUrl: null,
 };
 
@@ -81,6 +85,8 @@ export default function TemaAdminPage() {
     root.style.setProperty('--navy-dark', tema.navyColor);
     root.style.setProperty('--navy', tema.accentColor);
     document.body.style.setProperty('background', tema.backgroundColor);
+    root.style.setProperty('--text-primary', tema.textColor);
+    root.style.setProperty('--text-secondary', tema.textMutedColor);
   }, [tema]);
 
   async function lagreTema() {
@@ -137,6 +143,22 @@ export default function TemaAdminPage() {
           <ColorField label="Bakgrunnsfarge" value={tema.backgroundColor} onChange={v => setTema(t => ({ ...t, backgroundColor: v }))} />
           <ColorField label="Navigasjonsfarge" value={tema.navyColor} onChange={v => setTema(t => ({ ...t, navyColor: v }))} />
           <ColorField label="Aksentfarge" value={tema.accentColor} onChange={v => setTema(t => ({ ...t, accentColor: v }))} />
+          <ColorField label="Tekstfarge (overskrifter, innhold)" value={tema.textColor} onChange={v => setTema(t => ({ ...t, textColor: v }))} />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>Dempet tekstfarge (beskrivelser, labels)</label>
+            <input
+              type="text"
+              value={tema.textMutedColor}
+              onChange={e => setTema(t => ({ ...t, textMutedColor: e.target.value }))}
+              placeholder="rgba(255,255,255,0.65)"
+              className="flex-1 rounded px-3 py-1.5 text-sm font-mono"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.88)',
+              }}
+            />
+          </div>
         </div>
 
         {/* Logo-URL */}

@@ -113,6 +113,8 @@ model OrganisasjonTema {
   backgroundColor  String   @default("#0a1628") @db.NVarChar(20)
   navyColor        String   @default("#1B2A4A") @db.NVarChar(20)
   accentColor      String   @default("#243556") @db.NVarChar(20)
+  textColor        String   @default("#FFFFFF") @db.NVarChar(50)
+  textMutedColor   String   @default("rgba(255,255,255,0.65)") @db.NVarChar(50)
   logoUrl          String?  @db.NVarChar(500)
   oppdatert        DateTime @updatedAt
   opprettet        DateTime @default(now())
