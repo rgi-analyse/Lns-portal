@@ -19,6 +19,7 @@ if (mangler.length > 0) {
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { healthRoutes } from './routes/health';
 import { embedTokenRoutes } from './routes/embedToken';
 import { debugEnvRoutes } from './routes/debugEnv';
 import { debugPbiRoutes } from './routes/debugPbi';
@@ -85,16 +86,8 @@ async function start() {
     exposedHeaders: ['Set-Cookie'],
   });
 
-  // Health check - alltid tilgjengelig uten auth:
-  server.get('/health', async (request, reply) => {
-    return reply.send({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV ?? 'development',
-      version: process.env.npm_package_version ?? '1.0.0',
-      uptime: Math.floor(process.uptime())
-    });
-  });
+  // Health check — alltid tilgjengelig uten auth, registreres først
+  await server.register(healthRoutes);
 
   await server.register(embedTokenRoutes);
   await server.register(debugEnvRoutes);
