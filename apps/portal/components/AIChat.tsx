@@ -569,7 +569,7 @@ export default function AIChat({
                 <div style={{
                   fontFamily: 'Barlow Condensed, sans-serif',
                   fontWeight: 700,
-                  color: 'rgba(255,255,255,0.90)',
+                  color: 'var(--text-primary)',
                   fontSize: 15,
                   letterSpacing: '0.02em',
                 }}>
@@ -957,20 +957,20 @@ export default function AIChat({
                           ? {
                               background: 'var(--gold-dim)',
                               border: '1px solid var(--glass-gold-border)',
-                              color: 'rgba(255,255,255,0.90)',
+                              color: 'var(--text-primary)',
                               borderRadius: '10px 10px 3px 10px',
                             }
                           : msg.role === 'status'
                           ? {
                               fontSize: 11,
-                              color: 'rgba(255,255,255,0.30)',
+                              color: 'var(--text-muted)',
                               fontStyle: 'italic',
                               padding: '2px 0',
                             }
                           : {
-                              background: 'rgba(30,45,70,0.90)',
-                              border: '1px solid rgba(255,255,255,0.10)',
-                              color: 'rgba(255,255,255,0.92)',
+                              background: 'var(--glass-bg)',
+                              border: '1px solid var(--glass-border)',
+                              color: 'var(--text-primary)',
                               borderRadius: '3px 10px 10px 10px',
                             }
                       }
@@ -1006,12 +1006,12 @@ export default function AIChat({
                 <div
                   className="px-3 py-2"
                   style={{
-                    background: 'rgba(30,45,70,0.90)',
-                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: 'var(--glass-bg)',
+                    border: '1px solid var(--glass-border)',
                     borderRadius: '3px 10px 10px 10px',
                   }}
                 >
-                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
                 </div>
               </div>
             )}
