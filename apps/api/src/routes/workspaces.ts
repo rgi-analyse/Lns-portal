@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
-import { resolveBruker } from '../middleware/auth';
+import { resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL } from '../services/azureSqlService';
 
 function isNotFound(error: unknown): boolean {
@@ -71,7 +71,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const grupperArray = grupper ? grupper.split(',').filter(Boolean) : [];
 
         const bruker   = await resolveBruker(request);
-        const isAdmin  = bruker?.rolle === 'admin';
+        const isAdmin  = erAdmin(bruker?.rolle);
         const entraId  = bruker?.entraObjectId;
 
         if (isAdmin) {
@@ -222,7 +222,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       const db = (request as TenantRequest).tenantPrisma;
       try {
         const bruker = await resolveBruker(request);
-        const isAdmin = bruker?.rolle === 'admin';
+        const isAdmin = erAdmin(bruker?.rolle);
         const entraId = bruker?.entraObjectId;
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];

@@ -3,6 +3,7 @@ import { chat, type ChatMessage, type ChatContext } from '../services/openaiServ
 import { queryAzureSQL } from '../services/azureSqlService';
 import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { erAdmin } from '../middleware/auth';
 
 // ── Statisk tillegg som alltid er med (analyse-instruksjoner og generelle regler) ──
 const STATIC_APPENDIX = `
@@ -495,8 +496,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
       if (entraObjectId) {
         try {
           const bruker = await prisma.bruker.findUnique({ where: { entraObjectId }, select: { rolle: true } });
-          const kanLageRapport = bruker?.rolle === 'admin' || bruker?.rolle === 'redaktør';
-          chatContext = { entraObjectId, isAdmin: bruker?.rolle === 'admin', kanLageRapport };
+          const kanLageRapport = erAdmin(bruker?.rolle) || bruker?.rolle === 'redaktør';
+          chatContext = { entraObjectId, isAdmin: erAdmin(bruker?.rolle), kanLageRapport };
         } catch {
           // ignorerer feil, fortsetter uten admin-flagg
         }

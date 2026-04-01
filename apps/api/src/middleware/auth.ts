@@ -61,6 +61,13 @@ export async function requireTenantAdmin(
 }
 
 /**
+ * Returnerer true for roller som har admin-nivå tilgang (admin og tenantadmin).
+ */
+export function erAdmin(rolle: string | undefined): boolean {
+  return rolle === 'admin' || rolle === 'tenantadmin';
+}
+
+/**
  * Hjelpe-funksjon: slår opp Bruker fra header uten å returnere feil.
  * Brukes for ruter som er offentlige men oppfører seg annerledes for admins.
  */

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
-import { requireBruker, requireAdmin, resolveBruker } from '../middleware/auth';
+import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL } from '../services/azureSqlService';
 
 function isNotFound(error: unknown): boolean {
@@ -259,7 +259,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
         const bruker = await resolveBruker(request);
-        const isAdmin = bruker?.rolle === 'admin';
+        const isAdmin = erAdmin(bruker?.rolle);
         const entraId = bruker?.entraObjectId;
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];
