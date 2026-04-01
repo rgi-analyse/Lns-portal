@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, FileBarChart2, Clock, Star } from 'lucide-react';
+import { Clock, FileBarChart2, RefreshCw, Star } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
@@ -15,13 +15,10 @@ interface Workspace {
   _count?: { rapporter: number; tilgang: number };
 }
 
-interface Stats {
-  workspaces: number;
-  rapporter: number;
-}
-
 interface Aktivitet {
-  sisteAktiv: string | null;
+  sistInnlogget: string | null;
+  sistAapnetRapport: { navn: string | null; dato: string } | null;
+  sistOppdatertRapport: { navn: string | null; dato: string } | null;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -32,35 +29,31 @@ function projectCode(navn: string): string {
   return navn.slice(0, 3).toUpperCase();
 }
 
-const statCards = [
-  {
-    label: 'Workspaces',
-    key: 'workspaces' as const,
-    Icon: LayoutDashboard,
-    iconBg: 'rgba(27,42,74,0.60)',
-    iconBorder: 'var(--glass-border)',
-    iconColor: 'var(--text-secondary)',
-  },
-  {
-    label: 'Rapporter',
-    key: 'rapporter' as const,
-    Icon: FileBarChart2,
-    iconBg: 'var(--glass-gold-bg)',
-    iconBorder: 'var(--glass-gold-border)',
-    iconColor: 'var(--gold)',
-  },
-];
+function formaterDato(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const dato = new Date(iso);
+  if (isNaN(dato.getTime())) return '—';
+  const diffMs = Date.now() - dato.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffTimer = Math.floor(diffMin / 60);
+  const diffDager = Math.floor(diffTimer / 24);
+  if (diffMin < 1)   return 'akkurat nå';
+  if (diffMin < 60)  return `${diffMin} min siden`;
+  if (diffTimer < 24) return `${diffTimer}t siden`;
+  if (diffDager < 7) return `${diffDager} dager siden`;
+  return dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, entraObjectId, displayName, authHeaders, grupper } = usePortalAuth();
   const firstName = displayName.split(' ')[0];
 
-  const [stats,      setStats]      = useState<Stats | null>(null);
-  const [aktivitet,  setAktivitet]  = useState<Aktivitet | null>(null);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [filter,     setFilter]     = useState<'alle' | 'favoritter'>('favoritter');
-  const [favoritter, setFavoritter] = useState<string[]>([]);
+  const [aktivitet,        setAktivitet]        = useState<Aktivitet | null>(null);
+  const [workspaces,       setWorkspaces]        = useState<Workspace[]>([]);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
+  const [filter,           setFilter]            = useState<'alle' | 'favoritter'>('favoritter');
+  const [favoritter,       setFavoritter]        = useState<string[]>([]);
   const togglingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -72,14 +65,11 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then((data: Workspace[]) => {
         setWorkspaces(data);
-        setStats({
-          workspaces: data.length,
-          rapporter:  data.reduce((sum, ws) => sum + (ws._count?.rapporter ?? 0), 0),
-        });
+        setLoadingWorkspaces(false);
       })
       .catch(() => {
         setWorkspaces([]);
-        setStats({ workspaces: 0, rapporter: 0 });
+        setLoadingWorkspaces(false);
       });
   }, [isAuthenticated, entraObjectId, authHeaders, grupper]);
 
@@ -94,9 +84,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isAuthenticated || !entraObjectId) return;
     apiFetch('/api/meg/aktivitet', { headers: authHeaders })
-      .then((r) => r.json())
-      .then((data: Aktivitet) => setAktivitet(data))
-      .catch(() => setAktivitet({ sisteAktiv: null }));
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: Aktivitet | null) => setAktivitet(data))
+      .catch(() => setAktivitet(null));
   }, [isAuthenticated, entraObjectId, authHeaders]);
 
   async function toggleFavoritt(e: React.MouseEvent, workspaceId: string) {
@@ -104,7 +94,6 @@ export default function DashboardPage() {
     if (togglingRef.current.has(workspaceId)) return;
     togglingRef.current.add(workspaceId);
     const erFavoritt = favoritter.includes(workspaceId);
-    // Optimistisk oppdatering
     setFavoritter((prev) =>
       erFavoritt ? prev.filter((id) => id !== workspaceId) : [...prev, workspaceId],
     );
@@ -114,7 +103,6 @@ export default function DashboardPage() {
         headers: authHeaders,
       });
     } catch {
-      // Rull tilbake ved feil
       setFavoritter((prev) =>
         erFavoritt ? [...prev, workspaceId] : prev.filter((id) => id !== workspaceId),
       );
@@ -149,66 +137,12 @@ export default function DashboardPage() {
         {/* Section label — Oversikt */}
         <SectionLabel>Oversikt</SectionLabel>
 
-        {/* Stats */}
+        {/* Oversikt — 3 aktivitetskort */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-          {statCards.map(({ label, key, Icon, iconBg, iconBorder, iconColor }) => (
-            <div
-              key={label}
-              className="flex items-center gap-4 transition-all duration-150 cursor-default"
-              style={{
-                background: 'var(--glass-bg)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid var(--glass-bg-hover)',
-                borderRadius: 14,
-                padding: '20px 24px',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
-                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
-                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
-              }}
-            >
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: iconBg, border: `1px solid ${iconBorder}` }}
-              >
-                <Icon className="w-6 h-6" style={{ color: iconColor }} />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-widest font-semibold"
-                  style={{ color: 'var(--text-secondary)' }}>
-                  {label}
-                </p>
-                <p style={{
-                  fontFamily: 'Barlow Condensed, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 30,
-                  color: 'var(--text-primary)',
-                  lineHeight: 1,
-                  marginTop: 2,
-                }}>
-                  {stats === null ? (
-                    <span
-                      className="inline-block w-8 h-7 rounded animate-pulse"
-                      style={{ background: 'var(--glass-bg-hover)' }}
-                    />
-                  ) : (
-                    stats[key]
-                  )}
-                </p>
-              </div>
-            </div>
-          ))}
 
-          {/* Siste aktivitet-kort */}
+          {/* Kort 1: Sist innlogget */}
           <div
-            className="flex items-center gap-4 transition-all duration-150 cursor-default"
+            className="flex items-center gap-4"
             style={{
               background: 'var(--glass-bg)',
               backdropFilter: 'blur(20px)',
@@ -217,15 +151,93 @@ export default function DashboardPage() {
               borderRadius: 14,
               padding: '20px 24px',
             }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)';
-              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
-              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
+          >
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'var(--glass-bg-hover)', border: '1px solid var(--glass-border)' }}
+            >
+              <Clock className="w-6 h-6" style={{ color: 'var(--text-secondary)' }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest font-semibold"
+                style={{ color: 'var(--text-muted)' }}>
+                Sist innlogget
+              </p>
+              <p style={{
+                fontFamily: 'Barlow Condensed, sans-serif',
+                fontWeight: 700,
+                fontSize: 18,
+                color: 'var(--text-primary)',
+                lineHeight: 1.2,
+                marginTop: 4,
+              }}>
+                {aktivitet === null
+                  ? <span className="inline-block w-24 h-5 rounded animate-pulse"
+                      style={{ background: 'var(--glass-bg-hover)' }} />
+                  : formaterDato(aktivitet.sistInnlogget)}
+              </p>
+            </div>
+          </div>
+
+          {/* Kort 2: Siste åpnet rapport */}
+          <div
+            className="flex items-center gap-4"
+            style={{
+              background: 'var(--glass-bg)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid var(--glass-bg-hover)',
+              borderRadius: 14,
+              padding: '20px 24px',
             }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
-              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
-              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+          >
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)' }}
+            >
+              <FileBarChart2 className="w-6 h-6" style={{ color: 'var(--gold)' }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-widest font-semibold"
+                style={{ color: 'var(--text-muted)' }}>
+                Siste åpnet rapport
+              </p>
+              {aktivitet === null ? (
+                <span className="inline-block w-32 h-5 rounded animate-pulse mt-1"
+                  style={{ background: 'var(--glass-bg-hover)' }} />
+              ) : aktivitet.sistAapnetRapport ? (
+                <>
+                  <p className="truncate" style={{
+                    fontFamily: 'Barlow Condensed, sans-serif',
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: 'var(--text-primary)',
+                    marginTop: 4,
+                  }}>
+                    {aktivitet.sistAapnetRapport.navn ?? '—'}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {formaterDato(aktivitet.sistAapnetRapport.dato)}
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Ingen åpnet ennå
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Kort 3: Sist oppdatert rapport */}
+          <div
+            className="flex items-center gap-4"
+            style={{
+              background: 'var(--glass-bg)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid var(--glass-bg-hover)',
+              borderRadius: 14,
+              padding: '20px 24px',
             }}
           >
             <div
@@ -235,32 +247,39 @@ export default function DashboardPage() {
                 border: '1px solid rgba(16,185,129,0.20)',
               }}
             >
-              <Clock className="w-6 h-6" style={{ color: 'rgba(110,231,183,0.9)' }} />
+              <RefreshCw className="w-6 h-6" style={{ color: 'rgba(110,231,183,0.9)' }} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-widest font-semibold"
-                style={{ color: 'var(--text-secondary)' }}>
-                Siste aktivitet
+                style={{ color: 'var(--text-muted)' }}>
+                Sist oppdatert rapport
               </p>
-              <p style={{
-                fontFamily: 'Barlow Condensed, sans-serif',
-                fontWeight: 800,
-                fontSize: 22,
-                color: 'var(--text-primary)',
-                lineHeight: 1,
-                marginTop: 4,
-              }}>
-                {aktivitet === null ? (
-                  <span
-                    className="inline-block w-16 h-6 rounded animate-pulse"
-                    style={{ background: 'var(--glass-bg-hover)' }}
-                  />
-                ) : (
-                  formaterAktivitet(aktivitet.sisteAktiv)
-                )}
-              </p>
+              {aktivitet === null ? (
+                <span className="inline-block w-32 h-5 rounded animate-pulse mt-1"
+                  style={{ background: 'var(--glass-bg-hover)' }} />
+              ) : aktivitet.sistOppdatertRapport ? (
+                <>
+                  <p className="truncate" style={{
+                    fontFamily: 'Barlow Condensed, sans-serif',
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: 'var(--text-primary)',
+                    marginTop: 4,
+                  }}>
+                    {aktivitet.sistOppdatertRapport.navn}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                    {formaterDato(aktivitet.sistOppdatertRapport.dato)}
+                  </p>
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Ingen rapporter ennå
+                </p>
+              )}
             </div>
           </div>
+
         </div>
 
         {/* Section label + filter-tabs */}
@@ -308,8 +327,7 @@ export default function DashboardPage() {
             filter === 'alle' || favoritter.includes(w.id)
           );
 
-          if (stats === null) {
-            // Loading-skjelett
+          if (loadingWorkspaces) {
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -431,24 +449,6 @@ export default function DashboardPage() {
       <AIChat entraObjectId={entraObjectId} />
     </>
   );
-}
-
-function formaterAktivitet(iso: string | null): string {
-  if (!iso) return 'Ingen';
-  const dato = new Date(iso);
-  if (isNaN(dato.getTime())) return 'Ukjent';
-  const nå = Date.now();
-  const diffMs = nå - dato.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 1)  return 'Akkurat nå';
-  if (diffMin < 60) return `${diffMin}m siden`;
-  const diffTimer = Math.floor(diffMin / 60);
-  if (diffTimer < 24) return `${diffTimer}t siden`;
-  const diffDager = Math.floor(diffTimer / 24);
-  if (diffDager === 1) return 'I går';
-  if (diffDager < 7)  return `${diffDager}d siden`;
-  if (diffDager < 30) return `${Math.floor(diffDager / 7)}u siden`;
-  return dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {

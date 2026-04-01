@@ -1,24 +1,48 @@
 import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
-import { queryAzureSQL } from '../services/azureSqlService';
-
-function safeId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9\-]/g, '');
-}
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 export async function aktivitetRoutes(fastify: FastifyInstance) {
-  // GET /api/meg/aktivitet
-  // Returnerer tidspunktet for brukerens siste aktivitet (siste gang de interagerte med en rapport).
-  fastify.get('/api/meg/aktivitet', { preHandler: [requireBruker] }, async (request, reply) => {
-    const { id } = (request as AuthRequest).bruker;
-    try {
-      const rows = await queryAzureSQL(
-        `SELECT MAX(oppdatert) AS sisteAktiv FROM BrukerInnstilling WHERE brukerId = '${safeId(id)}'`,
-      );
-      const raw = (rows[0] as { sisteAktiv?: string | null } | undefined)?.sisteAktiv ?? null;
-      return reply.send({ sisteAktiv: raw });
-    } catch {
-      return reply.send({ sisteAktiv: null });
-    }
-  });
+  fastify.get(
+    '/api/meg/aktivitet',
+    { preHandler: [requireBruker, resolveTenant] },
+    async (request, reply) => {
+      const bruker = (request as AuthRequest).bruker;
+      const db = (request as TenantRequest).tenantPrisma;
+
+      // Sist åpnet rapport fra BrukerInnstilling
+      const sistAapnet = await db.brukerInnstilling
+        .findFirst({
+          where: { brukerId: bruker.id, type: 'sistAapnet' },
+          orderBy: { oppdatert: 'desc' },
+          select: { verdi: true, oppdatert: true },
+        })
+        .catch(() => null);
+
+      // Sist oppdatert rapport i tenanten
+      const sistOppdatert = await db.rapport
+        .findFirst({
+          where: { erAktiv: true },
+          orderBy: { oppdatert: 'desc' },
+          select: { navn: true, oppdatert: true },
+        })
+        .catch(() => null);
+
+      return reply.send({
+        sistInnlogget: bruker.sistInnlogget ?? null,
+        sistAapnetRapport: sistAapnet
+          ? {
+              navn: (() => {
+                try { return JSON.parse(sistAapnet.verdi)?.navn ?? null; }
+                catch { return sistAapnet.verdi ?? null; }
+              })(),
+              dato: sistAapnet.oppdatert,
+            }
+          : null,
+        sistOppdatertRapport: sistOppdatert
+          ? { navn: sistOppdatert.navn, dato: sistOppdatert.oppdatert }
+          : null,
+      });
+    },
+  );
 }
