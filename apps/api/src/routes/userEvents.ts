@@ -25,6 +25,7 @@ export async function userEventRoutes(fastify: FastifyInstance) {
             referanseNavn: { type: 'string' },
             verdi:         { type: 'object' },
           },
+          additionalProperties: false,
         },
       },
     },
@@ -32,20 +33,29 @@ export async function userEventRoutes(fastify: FastifyInstance) {
       const bruker = (request as AuthRequest).bruker;
       const { hendelsesType, referanseId, referanseNavn, verdi } = request.body;
 
-      // Svar umiddelbart — ikke vent på DB-skriving
+      // Svar UMIDDELBART — ikke vent på DB
       reply.status(202).send({ ok: true });
 
-      // Skriv til DB asynkront i bakgrunnen
+      const nå = new Date();
+
+      // Skriv UserEvent asynkront i bakgrunnen
       prisma.userEvent.create({
         data: {
-          userId: bruker.id,
+          userId:        bruker.id,
           hendelsesType,
           referanseId:   referanseId   ?? null,
           referanseNavn: referanseNavn ?? null,
           verdi:         verdi ? JSON.stringify(verdi) : null,
           tenantSlug:    (request.headers['x-tenant-id'] as string) ?? 'lns',
         },
-      }).catch((err) => fastify.log.error(err, '[userEvents] feil ved logging'));
+      }).catch(err => fastify.log.error(err, '[userEvents] logg feilet'));
+
+      // Oppdater UserProfile.lastActivity asynkront
+      prisma.userProfile.upsert({
+        where:  { userId: bruker.id },
+        update: { lastActivity: nå },
+        create: { userId: bruker.id, lastActivity: nå },
+      }).catch(() => {});
     },
   );
 }

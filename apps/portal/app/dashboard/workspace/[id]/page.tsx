@@ -6,6 +6,7 @@ import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { loggHendelse } from '@/lib/loggHendelse';
 
 interface Rapport {
   id: string;
@@ -64,6 +65,10 @@ export default function WorkspacePage() {
       if (!wsRes.ok) throw new Error(`HTTP ${wsRes.status}`);
       const ws = await wsRes.json() as WorkspaceDetail;
       setWorkspace(ws);
+      loggHendelse(
+        { hendelsesType: 'åpnet_workspace', referanseId: ws.id, referanseNavn: ws.navn },
+        authHeaders,
+      );
 
       // Hent rapporter via dedikert rute (samme som sidebar bruker)
       const rUrl = new URL(`${API}/api/workspaces/${id}/rapporter`);

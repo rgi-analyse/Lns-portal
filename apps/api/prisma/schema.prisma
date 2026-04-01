@@ -97,6 +97,17 @@ model Bruker {
   forrigeInnlogget  DateTime?  @map("forrigeInnlogget")
 }
 
+model UserProfile {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  favorittWorkspaceId   String?
+  favorittWorkspaceNavn String?   @db.NVarChar(500)
+  mostUsedReports       String?   @db.NVarChar(Max)
+  typicalFilters        String?   @db.NVarChar(Max)
+  lastActivity          DateTime?
+  oppdatert             DateTime  @updatedAt
+}
+
 model UserEvent {
   id             String   @id @default(uuid())
   userId         String

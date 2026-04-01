@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
 import type { FilterConfig, SlicerConfig } from '@/components/AIChat';
 import LagRapportModal from '@/components/LagRapportModal';
@@ -96,25 +97,14 @@ export default function RapportPage() {
         pbiWorkspaceId: loadedRapport.pbiWorkspaceId,
       });
       setRapport(loadedRapport);
+      loggHendelse(
+        { hendelsesType: 'åpnet_rapport', referanseId: loadedRapport.id, referanseNavn: loadedRapport.navn },
+        authHeaders,
+      );
     }
 
     load().catch(() => setError('Rapporten ble ikke funnet eller du har ikke tilgang.'));
   }, [id, isAuthenticated, router, entraObjectId, authHeaders, grupper]);
-
-  // Logg rapport-åpning som UserEvent (fire-and-forget)
-  useEffect(() => {
-    if (!rapport || !entraObjectId) return;
-    apiFetch('/api/meg/logg', {
-      method: 'POST',
-      headers: { ...authHeaders, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        hendelsesType: 'åpnet_rapport',
-        referanseId:   rapport.id,
-        referanseNavn: rapport.navn,
-      }),
-    }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rapport?.id]);
 
   if (error) {
     return (
