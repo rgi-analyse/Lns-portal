@@ -1,49 +1,48 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMsal } from '@azure/msal-react';
 import { useRouter } from 'next/navigation';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 export default function AdminAuthGuard({ children }: { children: React.ReactNode }) {
-  const { accounts, inProgress } = useMsal();
   const router = useRouter();
-
+  const { isAuthenticated, entraObjectId, rolle, isLocal } = usePortalAuth();
   const [status, setStatus] = useState<'loading' | 'ok' | 'denied'>('loading');
 
-  const initialized = inProgress === 'none';
-  const account = accounts[0];
-
   useEffect(() => {
-    if (!initialized) return;
-
-    if (!account) {
+    if (!isAuthenticated || !entraObjectId) {
       router.replace('/');
       return;
     }
 
+    // For lokale brukere: rolle er allerede tilgjengelig fra session
+    if (isLocal) {
+      const adminRoller = ['admin', 'tenantadmin'];
+      setStatus(adminRoller.includes(rolle ?? '') ? 'ok' : 'denied');
+      return;
+    }
+
+    // For Entra-brukere: hent rolle fra API
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
     fetch(`${apiUrl}/api/me`, {
       headers: {
         'x-tenant-id': 'lns',
-        'x-entra-object-id': account.localAccountId,
+        'x-entra-object-id': entraObjectId,
       },
     })
       .then(async (r) => {
-        console.log('[AdminAuthGuard] /api/me status:', r.status);
         if (!r.ok) { setStatus('denied'); return; }
         const bruker = await r.json() as { rolle: string };
-        console.log('[AdminAuthGuard] bruker rolle:', bruker.rolle);
         const adminRoller = ['admin', 'tenantadmin'];
         setStatus(adminRoller.includes(bruker.rolle) ? 'ok' : 'denied');
       })
       .catch(() => setStatus('denied'));
-  }, [initialized, account, router]);
+  }, [isAuthenticated, entraObjectId, rolle, isLocal, router]);
 
   useEffect(() => {
     if (status === 'denied') router.replace('/dashboard');
   }, [status, router]);
 
-  if (!initialized || !account || status !== 'ok') return null;
-
+  if (status !== 'ok') return null;
   return <>{children}</>;
 }
