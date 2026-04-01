@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, FileBarChart2, Users, Star } from 'lucide-react';
+import { LayoutDashboard, FileBarChart2, Clock, Star } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
@@ -18,7 +18,10 @@ interface Workspace {
 interface Stats {
   workspaces: number;
   rapporter: number;
-  tilgang: number;
+}
+
+interface Aktivitet {
+  sisteAktiv: string | null;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -46,14 +49,6 @@ const statCards = [
     iconBorder: 'var(--glass-gold-border)',
     iconColor: 'var(--gold)',
   },
-  {
-    label: 'Tilganger',
-    key: 'tilgang' as const,
-    Icon: Users,
-    iconBg: 'rgba(16,185,129,0.10)',
-    iconBorder: 'rgba(16,185,129,0.20)',
-    iconColor: 'rgba(110,231,183,0.9)',
-  },
 ];
 
 export default function DashboardPage() {
@@ -62,6 +57,7 @@ export default function DashboardPage() {
   const firstName = displayName.split(' ')[0];
 
   const [stats,      setStats]      = useState<Stats | null>(null);
+  const [aktivitet,  setAktivitet]  = useState<Aktivitet | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [filter,     setFilter]     = useState<'alle' | 'favoritter'>('favoritter');
   const [favoritter, setFavoritter] = useState<string[]>([]);
@@ -79,12 +75,11 @@ export default function DashboardPage() {
         setStats({
           workspaces: data.length,
           rapporter:  data.reduce((sum, ws) => sum + (ws._count?.rapporter ?? 0), 0),
-          tilgang:    data.reduce((sum, ws) => sum + (ws._count?.tilgang ?? 0), 0),
         });
       })
       .catch(() => {
         setWorkspaces([]);
-        setStats({ workspaces: 0, rapporter: 0, tilgang: 0 });
+        setStats({ workspaces: 0, rapporter: 0 });
       });
   }, [isAuthenticated, entraObjectId, authHeaders, grupper]);
 
@@ -94,6 +89,14 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then((ids: string[]) => setFavoritter(ids))
       .catch(() => setFavoritter([]));
+  }, [isAuthenticated, entraObjectId, authHeaders]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !entraObjectId) return;
+    apiFetch('/api/meg/aktivitet', { headers: authHeaders })
+      .then((r) => r.json())
+      .then((data: Aktivitet) => setAktivitet(data))
+      .catch(() => setAktivitet({ sisteAktiv: null }));
   }, [isAuthenticated, entraObjectId, authHeaders]);
 
   async function toggleFavoritt(e: React.MouseEvent, workspaceId: string) {
@@ -202,6 +205,62 @@ export default function DashboardPage() {
               </div>
             </div>
           ))}
+
+          {/* Siste aktivitet-kort */}
+          <div
+            className="flex items-center gap-4 transition-all duration-150 cursor-default"
+            style={{
+              background: 'var(--glass-bg)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              border: '1px solid var(--glass-bg-hover)',
+              borderRadius: 14,
+              padding: '20px 24px',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)';
+              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
+              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
+              (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
+              (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+            }}
+          >
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+              style={{
+                background: 'rgba(16,185,129,0.10)',
+                border: '1px solid rgba(16,185,129,0.20)',
+              }}
+            >
+              <Clock className="w-6 h-6" style={{ color: 'rgba(110,231,183,0.9)' }} />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest font-semibold"
+                style={{ color: 'var(--text-secondary)' }}>
+                Siste aktivitet
+              </p>
+              <p style={{
+                fontFamily: 'Barlow Condensed, sans-serif',
+                fontWeight: 800,
+                fontSize: 22,
+                color: 'var(--text-primary)',
+                lineHeight: 1,
+                marginTop: 4,
+              }}>
+                {aktivitet === null ? (
+                  <span
+                    className="inline-block w-16 h-6 rounded animate-pulse"
+                    style={{ background: 'var(--glass-bg-hover)' }}
+                  />
+                ) : (
+                  formaterAktivitet(aktivitet.sisteAktiv)
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Section label + filter-tabs */}
@@ -372,6 +431,24 @@ export default function DashboardPage() {
       <AIChat entraObjectId={entraObjectId} />
     </>
   );
+}
+
+function formaterAktivitet(iso: string | null): string {
+  if (!iso) return 'Ingen';
+  const dato = new Date(iso);
+  if (isNaN(dato.getTime())) return 'Ukjent';
+  const nå = Date.now();
+  const diffMs = nå - dato.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1)  return 'Akkurat nå';
+  if (diffMin < 60) return `${diffMin}m siden`;
+  const diffTimer = Math.floor(diffMin / 60);
+  if (diffTimer < 24) return `${diffTimer}t siden`;
+  const diffDager = Math.floor(diffTimer / 24);
+  if (diffDager === 1) return 'I går';
+  if (diffDager < 7)  return `${diffDager}d siden`;
+  if (diffDager < 30) return `${Math.floor(diffDager / 7)}u siden`;
+  return dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
