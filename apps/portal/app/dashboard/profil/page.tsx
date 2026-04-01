@@ -1,10 +1,23 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { User, Mail, Shield } from 'lucide-react';
 
 export default function ProfilPage() {
-  const { displayName, email, rolle, isAuthenticated } = usePortalAuth();
+  const { displayName, email, rolle: lokalRolle, entraObjectId, isAuthenticated } = usePortalAuth();
+  const [rolle, setRolle] = useState<string | undefined>(lokalRolle);
+
+  useEffect(() => {
+    if (!entraObjectId) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
+    fetch(`${apiUrl}/api/me`, {
+      headers: { 'x-entra-object-id': entraObjectId, 'x-tenant-id': 'lns' },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(b => { if (b?.rolle) setRolle(b.rolle); })
+      .catch(() => {});
+  }, [entraObjectId]);
 
   if (!isAuthenticated) return null;
 
@@ -14,6 +27,13 @@ export default function ProfilPage() {
     .slice(0, 2)
     .map((n) => n[0].toUpperCase())
     .join('');
+
+  const rolleLabel =
+    rolle === 'tenantadmin' ? 'Tenant Admin'
+    : rolle === 'admin'     ? 'Administrator'
+    : rolle === 'redaktør'  ? 'Redaktør'
+    : rolle === 'bruker'    ? 'Bruker'
+    : '—';
 
   return (
     <div className="h-full overflow-auto p-6">
@@ -52,9 +72,9 @@ export default function ProfilPage() {
           style={{ border: '1px solid var(--glass-bg-hover)' }}
         >
           {[
-            { icon: User,   label: 'Navn',    value: displayName },
-            { icon: Mail,   label: 'E-post',  value: email ?? '—' },
-            { icon: Shield, label: 'Rolle',   value: ['admin', 'tenantadmin'].includes(rolle ?? '') ? 'Administrator' : 'Bruker' },
+            { icon: User,   label: 'Navn',   value: displayName },
+            { icon: Mail,   label: 'E-post', value: email ?? '—' },
+            { icon: Shield, label: 'Rolle',  value: rolleLabel },
           ].map(({ icon: Icon, label, value }, i, arr) => (
             <div
               key={label}
