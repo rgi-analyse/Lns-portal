@@ -154,7 +154,7 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
           properties: {
             erAktiv:   { type: 'boolean' },
             lisensType: { type: 'string' },
-            rolle:     { type: 'string', enum: ['admin', 'redaktør', 'bruker'] },
+            rolle:     { type: 'string', enum: ['tenantadmin', 'admin', 'redaktør', 'bruker'] },
           },
           additionalProperties: false,
         },
