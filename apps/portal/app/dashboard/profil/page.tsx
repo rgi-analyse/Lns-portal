@@ -54,7 +54,7 @@ export default function ProfilPage() {
           {[
             { icon: User,   label: 'Navn',    value: displayName },
             { icon: Mail,   label: 'E-post',  value: email ?? '—' },
-            { icon: Shield, label: 'Rolle',   value: rolle === 'admin' ? 'Administrator' : 'Bruker' },
+            { icon: Shield, label: 'Rolle',   value: ['admin', 'tenantadmin'].includes(rolle) ? 'Administrator' : 'Bruker' },
           ].map(({ icon: Icon, label, value }, i, arr) => (
             <div
               key={label}

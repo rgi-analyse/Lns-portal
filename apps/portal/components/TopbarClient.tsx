@@ -38,7 +38,7 @@ export default function TopbarClient() {
       .then(async (r) => {
         if (!r.ok) return;
         const bruker = await r.json() as { rolle: string };
-        setIsAdmin(bruker.rolle === 'admin');
+        setIsAdmin(['admin', 'tenantadmin'].includes(bruker.rolle));
       })
       .catch(() => {});
   }, [authHeaders, isLocal, localRolle]);

@@ -84,7 +84,7 @@ export default function RapportPage() {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string };
-            setKanLageRapport(meg.rolle === 'admin' || meg.rolle === 'redaktør');
+            setKanLageRapport(['admin', 'tenantadmin'].includes(meg.rolle ?? '') || meg.rolle === 'redaktør');
           }
         } catch { /* ikke kritisk */ }
       }
