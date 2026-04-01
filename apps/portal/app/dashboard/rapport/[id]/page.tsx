@@ -101,6 +101,21 @@ export default function RapportPage() {
     load().catch(() => setError('Rapporten ble ikke funnet eller du har ikke tilgang.'));
   }, [id, isAuthenticated, router, entraObjectId, authHeaders, grupper]);
 
+  // Logg rapport-åpning som UserEvent (fire-and-forget)
+  useEffect(() => {
+    if (!rapport || !entraObjectId) return;
+    apiFetch('/api/meg/logg', {
+      method: 'POST',
+      headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hendelsesType: 'åpnet_rapport',
+        referanseId:   rapport.id,
+        referanseNavn: rapport.navn,
+      }),
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rapport?.id]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">

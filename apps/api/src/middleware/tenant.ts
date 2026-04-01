@@ -34,6 +34,7 @@ const SKIP_TENANT_PATHS = [
   '/api/admin/',
   '/api/auth/',
   '/api/tema',
+  '/api/meg/logg',
   '/health',
 ];
 

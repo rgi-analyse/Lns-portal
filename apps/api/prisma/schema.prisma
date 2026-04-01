@@ -97,6 +97,17 @@ model Bruker {
   forrigeInnlogget  DateTime?  @map("forrigeInnlogget")
 }
 
+model UserEvent {
+  id             String   @id @default(uuid())
+  userId         String
+  hendelsesType  String
+  referanseId    String?
+  referanseNavn  String?
+  verdi          String?  @db.NVarChar(Max)
+  tidspunkt      DateTime @default(now())
+  tenantSlug     String   @default("lns")
+}
+
 model Tenant {
   id          String   @id @default(uuid())
   slug        String   @unique @db.NVarChar(100)

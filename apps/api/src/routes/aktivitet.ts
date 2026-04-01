@@ -10,12 +10,12 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const bruker = (request as AuthRequest).bruker;
 
-      // BrukerInnstilling bor i master-DB
-      const sistAapnet = await prisma.brukerInnstilling
+      // Sist åpnet rapport fra UserEvent (master-DB)
+      const sistAapnet = await prisma.userEvent
         .findFirst({
-          where: { brukerId: bruker.id, type: 'sistAapnet' },
-          orderBy: { oppdatert: 'desc' },
-          select: { verdi: true, oppdatert: true },
+          where: { userId: bruker.id, hendelsesType: 'åpnet_rapport' },
+          orderBy: { tidspunkt: 'desc' },
+          select: { referanseNavn: true, tidspunkt: true },
         })
         .catch(() => null);
 
@@ -32,13 +32,7 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
       return reply.send({
         sistInnlogget: bruker.forrigeInnlogget ?? null,
         sistAapnetRapport: sistAapnet
-          ? {
-              navn: (() => {
-                try { return JSON.parse(sistAapnet.verdi)?.navn ?? null; }
-                catch { return sistAapnet.verdi ?? null; }
-              })(),
-              dato: sistAapnet.oppdatert,
-            }
+          ? { navn: sistAapnet.referanseNavn, dato: sistAapnet.tidspunkt }
           : null,
         sistOppdatertRapport: sistOppdatert
           ? { navn: sistOppdatert.navn, dato: sistOppdatert.oppdatert }
