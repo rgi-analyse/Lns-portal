@@ -92,7 +92,10 @@ export async function authRoutes(fastify: FastifyInstance) {
       }
       await prisma.bruker.update({
         where: { id: bruker.id },
-        data: { sistInnlogget: new Date() },
+        data: {
+          forrigeInnlogget: bruker.sistInnlogget,
+          sistInnlogget: new Date(),
+        },
       });
       return reply.send({
         success: true,
@@ -102,6 +105,24 @@ export async function authRoutes(fastify: FastifyInstance) {
         rolle:         bruker.rolle,
         måByttePassord: bruker.måByttePassord,
       });
+    },
+  );
+
+  // ── POST /api/auth/registrer-innlogging ───────────────────────────────────
+  // Kalles av portalen etter vellykket Entra/MSAL-innlogging
+  fastify.post(
+    '/api/auth/registrer-innlogging',
+    { preHandler: [requireBruker] },
+    async (request, reply) => {
+      const bruker = (request as AuthRequest).bruker;
+      await prisma.bruker.update({
+        where: { id: bruker.id },
+        data: {
+          forrigeInnlogget: bruker.sistInnlogget,
+          sistInnlogget: new Date(),
+        },
+      });
+      return reply.send({ ok: true });
     },
   );
 

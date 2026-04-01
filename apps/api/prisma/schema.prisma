@@ -94,6 +94,7 @@ model Bruker {
   sistPassordEndret DateTime?                  @map("sistPassordEndret")
   opprettet         DateTime  @default(now())
   sistInnlogget     DateTime?
+  forrigeInnlogget  DateTime?  @map("forrigeInnlogget")
 }
 
 model Tenant {

@@ -30,7 +30,7 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
         .catch(() => null);
 
       return reply.send({
-        sistInnlogget: bruker.sistInnlogget ?? null,
+        sistInnlogget: bruker.forrigeInnlogget ?? null,
         sistAapnetRapport: sistAapnet
           ? {
               navn: (() => {
