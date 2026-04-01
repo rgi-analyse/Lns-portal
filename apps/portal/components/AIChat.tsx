@@ -723,9 +723,9 @@ export default function AIChat({
               <div
                 className="rounded-lg px-3 py-2 text-xs"
                 style={{
-                  background: 'var(--gold-dim)',
-                  border: '1px solid var(--glass-gold-border)',
-                  color: 'var(--gold-dim)',
+                  background: 'var(--glass-bg)',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--text-secondary)',
                 }}
               >
                 Ingen rapport er åpen. Spør meg hvilke rapporter som finnes, eller åpne en rapport fra sidemenyen.
