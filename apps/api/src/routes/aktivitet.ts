@@ -1,17 +1,17 @@
 import type { FastifyInstance } from 'fastify';
+import { prisma } from '../lib/prisma';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 
 export async function aktivitetRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/api/meg/aktivitet',
-    { preHandler: [requireBruker, resolveTenant] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const bruker = (request as AuthRequest).bruker;
-      const db = (request as TenantRequest).tenantPrisma;
 
-      // Sist åpnet rapport fra BrukerInnstilling
-      const sistAapnet = await db.brukerInnstilling
+      // BrukerInnstilling bor i master-DB
+      const sistAapnet = await prisma.brukerInnstilling
         .findFirst({
           where: { brukerId: bruker.id, type: 'sistAapnet' },
           orderBy: { oppdatert: 'desc' },
@@ -19,7 +19,8 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
         })
         .catch(() => null);
 
-      // Sist oppdatert rapport i tenanten
+      // Sist oppdatert rapport hentes fra tenant-DB med fallback til master
+      const db = (request as TenantRequest).tenantPrisma ?? prisma;
       const sistOppdatert = await db.rapport
         .findFirst({
           where: { erAktiv: true },
