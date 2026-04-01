@@ -37,7 +37,7 @@ export async function tenantRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateTenantBody }>(
     '/api/admin/tenants',
     {
-      preHandler: [requireBruker, requireAdmin],
+      preHandler: [requireBruker, requireTenantAdmin],
       schema: {
         body: {
           type: 'object',
