@@ -103,7 +103,7 @@ export default function LagRapportModal({
         style={{
           width: 480, maxHeight: '80vh',
           background: 'rgba(16,22,36,0.98)',
-          border: '1px solid rgba(255,255,255,0.10)',
+          border: '1px solid var(--glass-border)',
           borderRadius: 14,
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
@@ -114,17 +114,17 @@ export default function LagRapportModal({
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 20px',
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: '1px solid var(--glass-bg-hover)',
         }}>
           <div>
             <div style={{
               fontFamily: 'Barlow Condensed, sans-serif',
               fontWeight: 700, fontSize: 16,
-              color: 'rgba(255,255,255,0.9)',
+              color: 'var(--text-primary)',
             }}>
               Lag rapport
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               Basert på {rapportNavn}
             </div>
           </div>
@@ -132,10 +132,10 @@ export default function LagRapportModal({
             onClick={onLukk}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: 'rgba(255,255,255,0.45)', padding: 4, borderRadius: 5,
+              color: 'var(--text-muted)', padding: 4, borderRadius: 5,
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.45)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
           >
             <X className="w-4 h-4" />
           </button>
@@ -144,7 +144,7 @@ export default function LagRapportModal({
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
           {laster ? (
-            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>
               Laster tilgjengelige datakilder…
             </div>
           ) : fetchFeil ? (
@@ -159,7 +159,7 @@ export default function LagRapportModal({
                   Kunne ikke hente datakilder
                 </span>
               </div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
                 Nettverksfeil ved henting av tilgjengelige views. Lukk og prøv igjen.
               </p>
             </div>
@@ -176,15 +176,15 @@ export default function LagRapportModal({
                   Ingen datakilder tilgjengelig
                 </span>
               </div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
                 Denne rapporten er ikke koblet til noen datakilder i metadata-katalogen.
                 Kontakt administrator for å koble et AI-view til rapporten før du kan opprette egne rapporter.
               </p>
               <div style={{
                 marginTop: 12, padding: '8px 12px',
-                background: 'rgba(255,255,255,0.04)',
+                background: 'var(--glass-bg)',
                 borderRadius: 6, fontSize: 11,
-                color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace',
+                color: 'var(--text-muted)', fontFamily: 'monospace',
               }}>
                 Admin → Metadata → Rapporter → Koble view
               </div>
@@ -193,7 +193,7 @@ export default function LagRapportModal({
             <div>
               <div style={{
                 fontSize: 11, fontWeight: 600, letterSpacing: '0.08em',
-                textTransform: 'uppercase', color: 'rgba(255,255,255,0.40)',
+                textTransform: 'uppercase', color: 'var(--text-muted)',
                 marginBottom: 10,
               }}>
                 Velg datakilde
@@ -205,8 +205,8 @@ export default function LagRapportModal({
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                      border: `1px solid ${valgtViewId === v.id ? 'var(--gold-dim)' : 'rgba(255,255,255,0.07)'}`,
-                      background: valgtViewId === v.id ? 'var(--gold-dim)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${valgtViewId === v.id ? 'var(--gold-dim)' : 'var(--glass-bg-hover)'}`,
+                      background: valgtViewId === v.id ? 'var(--gold-dim)' : 'var(--glass-bg)',
                     }}
                   >
                     <input
@@ -218,10 +218,10 @@ export default function LagRapportModal({
                       style={{ accentColor: 'var(--gold)' }}
                     />
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                         {v.visningsnavn ?? v.view_name}
                       </div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                         {v.schema_name}.{v.view_name}
                       </div>
                     </div>
@@ -236,19 +236,19 @@ export default function LagRapportModal({
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 8,
           padding: '12px 20px',
-          borderTop: '1px solid rgba(255,255,255,0.07)',
+          borderTop: '1px solid var(--glass-bg-hover)',
         }}>
           <button
             onClick={onLukk}
             style={{
               padding: '7px 16px', fontSize: 13, borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'rgba(255,255,255,0.65)',
+              border: '1px solid var(--glass-border)',
+              background: 'var(--glass-bg)',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
           >
             Avbryt
           </button>
@@ -259,7 +259,7 @@ export default function LagRapportModal({
               padding: '7px 16px', fontSize: 13, borderRadius: 7,
               border: 'none',
               background: erDeaktivert ? 'var(--glass-gold-border)' : 'var(--gold)',
-              color: erDeaktivert ? 'rgba(255,255,255,0.35)' : '#1a1a1a',
+              color: erDeaktivert ? 'var(--text-muted)' : '#1a1a1a',
               cursor: erDeaktivert ? 'not-allowed' : 'pointer',
               fontWeight: 600,
             }}

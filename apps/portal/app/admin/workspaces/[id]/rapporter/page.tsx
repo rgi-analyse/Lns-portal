@@ -609,26 +609,26 @@ export default function WorkspaceRapporterPage() {
               background: 'rgba(15,25,45,0.95)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              border: '1px solid var(--glass-border)',
               borderRadius: 14,
               boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
             }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--glass-bg-hover)' }}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 style={{ fontWeight: 700, fontSize: 16, color: 'rgba(255,255,255,0.90)', margin: 0 }}>
+                  <h2 style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', margin: 0 }}>
                     Koble AI-views
                   </h2>
-                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)', marginTop: 3, marginBottom: 0 }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3, marginBottom: 0 }}>
                     {aiKoblingRapport.navn}
                   </p>
                 </div>
                 <button
                   onClick={() => setAiKoblingRapport(null)}
-                  style={{ fontSize: 22, lineHeight: 1, color: 'rgba(255,255,255,0.40)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
+                  style={{ fontSize: 22, lineHeight: 1, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px' }}
                 >
                   ×
                 </button>
@@ -638,13 +638,13 @@ export default function WorkspaceRapporterPage() {
             {/* Content */}
             <div style={{ padding: '16px 24px 24px' }}>
               {/* Existing couplings */}
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.40)', marginBottom: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 8 }}>
                 Aktive koblinger
               </p>
               {aiLoadingKobling ? (
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)', marginBottom: 16 }}>Laster…</p>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Laster…</p>
               ) : kobletViews.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 16 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
                   Ingen koblinger. AI bruker område-filter som standard.
                 </p>
               ) : (
@@ -653,24 +653,24 @@ export default function WorkspaceRapporterPage() {
                     <div
                       key={v.view_id}
                       className="flex items-center gap-3"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px' }}
+                      style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)', borderRadius: 8, padding: '10px 14px' }}
                     >
                       <div className="flex-1 min-w-0">
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.90)' }}>{v.visningsnavn}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{v.visningsnavn}</span>
                         {v.område && (
                           <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)', color: 'var(--gold)', display: 'inline-block' }}>
                             {v.område}
                           </span>
                         )}
-                        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2, marginBottom: 0 }}>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, marginBottom: 0 }}>
                           Prioritet: {v.prioritet}
                         </p>
                       </div>
                       <button
                         onClick={() => fjernAiKobling(v.view_id)}
-                        style={{ color: 'rgba(255,255,255,0.30)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0 }}
+                        style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, flexShrink: 0 }}
                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(239,68,68,0.80)'; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.30)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -680,15 +680,15 @@ export default function WorkspaceRapporterPage() {
               )}
 
               {/* Add new */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.40)', marginBottom: 10 }}>
+              <div style={{ borderTop: '1px solid var(--glass-bg)', paddingTop: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 10 }}>
                   Legg til view
                 </p>
                 <div className="flex gap-2">
                   <select
                     value={nyViewId}
                     onChange={e => setNyViewId(e.target.value)}
-                    style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: nyViewId ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.40)', outline: 'none' }}
+                    style={{ flex: 1, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: nyViewId ? 'var(--text-primary)' : 'var(--text-muted)', outline: 'none' }}
                   >
                     <option value="">Velg view...</option>
                     {aiViews.map(v => (
@@ -698,7 +698,7 @@ export default function WorkspaceRapporterPage() {
                   <select
                     value={nyPrioritet}
                     onChange={e => setNyPrioritet(Number(e.target.value))}
-                    style={{ width: 130, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'rgba(255,255,255,0.80)', outline: 'none', flexShrink: 0 }}
+                    style={{ width: 130, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--text-primary)', outline: 'none', flexShrink: 0 }}
                   >
                     <option value={1}>1 — Primær</option>
                     <option value={2}>2 — Sekundær</option>
@@ -709,9 +709,9 @@ export default function WorkspaceRapporterPage() {
                     disabled={!nyViewId}
                     style={{
                       padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, flexShrink: 0,
-                      background: nyViewId ? 'var(--gold-dim)' : 'rgba(255,255,255,0.04)',
-                      border: nyViewId ? '1px solid var(--gold-dim)' : '1px solid rgba(255,255,255,0.08)',
-                      color: nyViewId ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
+                      background: nyViewId ? 'var(--gold-dim)' : 'var(--glass-bg)',
+                      border: nyViewId ? '1px solid var(--gold-dim)' : '1px solid var(--glass-bg-hover)',
+                      color: nyViewId ? 'var(--gold)' : 'var(--text-muted)',
                       cursor: nyViewId ? 'pointer' : 'not-allowed',
                       transition: 'all 0.15s',
                     }}

@@ -35,8 +35,8 @@ const statCards = [
     key: 'workspaces' as const,
     Icon: LayoutDashboard,
     iconBg: 'rgba(27,42,74,0.60)',
-    iconBorder: 'rgba(255,255,255,0.10)',
-    iconColor: 'rgba(255,255,255,0.70)',
+    iconBorder: 'var(--glass-border)',
+    iconColor: 'var(--text-secondary)',
   },
   {
     label: 'Rapporter',
@@ -132,13 +132,13 @@ export default function DashboardPage() {
               fontFamily: 'Barlow Condensed, sans-serif',
               fontWeight: 800,
               fontSize: 28,
-              color: 'rgba(255,255,255,0.90)',
+              color: 'var(--text-primary)',
               letterSpacing: '0.03em',
             }}
           >
             Velkommen, {firstName}
           </h1>
-          <p className="mt-1 text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
             Her er en oversikt over tilgjengelige ressurser.
           </p>
         </div>
@@ -153,21 +153,21 @@ export default function DashboardPage() {
               key={label}
               className="flex items-center gap-4 transition-all duration-150 cursor-default"
               style={{
-                background: 'rgba(255,255,255,0.04)',
+                background: 'var(--glass-bg)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--glass-bg-hover)',
                 borderRadius: 14,
                 padding: '20px 24px',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.07)';
+                (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg-hover)';
                 (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.08)';
+                (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
+                (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
               }}
             >
@@ -179,21 +179,21 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-widest font-semibold"
-                  style={{ color: 'rgba(255,255,255,0.50)' }}>
+                  style={{ color: 'var(--text-secondary)' }}>
                   {label}
                 </p>
                 <p style={{
                   fontFamily: 'Barlow Condensed, sans-serif',
                   fontWeight: 800,
                   fontSize: 30,
-                  color: 'rgba(255,255,255,0.90)',
+                  color: 'var(--text-primary)',
                   lineHeight: 1,
                   marginTop: 2,
                 }}>
                   {stats === null ? (
                     <span
                       className="inline-block w-8 h-7 rounded animate-pulse"
-                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                      style={{ background: 'var(--glass-bg-hover)' }}
                     />
                   ) : (
                     stats[key]
@@ -212,7 +212,7 @@ export default function DashboardPage() {
             fontSize: 12,
             letterSpacing: '0.10em',
             textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.45)',
+            color: 'var(--text-muted)',
             whiteSpace: 'nowrap',
           }}>
             Workspaces
@@ -230,9 +230,9 @@ export default function DashboardPage() {
                   border: '1px solid var(--glass-gold-border)',
                   color: 'var(--gold)',
                 } : {
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.40)',
+                  background: 'var(--glass-bg)',
+                  border: '1px solid var(--glass-bg-hover)',
+                  color: 'var(--text-muted)',
                 }}
               >
                 {val === 'favoritter' ? 'Favoritter' : 'Alle'}
@@ -240,7 +240,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--glass-bg)' }} />
         </div>
 
         {/* Workspace-kort */}
@@ -256,8 +256,8 @@ export default function DashboardPage() {
                 {Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="animate-pulse" style={{
                     height: 72,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    background: 'var(--glass-bg)',
+                    border: '1px solid var(--glass-bg)',
                     borderRadius: 14,
                   }} />
                 ))}
@@ -267,7 +267,7 @@ export default function DashboardPage() {
 
           if (viserWorkspaces.length === 0) {
             return (
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.30)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 {filter === 'favoritter'
                   ? 'Du har ingen favoritter ennå. Klikk på stjernen på et workspace for å pinne det her.'
                   : 'Ingen workspaces tilgjengelig.'}
@@ -286,21 +286,21 @@ export default function DashboardPage() {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') router.push(`/dashboard/workspace/${ws.id}`); }}
                   className="flex items-center gap-3 text-left w-full transition-all duration-150"
                   style={{
-                    background: 'rgba(255,255,255,0.03)',
+                    background: 'var(--glass-bg)',
                     backdropFilter: 'blur(20px)',
                     WebkitBackdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255,255,255,0.07)',
+                    border: '1px solid var(--glass-bg-hover)',
                     borderRadius: 14,
                     padding: '16px 18px',
                     cursor: 'pointer',
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
+                    (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
                     (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-gold-border)';
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
-                    (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
+                    (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
                   }}
                 >
                   {/* Prosjektnummer-ikon */}
@@ -320,10 +320,10 @@ export default function DashboardPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="truncate" style={{ fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.95)' }}>
+                    <div className="truncate" style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
                       {ws.navn}
                     </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
                       {ws._count?.rapporter ?? 0} rapporter
                       {ws.beskrivelse ? ` · ${ws.beskrivelse}` : ''}
                     </div>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                       border: 'none',
                       padding: '4px',
                       cursor: 'pointer',
-                      color: favoritter.includes(ws.id) ? 'var(--gold)' : 'rgba(255,255,255,0.25)',
+                      color: favoritter.includes(ws.id) ? 'var(--gold)' : 'var(--text-muted)',
                       transition: 'color 0.15s',
                     }}
                     onMouseEnter={(e) => {
@@ -349,7 +349,7 @@ export default function DashboardPage() {
                     }}
                     onMouseLeave={(e) => {
                       if (!favoritter.includes(ws.id))
-                        (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.25)';
+                        (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
                     }}
                   >
                     <Star
@@ -360,7 +360,7 @@ export default function DashboardPage() {
                   </button>
 
                   {/* Pil */}
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>
                     ›
                   </div>
                 </div>
@@ -383,12 +383,12 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         fontSize: 12,
         letterSpacing: '0.10em',
         textTransform: 'uppercase' as const,
-        color: 'rgba(255,255,255,0.30)',
+        color: 'var(--text-muted)',
         whiteSpace: 'nowrap' as const,
       }}>
         {children}
       </span>
-      <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+      <div className="flex-1 h-px" style={{ background: 'var(--glass-bg)' }} />
     </div>
   );
 }

@@ -190,9 +190,9 @@ export default function RapportPreviewPage() {
           type="button"
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-xs transition-colors"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.70)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)'; }}
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Tilbake
@@ -202,7 +202,7 @@ export default function RapportPreviewPage() {
           ✏️ {tittel}
         </div>
 
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginLeft: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
           Blank rapport med datasett. Bruk Power BI-verktøylinjen til å legge til og redigere visuals, deretter lagre.
         </div>
 
@@ -230,9 +230,9 @@ export default function RapportPreviewPage() {
               onClick={forkast}
               disabled={lagrer}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)' }}
-              onMouseEnter={(e) => { if (!lagrer) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.80)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.50)'; }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => { if (!lagrer) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
             >
               <Trash2 className="w-3.5 h-3.5" />
               Forkast
@@ -247,7 +247,7 @@ export default function RapportPreviewPage() {
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(10,18,35,0.85)' }}>
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--gold)' }} />
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>Kobler til datasett...</p>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Kobler til datasett...</p>
             </div>
           </div>
         )}

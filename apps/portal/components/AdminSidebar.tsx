@@ -23,14 +23,14 @@ export default function AdminSidebar() {
         background: 'rgba(10,22,40,0.65)',
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        borderRight: '1px solid var(--glass-bg)',
       }}
     >
 
       {/* Logo */}
       <div
         className="flex flex-col items-center px-4 py-4 shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
         <img
           src="/logo/LNS-logo-hvit-gul-liten-RGB.png"
@@ -47,19 +47,19 @@ export default function AdminSidebar() {
         <Link
           href="/dashboard"
           className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
-          style={{ color: 'rgba(255,255,255,0.5)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLAnchorElement).style.color = '#fff'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.5)'; }}
+          style={{ color: 'var(--text-secondary)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg-hover)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)'; }}
         >
           <LayoutDashboard className="w-4 h-4 shrink-0" />
           <span>Til dashboard</span>
         </Link>
-        <div className="mt-2 mx-2" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }} />
+        <div className="mt-2 mx-2" style={{ borderTop: '1px solid var(--glass-bg-hover)' }} />
       </div>
 
       {/* Admin nav */}
       <div className="px-4 pt-2 pb-1">
-        <p className="px-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.3)' }}>
+        <p className="px-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
           Administrasjon
         </p>
       </div>
@@ -74,14 +74,14 @@ export default function AdminSidebar() {
               style={active ? {
                 background: 'var(--glass-gold-bg)',
                 border: '1px solid var(--glass-gold-border)',
-                color: '#FFFFFF',
+                color: 'var(--text-primary)',
                 borderLeft: '2px solid var(--gold)',
                 paddingLeft: 10,
               } : {
-                color: 'rgba(255,255,255,0.45)',
+                color: 'var(--text-muted)',
               }}
-              onMouseEnter={(e) => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.80)'; } }}
-              onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.45)'; } }}
+              onMouseEnter={(e) => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)'; } }}
+              onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-muted)'; } }}
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="font-medium">{label}</span>

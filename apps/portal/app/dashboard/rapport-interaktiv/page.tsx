@@ -82,11 +82,11 @@ const OPERATORER = [
 ];
 
 const selectStyle: React.CSSProperties = {
-  width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-  color: 'rgba(255,255,255,0.8)', borderRadius: 7, padding: '7px 10px', fontSize: 13,
+  width: '100%', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+  color: 'var(--text-primary)', borderRadius: 7, padding: '7px 10px', fontSize: 13,
 };
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em',
+  fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em',
   textTransform: 'uppercase', display: 'block', marginBottom: 6,
 };
 
@@ -308,13 +308,13 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<strin
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
       {/* Y-axis label */}
-      <text x={14} y={padT + plotH / 2} fontSize={10} fill="rgba(255,255,255,0.35)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
+      <text x={14} y={padT + plotH / 2} fontSize={10} fill="var(--text-muted)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
       {[0,.25,.5,.75,1].map(t => {
         const y = padT + plotH - t * plotH;
         return (
           <g key={t}>
-            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="rgba(255,255,255,0.07)"/>
-            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="rgba(255,255,255,0.35)">
+            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
+            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
               {(t*maxVal).toLocaleString('nb-NO',{maximumFractionDigits:0})}
             </text>
           </g>
@@ -332,23 +332,23 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<strin
               return (
                 <g key={grp}>
                   <rect x={bx} y={by} width={barW} height={bh} fill={COLORS[gi%COLORS.length]} rx={2} opacity={0.85}/>
-                  {bh>20 && <text x={bx+barW/2} y={by+12} fontSize={9} textAnchor="middle" fill="rgba(255,255,255,0.7)">{val.toLocaleString('nb-NO',{maximumFractionDigits:0})}</text>}
+                  {bh>20 && <text x={bx+barW/2} y={by+12} fontSize={9} textAnchor="middle" fill="var(--text-secondary)">{val.toLocaleString('nb-NO',{maximumFractionDigits:0})}</text>}
                 </g>
               );
             })}
-            <text x={padL+ci*groupW+groupW/2} y={padT+plotH+16} fontSize={11} textAnchor="middle" fill="rgba(255,255,255,0.50)"
+            <text x={padL+ci*groupW+groupW/2} y={padT+plotH+16} fontSize={11} textAnchor="middle" fill="var(--text-secondary)"
               transform={`rotate(-30,${padL+ci*groupW+groupW/2},${padT+plotH+16})`}>
               {cat.slice(0,14)}
             </text>
           </g>
         );
       })}
-      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="rgba(255,255,255,0.20)"/>
-      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="rgba(255,255,255,0.20)"/>
+      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="var(--text-muted)"/>
+      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="var(--text-muted)"/>
       {grupperPaa && groups.map((g,i) => (
         <g key={g}>
           <rect x={padL+i*120} y={H-20} width={10} height={10} fill={COLORS[i%COLORS.length]} rx={1}/>
-          <text x={padL+i*120+14} y={H-11} fontSize={11} fill="rgba(255,255,255,0.55)">{g.slice(0,14)}</text>
+          <text x={padL+i*120+14} y={H-11} fontSize={11} fill="var(--text-secondary)">{g.slice(0,14)}</text>
         </g>
       ))}
     </svg>
@@ -374,13 +374,13 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
   const step = Math.max(1, Math.floor(pts.length/10));
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-      <text x={14} y={padT + plotH / 2} fontSize={10} fill="rgba(255,255,255,0.35)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
+      <text x={14} y={padT + plotH / 2} fontSize={10} fill="var(--text-muted)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
       {[0,.25,.5,.75,1].map(t => {
         const y = padT+plotH - t*plotH;
         return (
           <g key={t}>
-            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="rgba(255,255,255,0.07)"/>
-            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="rgba(255,255,255,0.35)">
+            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
+            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
               {(t*maxVal).toLocaleString('nb-NO',{maximumFractionDigits:0})}
             </text>
           </g>
@@ -391,11 +391,11 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
       {pts.map((p, i) => (
         <g key={i}>
           <circle cx={p.x} cy={p.y} r={3} fill="var(--gold)"/>
-          {i%step===0 && <text x={p.x} y={padT+plotH+16} fontSize={10} textAnchor="middle" fill="rgba(255,255,255,0.40)">{p.label.slice(0,8)}</text>}
+          {i%step===0 && <text x={p.x} y={padT+plotH+16} fontSize={10} textAnchor="middle" fill="var(--text-muted)">{p.label.slice(0,8)}</text>}
         </g>
       ))}
-      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="rgba(255,255,255,0.20)"/>
-      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="rgba(255,255,255,0.20)"/>
+      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="var(--text-muted)"/>
+      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="var(--text-muted)"/>
     </svg>
   );
 }
@@ -427,7 +427,7 @@ function PieChart({ data, xCol, yCol }: { data: Record<string,unknown>[]; xCol: 
       {slices.map((s,i) => (
         <g key={i}>
           <rect x={W-160} y={20+i*24} width={12} height={12} fill={COLORS[i%COLORS.length]} rx={2}/>
-          <text x={W-144} y={31+i*24} fontSize={12} fill="rgba(255,255,255,0.70)">{s.label.slice(0,16)} ({((s.val/total)*100).toFixed(0)}%)</text>
+          <text x={W-144} y={31+i*24} fontSize={12} fill="var(--text-secondary)">{s.label.slice(0,16)} ({((s.val/total)*100).toFixed(0)}%)</text>
         </g>
       ))}
     </svg>
@@ -444,8 +444,8 @@ function CardChart({ data, yCol, yLabel }: { data: Record<string,unknown>[]; yCo
         <div style={{ fontSize:64, fontWeight:800, color:'var(--gold)', fontFamily:'Barlow Condensed, sans-serif' }}>
           {isNaN(num) ? String(val??'-') : num.toLocaleString('nb-NO')}
         </div>
-        <div style={{ fontSize:15, color:'rgba(255,255,255,0.45)', marginTop:10 }}>{yLabel}</div>
-        <div style={{ fontSize:12, color:'rgba(255,255,255,0.25)', marginTop:4 }}>{data.length} rader i datasettet</div>
+        <div style={{ fontSize:15, color:'var(--text-muted)', marginTop:10 }}>{yLabel}</div>
+        <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:4 }}>{data.length} rader i datasettet</div>
       </div>
     </div>
   );
@@ -464,7 +464,7 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
   const rows  = data.slice(page*pageSize, (page+1)*pageSize);
 
   const formaterVerdi = (verdi: unknown, kolonne: string): React.ReactNode => {
-    if (verdi === null || verdi === undefined) return <span style={{color:'rgba(255,255,255,0.20)'}}>—</span>;
+    if (verdi === null || verdi === undefined) return <span style={{color:'var(--text-muted)'}}>—</span>;
     const meta = alleViewKolonner?.find(k => k.kolonne_navn === kolonne);
     if (meta?.kolonne_type === 'measure') {
       const tall = Number(verdi);
@@ -483,7 +483,7 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
         <thead>
           <tr>
             {cols.map(c => (
-              <th key={c} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'1px solid rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.50)', fontWeight:600, fontSize:12, whiteSpace:'nowrap', fontFamily:'Barlow Condensed, sans-serif', letterSpacing:'0.05em' }}>
+              <th key={c} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'1px solid var(--glass-border)', color:'var(--text-secondary)', fontWeight:600, fontSize:12, whiteSpace:'nowrap', fontFamily:'Barlow Condensed, sans-serif', letterSpacing:'0.05em' }}>
                 {c}
               </th>
             ))}
@@ -491,9 +491,9 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ background: i%2===0?'transparent':'rgba(255,255,255,0.02)' }}>
+            <tr key={i} style={{ background: i%2===0?'transparent':'var(--glass-bg)' }}>
               {cols.map(c => (
-                <td key={c} style={{ padding:'7px 12px', borderBottom:'1px solid rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.80)', whiteSpace:'nowrap' }}>
+                <td key={c} style={{ padding:'7px 12px', borderBottom:'1px solid var(--glass-bg)', color:'var(--text-primary)', whiteSpace:'nowrap' }}>
                   {formaterVerdi(row[c], c)}
                 </td>
               ))}
@@ -502,10 +502,10 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
         </tbody>
       </table>
       {total>pageSize && (
-        <div style={{ display:'flex', gap:8, alignItems:'center', padding:'12px 0', fontSize:12, color:'rgba(255,255,255,0.40)' }}>
-          <button disabled={page===0} onClick={()=>setPage(p=>p-1)} style={{ padding:'4px 10px', borderRadius:6, background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.55)', cursor:page===0?'default':'pointer' }}>Forrige</button>
+        <div style={{ display:'flex', gap:8, alignItems:'center', padding:'12px 0', fontSize:12, color:'var(--text-muted)' }}>
+          <button disabled={page===0} onClick={()=>setPage(p=>p-1)} style={{ padding:'4px 10px', borderRadius:6, background:'var(--glass-bg-hover)', border:'1px solid var(--glass-border)', color:'var(--text-secondary)', cursor:page===0?'default':'pointer' }}>Forrige</button>
           <span>Side {page+1} av {Math.ceil(total/pageSize)}</span>
-          <button disabled={(page+1)*pageSize>=total} onClick={()=>setPage(p=>p+1)} style={{ padding:'4px 10px', borderRadius:6, background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.55)', cursor:(page+1)*pageSize>=total?'default':'pointer' }}>Neste</button>
+          <button disabled={(page+1)*pageSize>=total} onClick={()=>setPage(p=>p+1)} style={{ padding:'4px 10px', borderRadius:6, background:'var(--glass-bg-hover)', border:'1px solid var(--glass-border)', color:'var(--text-secondary)', cursor:(page+1)*pageSize>=total?'default':'pointer' }}>Neste</button>
           <span style={{ marginLeft:8 }}>{total} rader totalt</span>
         </div>
       )}
@@ -516,8 +516,8 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
 // ── FilterVerdiInput ──────────────────────────────────────────────────────────
 const fvInputStyle: React.CSSProperties = {
   width: '100%', fontSize: 11, padding: '4px 6px',
-  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-  color: 'rgba(255,255,255,0.8)', borderRadius: 5, outline: 'none',
+  background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+  color: 'var(--text-primary)', borderRadius: 5, outline: 'none',
 };
 
 interface FilterVerdiInputProps {
@@ -633,12 +633,12 @@ function FilterVerdiInput({
         alignItems: 'center', justifyContent: 'space-between', userSelect: 'none',
       }}>
         <span style={{
-          color: verdi ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.3)',
+          color: verdi ? 'var(--text-primary)' : 'var(--text-muted)',
           fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {verdi || (laster ? 'Laster...' : 'Velg verdi...')}
         </span>
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, flexShrink: 0, marginLeft: 4 }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 10, flexShrink: 0, marginLeft: 4 }}>
           {visSok ? '▲' : '▼'}
         </span>
       </div>
@@ -657,23 +657,23 @@ function FilterVerdiInput({
               placeholder="Søk..." autoFocus
               onClick={e => e.stopPropagation()}
               style={{
-                width: '100%', background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)', borderRadius: 4,
-                padding: '4px 8px', color: 'rgba(255,255,255,0.85)',
+                width: '100%', background: 'var(--glass-bg-hover)',
+                border: '1px solid var(--glass-border-hover)', borderRadius: 4,
+                padding: '4px 8px', color: 'var(--text-primary)',
                 fontSize: 11, outline: 'none', boxSizing: 'border-box',
               }} />
           </div>
           <div style={{ maxHeight: 180, overflowY: 'auto' }}>
             <div onClick={() => { onChange(''); setVisSok(false); setSok(''); }}
               style={{
-                padding: '6px 10px', fontSize: 11, color: 'rgba(255,255,255,0.3)',
-                cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                padding: '6px 10px', fontSize: 11, color: 'var(--text-muted)',
+                cursor: 'pointer', borderBottom: '1px solid var(--glass-bg)',
                 fontStyle: 'italic',
               }}>
               — Ingen verdi —
             </div>
             {filtrerte.length === 0 && (
-              <div style={{ padding: '8px 10px', fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+              <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)' }}>
                 {laster ? 'Laster verdier...' : 'Ingen treff'}
               </div>
             )}
@@ -681,12 +681,12 @@ function FilterVerdiInput({
               <div key={i} onClick={() => { onChange(v); setVisSok(false); setSok(''); }}
                 style={{
                   padding: '6px 10px', fontSize: 11, cursor: 'pointer',
-                  color: v === verdi ? 'var(--gold)' : 'rgba(255,255,255,0.7)',
+                  color: v === verdi ? 'var(--gold)' : 'var(--text-secondary)',
                   background: v === verdi ? 'var(--gold-dim)' : 'transparent',
-                  borderBottom: '1px solid rgba(255,255,255,0.03)',
+                  borderBottom: '1px solid var(--glass-bg)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
-                onMouseEnter={e => { if (v !== verdi) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                onMouseEnter={e => { if (v !== verdi) (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)'; }}
                 onMouseLeave={e => { if (v !== verdi) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
                 {v}
               </div>
@@ -694,8 +694,8 @@ function FilterVerdiInput({
           </div>
           {verdier.length > 0 && (
             <div style={{
-              padding: '4px 10px', fontSize: 10, color: 'rgba(255,255,255,0.2)',
-              borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'right',
+              padding: '4px 10px', fontSize: 10, color: 'var(--text-muted)',
+              borderTop: '1px solid var(--glass-bg)', textAlign: 'right',
             }}>
               {filtrerte.length} av {verdier.length} verdier
             </div>
@@ -1341,7 +1341,7 @@ export default function RapportInteraktivPage() {
   if (!forslag || !config) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div style={{ color:'rgba(255,255,255,0.40)', fontSize:14 }}>
+        <div style={{ color:'var(--text-muted)', fontSize:14 }}>
           Ingen rapport lastet. Gå tilbake og be AI-assistenten lage en rapport.
         </div>
       </div>
@@ -1391,7 +1391,7 @@ export default function RapportInteraktivPage() {
       }
 
       const canvas = await html2canvas(element, {
-        backgroundColor: '#0a1628',
+        backgroundColor: 'var(--navy-darkest)',
         scale: 2,
         useCORS: true,
         logging: false,
@@ -1561,7 +1561,7 @@ export default function RapportInteraktivPage() {
   function renderChart() {
     if (!config) return null;
     if (!behandletData.length) return (
-      <div style={{ color:'rgba(255,255,255,0.35)', padding:40, textAlign:'center' }}>Ingen data å vise.</div>
+      <div style={{ color:'var(--text-muted)', padding:40, textAlign:'center' }}>Ingen data å vise.</div>
     );
     switch (config.visualType) {
       case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel}/>;
@@ -1580,9 +1580,9 @@ export default function RapportInteraktivPage() {
       {/* ── Topbar ── */}
       <div className="rapport-topbar" style={{ flexShrink:0, display:'flex', alignItems:'center', gap:12, padding:'10px 20px', background:'var(--gold-dim)', borderBottom:'1px solid var(--gold-dim)' }}>
         <button type="button" onClick={()=>router.back()}
-          style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'rgba(255,255,255,0.35)', background:'none', border:'none', cursor:'pointer' }}
-          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.70)';}}
-          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.35)';}}>
+          style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}
+          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-secondary)';}}
+          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-muted)';}}>
           <ArrowLeft style={{ width:14, height:14 }}/> Tilbake
         </button>
 
@@ -1590,7 +1590,7 @@ export default function RapportInteraktivPage() {
           {forslag.tittel}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', flex:1, minWidth:0 }}>
-          <span style={{ fontSize:11, color:'rgba(255,255,255,0.35)', whiteSpace:'nowrap' }}>
+          <span style={{ fontSize:11, color:'var(--text-muted)', whiteSpace:'nowrap' }}>
             {config.visualType==='table' ? '📋 Tabell' : `📊 ${visTypeLabel[config.visualType]??config.visualType}`} · {yAkseLabel} · {behandletData.length} rader
           </span>
           {/* Låst prosjektfilter-badge */}
@@ -1648,55 +1648,55 @@ export default function RapportInteraktivPage() {
         </button>
 
         <button type="button" onClick={()=>setVisRediger(v=>!v)}
-          style={{ background:visRediger?'var(--gold-dim)':'rgba(255,255,255,0.05)', border:visRediger?'1px solid var(--gold-dim)':'1px solid rgba(255,255,255,0.10)', color:visRediger?'var(--gold)':'rgba(255,255,255,0.6)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+          style={{ background:visRediger?'var(--gold-dim)':'var(--glass-bg)', border:visRediger?'1px solid var(--gold-dim)':'1px solid var(--glass-border)', color:visRediger?'var(--gold)':'var(--text-secondary)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
           ✏️ {visRediger ? 'Skjul rediger' : 'Rediger'}
         </button>
 
         {config.visualType!=='table' && (
           <button type="button" onClick={()=>setVisTabell(v=>!v)}
-            style={{ background:visTabell?'var(--glass-gold-border)':'rgba(255,255,255,0.05)', border:`1px solid ${visTabell?'var(--gold-dim)':'rgba(255,255,255,0.12)'}`, color:visTabell?'var(--gold)':'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+            style={{ background:visTabell?'var(--glass-gold-border)':'var(--glass-bg)', border:`1px solid ${visTabell?'var(--gold-dim)':'var(--glass-border)'}`, color:visTabell?'var(--gold)':'var(--text-secondary)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}>
             {visTabell ? 'Skjul tabell' : 'Vis tabell'}
           </button>
         )}
 
         <button type="button" onClick={()=>exportToCsv(behandletData, forslag.tittel)}
-          style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}
-          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.80)';}}
-          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.50)';}}>
+          style={{ display:'flex', alignItems:'center', gap:6, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-secondary)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}
+          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-primary)';}}
+          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-secondary)';}}>
           <Download style={{ width:14, height:14 }}/> CSV
         </button>
 
         <button type="button" onClick={eksporterExcel}
-          style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.50)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}
-          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.80)';}}
-          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='rgba(255,255,255,0.50)';}}>
+          style={{ display:'flex', alignItems:'center', gap:6, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-secondary)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer' }}
+          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-primary)';}}
+          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.color='var(--text-secondary)';}}>
           <FileSpreadsheet style={{ width:14, height:14 }}/> Excel
         </button>
 
         <button type="button" onClick={eksporterPDF} disabled={eksporterer}
-          style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.12)', color: eksporterer ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.70)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor: eksporterer ? 'not-allowed' : 'pointer' }}>
+          style={{ display:'flex', alignItems:'center', gap:6, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color: eksporterer ? 'var(--text-muted)' : 'var(--text-secondary)', padding:'7px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor: eksporterer ? 'not-allowed' : 'pointer' }}>
           {eksporterer ? '⏳ Genererer...' : '📄 PDF'}
         </button>
       </div>
 
       {/* ── Filter-rad (topbar linje 2) ── */}
-      <div style={{ flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'8px 20px', borderBottom:'1px solid rgba(255,255,255,0.05)', flexWrap:'wrap', minHeight:44, background:'var(--gold-dim)' }}>
-        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'rgba(255,255,255,0.30)', flexShrink:0 }}>
+      <div style={{ flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'8px 20px', borderBottom:'1px solid var(--glass-bg)', flexWrap:'wrap', minHeight:44, background:'var(--gold-dim)' }}>
+        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--text-muted)', flexShrink:0 }}>
           Filter
         </span>
         {aktiveFiltre.map((filter, idx) => (
           filter.kolonne ? (
-            <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:6, padding:'3px 6px 3px 8px', fontSize:12 }}>
+            <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:6, padding:'3px 6px 3px 8px', fontSize:12 }}>
               <select value={filter.kolonne}
                 onChange={e => oppdaterFilterKolonne(idx, e.target.value)}
-                style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.80)', fontSize:12, cursor:'pointer', outline:'none', maxWidth:130 }}>
+                style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:12, cursor:'pointer', outline:'none', maxWidth:130 }}>
                 {tilgjengeligeKolonner
                   .filter(k => k !== (forslag.prosjektKolonne ?? ''))
                   .map(k => <option key={k} value={k}>{k}</option>)}
               </select>
               <select value={filter.operator}
                 onChange={e => oppdaterFilterOperator(idx, e.target.value)}
-                style={{ background:'transparent', border:'none', color:'rgba(255,255,255,0.50)', fontSize:11, cursor:'pointer', outline:'none' }}>
+                style={{ background:'transparent', border:'none', color:'var(--text-secondary)', fontSize:11, cursor:'pointer', outline:'none' }}>
                 {OPERATORER.map(op => <option key={op.verdi} value={op.verdi}>{op.label}</option>)}
               </select>
               <FilterVerdiInput
@@ -1718,7 +1718,7 @@ export default function RapportInteraktivPage() {
           ) : null
         ))}
         <button type="button" onClick={leggTilFilter}
-          style={{ background:'rgba(255,255,255,0.04)', border:'1px dashed rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.40)', borderRadius:6, padding:'4px 12px', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
+          style={{ background:'var(--glass-bg)', border:'1px dashed var(--glass-border-hover)', color:'var(--text-muted)', borderRadius:6, padding:'4px 12px', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
           + Filter
         </button>
       </div>
@@ -1732,16 +1732,16 @@ export default function RapportInteraktivPage() {
           {/* Chart area */}
           <div className="rapport-chart-omraade" style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:16, overflowY:'auto' }}>
             {config.visualType!=='table' && (
-              <div style={{ borderRadius:12, padding:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ borderRadius:12, padding:16, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)' }}>
                 {lasterData
-                  ? <div style={{ color:'rgba(255,255,255,0.35)', padding:40, textAlign:'center' }}>Henter data...</div>
+                  ? <div style={{ color:'var(--text-muted)', padding:40, textAlign:'center' }}>Henter data...</div>
                   : renderChart()
                 }
               </div>
             )}
             {(visTabell||config.visualType==='table') && (
-              <div className="rapport-tabell-omraade" style={{ borderRadius:12, padding:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.30)', marginBottom:10, fontFamily:'Barlow Condensed', letterSpacing:'0.08em', fontWeight:700 }}>DATATABELL</div>
+              <div className="rapport-tabell-omraade" style={{ borderRadius:12, padding:16, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)' }}>
+                <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:10, fontFamily:'Barlow Condensed', letterSpacing:'0.08em', fontWeight:700 }}>DATATABELL</div>
                 <DataTable data={behandletData} visKolonner={visKolonner} alleViewKolonner={forslag.alleViewKolonner}/>
               </div>
             )}
@@ -1749,7 +1749,7 @@ export default function RapportInteraktivPage() {
 
           {/* ── Rediger-panel ── */}
           {visRediger && (
-            <div className="rapport-rediger-panel" style={{ width:280, flexShrink:0, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:16 }}>
+            <div className="rapport-rediger-panel" style={{ width:280, flexShrink:0, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)', borderRadius:12, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:16 }}>
               <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:14, color:'var(--gold)', letterSpacing:'0.06em', textTransform:'uppercase' }}>
                 ⚙ Rediger rapport
               </div>
@@ -1760,7 +1760,7 @@ export default function RapportInteraktivPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                   {VIS_TYPE_OPTIONS.map(v => (
                     <button key={v.type} type="button" onClick={()=>setConfig(p=>p?{...p,visualType:v.type}:p)}
-                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid var(--gold-dim)':'1px solid rgba(255,255,255,0.08)', background:config.visualType===v.type?'var(--glass-gold-bg)':'rgba(255,255,255,0.04)', color:config.visualType===v.type?'var(--gold)':'rgba(255,255,255,0.5)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+                      style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid var(--gold-dim)':'1px solid var(--glass-bg-hover)', background:config.visualType===v.type?'var(--glass-gold-bg)':'var(--glass-bg)', color:config.visualType===v.type?'var(--gold)':'var(--text-secondary)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:18 }}>{v.ikon}</span><span>{v.navn}</span>
                     </button>
                   ))}
@@ -1830,9 +1830,9 @@ export default function RapportInteraktivPage() {
                         onClick={()=>setConfig(p=>p?{...p,aggregering:a.verdi}:p)}
                         style={{
                           padding:'7px 6px', borderRadius:7, cursor:'pointer',
-                          border: config.aggregering===a.verdi ? '1px solid var(--gold-dim)' : '1px solid rgba(255,255,255,0.08)',
-                          background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'rgba(255,255,255,0.04)',
-                          color: config.aggregering===a.verdi ? 'var(--gold)' : 'rgba(255,255,255,0.5)',
+                          border: config.aggregering===a.verdi ? '1px solid var(--gold-dim)' : '1px solid var(--glass-bg-hover)',
+                          background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
+                          color: config.aggregering===a.verdi ? 'var(--gold)' : 'var(--text-secondary)',
                           fontSize:11, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
                           fontFamily:'Barlow, sans-serif',
                         }}>
@@ -1842,7 +1842,7 @@ export default function RapportInteraktivPage() {
                     ))}
                   </div>
                   {/* Aktuelt uttrykk */}
-                  <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.30)', fontFamily:'monospace', background:'rgba(255,255,255,0.04)', borderRadius:5, padding:'4px 8px' }}>
+                  <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'monospace', background:'var(--glass-bg)', borderRadius:5, padding:'4px 8px' }}>
                     {yAkseLabel}
                   </div>
                 </div>
@@ -1870,7 +1870,7 @@ export default function RapportInteraktivPage() {
                       const typeIkon  = type==='measure' ? 'Σ' : type==='dato' ? '⌚' : type==='id' ? '#' : '≡';
                       const typeColor = type==='measure' ? 'var(--gold)' : type==='dato' ? 'rgba(110,231,183,0.9)' : type==='id' ? 'rgba(200,200,200,0.5)' : 'rgba(147,197,253,0.9)';
                       return (
-                        <label key={kol} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'rgba(255,255,255,0.65)', cursor:'pointer', padding:'2px 0' }}>
+                        <label key={kol} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text-secondary)', cursor:'pointer', padding:'2px 0' }}>
                           <input type="checkbox" checked={checked} style={{ accentColor:'var(--gold)', flexShrink:0 }}
                             onChange={e => {
                               setValgteKolonner(prev =>
@@ -1885,7 +1885,7 @@ export default function RapportInteraktivPage() {
                   </div>
                   {valgteKolonner.length>0 && (
                     <button type="button" onClick={()=>setValgteKolonner([])}
-                      style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.35)', background:'none', border:'none', cursor:'pointer' }}>
+                      style={{ marginTop:6, fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
                       Nullstill kolonnevalg
                     </button>
                   )}
@@ -1911,7 +1911,7 @@ export default function RapportInteraktivPage() {
                 <input type="range" min="5" max="200" step="5" value={config.maksRader}
                   onChange={e=>setConfig(p=>p?{...p,maksRader:parseInt(e.target.value)}:p)}
                   style={{ width:'100%', accentColor:'var(--gold)' }}/>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.25)', marginTop:2 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginTop:2 }}>
                   <span>5</span><span>200</span>
                 </div>
               </div>
@@ -1927,7 +1927,7 @@ export default function RapportInteraktivPage() {
                   setAktiveFiltre(parseFiltreTilObjekter(forslag.sql ?? '', forslag.prosjektFilter ?? '', forslag.prosjektKolonne));
                   setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], sorterPaa:null, sorterRetning:'DESC', maksRader:50 });
                 }}
-                style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.40)' }}>
+                style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-muted)' }}>
                 Tilbakestill til AI-forslag
               </button>
             </div>

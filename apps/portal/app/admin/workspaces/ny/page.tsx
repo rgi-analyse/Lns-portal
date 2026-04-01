@@ -85,7 +85,7 @@ export default function NyttWorkspacePage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Nytt workspace</h1>
       <p className="text-sm text-gray-500 mb-6">Opprett en organisatorisk mappe for rapporter.</p>
 
-      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid var(--glass-bg-hover)' }}>
         <div>
           <Label htmlFor="navn">Navn <span className="text-red-500">*</span></Label>
           <Input id="navn" placeholder="Workspace-navn" {...field('navn')} />

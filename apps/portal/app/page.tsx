@@ -166,7 +166,7 @@ export default function LoginPage() {
     <main
       className="min-h-screen flex items-center justify-center p-6"
       style={{
-        background: 'linear-gradient(135deg, #0a1628 0%, #1B2A4A 50%, #0d1f3c 100%)',
+        background: 'linear-gradient(135deg, var(--navy-darkest) 0%, var(--navy) 50%, #0d1f3c 100%)',
       }}
     >
       {/* Bakgrunns-orbs */}
@@ -181,7 +181,7 @@ export default function LoginPage() {
         className="w-full max-w-sm relative z-10 rounded-2xl p-8 flex flex-col items-center gap-6"
         style={{
           background:     'rgba(15,25,45,0.92)',
-          border:         '1px solid rgba(255,255,255,0.10)',
+          border:         '1px solid var(--glass-border)',
           boxShadow:      '0 24px 64px rgba(0,0,0,0.5)',
           backdropFilter: 'blur(8px)',
         }}
@@ -211,15 +211,15 @@ export default function LoginPage() {
         {step === 'email' && (
           <form onSubmit={sjekkEpost} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'rgba(255,255,255,0.90)' }}>
+              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Logg inn
               </h1>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 Skriv inn e-postadressen din for å fortsette
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                 E-postadresse
               </label>
               <input
@@ -231,13 +231,13 @@ export default function LoginPage() {
                 autoFocus
                 className="w-full px-3 py-2.5 text-sm rounded-lg"
                 style={{
-                  background:   'rgba(255,255,255,0.06)',
-                  border:       '1px solid rgba(255,255,255,0.12)',
-                  color:        'rgba(255,255,255,0.85)',
+                  background:   'var(--glass-bg)',
+                  border:       '1px solid var(--glass-border)',
+                  color:        'var(--text-primary)',
                   outline:      'none',
                 }}
                 onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
-                onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--glass-border)'; e.currentTarget.style.boxShadow = 'none'; }}
               />
             </div>
             {feil && <p className="text-xs text-center" style={{ color: 'rgba(252,165,165,0.90)' }}>{feil}</p>}
@@ -245,7 +245,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !email.trim()}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fortsett'}
             </button>
@@ -256,10 +256,10 @@ export default function LoginPage() {
         {step === 'microsoft' && (
           <div className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'rgba(255,255,255,0.90)' }}>
+              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Logg inn med Microsoft
               </h1>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 {email}
               </p>
             </div>
@@ -285,9 +285,9 @@ export default function LoginPage() {
             <button
               onClick={() => { setStep('email'); setFeil(null); }}
               className="text-xs text-center transition-colors"
-              style={{ color: 'rgba(255,255,255,0.35)' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)'; }}
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
             >
               ← Tilbake
             </button>
@@ -298,15 +298,15 @@ export default function LoginPage() {
         {step === 'passord' && (
           <form onSubmit={loggInnLokal} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'rgba(255,255,255,0.90)' }}>
+              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Skriv inn passord
               </h1>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 {email}
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                 Passord
               </label>
               <div className="relative">
@@ -319,19 +319,19 @@ export default function LoginPage() {
                   autoFocus
                   className="w-full px-3 py-2.5 pr-10 text-sm rounded-lg"
                   style={{
-                    background:   'rgba(255,255,255,0.06)',
-                    border:       '1px solid rgba(255,255,255,0.12)',
-                    color:        'rgba(255,255,255,0.85)',
+                    background:   'var(--glass-bg)',
+                    border:       '1px solid var(--glass-border)',
+                    color:        'var(--text-primary)',
                     outline:      'none',
                   }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
-                  onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--glass-border)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
                 <button
                   type="button"
                   onClick={() => setVisPassord((v) => !v)}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                  style={{ color: 'rgba(255,255,255,0.35)' }}
+                  style={{ color: 'var(--text-muted)' }}
                   tabIndex={-1}
                 >
                   {visPassord ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -343,7 +343,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !passord}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Logg inn'}
             </button>
@@ -351,9 +351,9 @@ export default function LoginPage() {
               onClick={() => { setStep('email'); setFeil(null); }}
               type="button"
               className="text-xs text-center transition-colors"
-              style={{ color: 'rgba(255,255,255,0.35)' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.65)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)'; }}
+              style={{ color: 'var(--text-muted)' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
             >
               ← Tilbake
             </button>
@@ -364,16 +364,16 @@ export default function LoginPage() {
         {step === 'bytt-passord' && (
           <form onSubmit={byttPassord} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'rgba(255,255,255,0.90)' }}>
+              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Sett nytt passord
               </h1>
-              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 Du må bytte passord før du kan fortsette
               </p>
             </div>
             {(['nyttPassord', 'bekreft'] as const).map((felt) => (
               <div key={felt} className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   {felt === 'nyttPassord' ? 'Nytt passord' : 'Bekreft passord'}
                 </label>
                 <input
@@ -389,17 +389,17 @@ export default function LoginPage() {
                   autoFocus={felt === 'nyttPassord'}
                   className="w-full px-3 py-2.5 text-sm rounded-lg"
                   style={{
-                    background:   'rgba(255,255,255,0.06)',
-                    border:       '1px solid rgba(255,255,255,0.12)',
-                    color:        'rgba(255,255,255,0.85)',
+                    background:   'var(--glass-bg)',
+                    border:       '1px solid var(--glass-border)',
+                    color:        'var(--text-primary)',
                     outline:      'none',
                   }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--gold-dim)'; e.currentTarget.style.boxShadow = '0 0 0 2px var(--glass-gold-bg)'; }}
-                  onBlur={(e)  => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = 'var(--glass-border)'; e.currentTarget.style.boxShadow = 'none'; }}
                 />
               </div>
             ))}
-            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.30)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Minst 8 tegn, én stor bokstav og ett tall.
             </p>
             {feil && <p className="text-xs text-center" style={{ color: 'rgba(252,165,165,0.90)' }}>{feil}</p>}
@@ -407,7 +407,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !nyttPassord || !bekreft}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: '#111D33' }}
+              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lagre og logg inn'}
             </button>

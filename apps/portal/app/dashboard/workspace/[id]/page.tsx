@@ -159,9 +159,9 @@ export default function WorkspacePage() {
         <button
           onClick={() => router.back()}
           className="flex items-center gap-2 mb-6 text-sm transition-colors"
-          style={{ color: 'rgba(255,255,255,0.35)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.75)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)'; }}
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
         >
           <ArrowLeft className="w-4 h-4" />
           Tilbake
@@ -170,11 +170,11 @@ export default function WorkspacePage() {
         {workspace === null ? (
           /* Loading-skjelett */
           <div className="animate-pulse space-y-6">
-            <div style={{ height: 32, width: 280, background: 'rgba(255,255,255,0.06)', borderRadius: 8 }} />
-            <div style={{ height: 16, width: 200, background: 'rgba(255,255,255,0.04)', borderRadius: 6 }} />
+            <div style={{ height: 32, width: 280, background: 'var(--glass-bg)', borderRadius: 8 }} />
+            <div style={{ height: 16, width: 200, background: 'var(--glass-bg)', borderRadius: 6 }} />
             <div className="space-y-2 mt-8">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} style={{ height: 56, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10 }} />
+                <div key={i} style={{ height: 56, background: 'var(--glass-bg)', border: '1px solid var(--glass-bg)', borderRadius: 10 }} />
               ))}
             </div>
           </div>
@@ -200,14 +200,14 @@ export default function WorkspacePage() {
                   fontFamily: 'Barlow Condensed, sans-serif',
                   fontWeight: 800,
                   fontSize: 26,
-                  color: 'rgba(255,255,255,0.90)',
+                  color: 'var(--text-primary)',
                   letterSpacing: '0.02em',
                   lineHeight: 1.1,
                 }}>
                   {workspace.navn}
                 </h1>
                 {workspace.beskrivelse && (
-                  <p className="mt-1 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {workspace.beskrivelse}
                   </p>
                 )}
@@ -215,7 +215,7 @@ export default function WorkspacePage() {
             </div>
 
             {/* Meta */}
-            <p className="mb-8 text-xs" style={{ color: 'rgba(255,255,255,0.45)', marginLeft: 68 }}>
+            <p className="mb-8 text-xs" style={{ color: 'var(--text-muted)', marginLeft: 68 }}>
               {rapporter.length} rapport{rapporter.length !== 1 ? 'er' : ''}
             </p>
 
@@ -226,17 +226,17 @@ export default function WorkspacePage() {
                 fontWeight: 700, fontSize: 12,
                 letterSpacing: '0.10em',
                 textTransform: 'uppercase',
-                color: 'rgba(255,255,255,0.45)',
+                color: 'var(--text-muted)',
                 whiteSpace: 'nowrap',
               }}>
                 Rapporter
               </span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+              <div className="flex-1 h-px" style={{ background: 'var(--glass-bg)' }} />
             </div>
 
             {/* Rapport-liste */}
             {rapporter.length === 0 ? (
-              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                 Ingen rapporter i dette workspacet.
               </p>
             ) : (
@@ -251,8 +251,8 @@ export default function WorkspacePage() {
                       gap: 10,
                       padding: '10px 14px',
                       borderRadius: 10,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.07)',
+                      background: 'var(--glass-bg)',
+                      border: '1px solid var(--glass-bg-hover)',
                       cursor: redigererId === rapport.id ? 'default' : 'pointer',
                     }}
                     onClick={() => {
@@ -265,10 +265,10 @@ export default function WorkspacePage() {
                       }
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.13)';
+                      (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-border-hover)';
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
+                      (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
                     }}
                   >
                     {/* Rapport-ikon */}
@@ -302,11 +302,11 @@ export default function WorkspacePage() {
                           onBlur={() => lagreNavn(rapport.id)}
                           onClick={(e) => e.stopPropagation()}
                           style={{
-                            background: 'rgba(255,255,255,0.08)',
+                            background: 'var(--glass-bg-hover)',
                             border: '1px solid var(--gold-dim)',
                             borderRadius: 5,
                             padding: '3px 8px',
-                            color: 'rgba(255,255,255,0.90)',
+                            color: 'var(--text-primary)',
                             fontSize: 13,
                             fontWeight: 500,
                             width: '100%',
@@ -322,7 +322,7 @@ export default function WorkspacePage() {
                           }}
                           style={{
                             fontSize: 13, fontWeight: 500,
-                            color: 'rgba(255,255,255,0.85)',
+                            color: 'var(--text-primary)',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           }}
                         >
@@ -330,7 +330,7 @@ export default function WorkspacePage() {
                         </div>
                       )}
                       {rapport.erDesignerRapport && redigererId !== rapport.id && (
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 1, display: 'flex', gap: 8 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, display: 'flex', gap: 8 }}>
                           <span>Designer-rapport</span>
                           {(rapport.oppdatert || rapport.opprettetDato) && (
                             <span>
@@ -357,19 +357,19 @@ export default function WorkspacePage() {
                             title="Endre navn"
                             style={{
                               width: 26, height: 26, borderRadius: 5,
-                              border: '1px solid rgba(255,255,255,0.10)',
-                              background: 'rgba(255,255,255,0.05)',
-                              color: 'rgba(255,255,255,0.45)',
+                              border: '1px solid var(--glass-border)',
+                              background: 'var(--glass-bg)',
+                              color: 'var(--text-muted)',
                               cursor: 'pointer', display: 'flex',
                               alignItems: 'center', justifyContent: 'center',
                             }}
                             onMouseEnter={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.80)';
-                              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.22)';
+                              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--text-muted)';
                             }}
                             onMouseLeave={(e) => {
-                              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.45)';
-                              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.10)';
+                              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+                              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--glass-border)';
                             }}
                           >
                             <Pencil className="w-3 h-3" />

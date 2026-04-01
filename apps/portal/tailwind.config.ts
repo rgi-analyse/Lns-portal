@@ -15,9 +15,9 @@ const config: Config = {
   		},
   		colors: {
   			navy: {
-  				DEFAULT: '#1B2A4A',
-  				dark:    '#111D33',
-  				mid:     '#243556',
+  				DEFAULT: 'var(--navy)',
+  				dark:    'var(--navy-dark)',
+  				mid:     'var(--navy-mid)',
   			},
   			gold: {
   				DEFAULT: '#F5A623',

@@ -246,12 +246,12 @@ export default function BrukerAdminPage() {
             onClick={() => setLokalOpen(true)}
             className="inline-flex items-center gap-2 h-9 px-4 text-sm rounded-lg font-medium transition-colors"
             style={{
-              background: 'rgba(255,255,255,0.06)',
-              border:     '1px solid rgba(255,255,255,0.12)',
-              color:      'rgba(255,255,255,0.70)',
+              background: 'var(--glass-bg)',
+              border:     '1px solid var(--glass-border)',
+              color:      'var(--text-secondary)',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.10)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-border)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
           >
             <UserPlus className="w-4 h-4" />
             Ny lokal bruker
@@ -316,9 +316,9 @@ export default function BrukerAdminPage() {
                       <span
                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
                         style={{
-                          background: 'rgba(255,255,255,0.06)',
-                          border:     '1px solid rgba(255,255,255,0.15)',
-                          color:      'rgba(255,255,255,0.50)',
+                          background: 'var(--glass-bg)',
+                          border:     '1px solid var(--glass-border-hover)',
+                          color:      'var(--text-secondary)',
                         }}
                       >
                         Lokal
@@ -447,7 +447,7 @@ export default function BrukerAdminPage() {
               required
               autoFocus
               className="w-full px-3 py-2 text-sm rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
           <div>
@@ -459,7 +459,7 @@ export default function BrukerAdminPage() {
               placeholder="ola@bedrift.no"
               required
               className="w-full px-3 py-2 text-sm rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
           <div>
@@ -472,13 +472,13 @@ export default function BrukerAdminPage() {
                 placeholder="Minst 8 tegn, stor bokstav, tall"
                 required
                 className="w-full px-3 py-2 pr-10 text-sm rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+                style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
               />
               <button
                 type="button"
                 onClick={() => setVisLokalPassord((v) => !v)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
+                style={{ color: 'var(--text-muted)' }}
                 tabIndex={-1}
               >
                 {visLokalPassord ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -491,7 +491,7 @@ export default function BrukerAdminPage() {
               value={lokalRolle}
               onChange={(e) => setLokalRolle(e.target.value as Rolle)}
               className="w-full px-3 py-2 text-sm rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             >
               {ROLLER.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
@@ -503,7 +503,7 @@ export default function BrukerAdminPage() {
               onChange={(e) => setLokalMåBytte(e.target.checked)}
               className="rounded accent-brand-600"
             />
-            <span className="text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               Bruker må bytte passord ved første innlogging
             </span>
           </label>
@@ -540,13 +540,13 @@ export default function BrukerAdminPage() {
                 required
                 autoFocus
                 className="w-full px-3 py-2 pr-10 text-sm rounded-lg"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+                style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
               />
               <button
                 type="button"
                 onClick={() => setVisReset((v) => !v)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
+                style={{ color: 'var(--text-muted)' }}
                 tabIndex={-1}
               >
                 {visReset ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

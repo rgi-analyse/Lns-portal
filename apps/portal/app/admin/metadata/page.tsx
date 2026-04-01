@@ -544,7 +544,7 @@ export default function MetadataAdminPage() {
                                       <select
                                         value={kol.kolonne_type ?? 'dimensjon'}
                                         onChange={e => oppdaterKolonneType(view.id, kol, e.target.value)}
-                                        style={{ fontSize:10, padding:'1px 4px', borderRadius:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.55)', cursor:'pointer' }}
+                                        style={{ fontSize:10, padding:'1px 4px', borderRadius:4, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-secondary)', cursor:'pointer' }}
                                         title="Endre kolonnetype"
                                       >
                                         <option value="dimensjon">Dimensjon</option>

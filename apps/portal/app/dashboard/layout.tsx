@@ -14,7 +14,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             background: 'rgba(10,22,40,0.5)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            borderBottom: '1px solid var(--glass-bg)',
           }}
         >
           <span
@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               fontWeight: 700,
               fontSize: 15,
               letterSpacing: '0.08em',
-              color: 'rgba(255,255,255,0.55)',
+              color: 'var(--text-secondary)',
               textTransform: 'uppercase',
             }}
           >

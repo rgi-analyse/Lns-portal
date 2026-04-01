@@ -16,7 +16,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 background: 'rgba(10,22,40,0.50)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid var(--glass-bg)',
               }}
             >
               <div className="flex items-center gap-2.5">
@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   fontWeight: 700,
                   fontSize: 15,
                   letterSpacing: '0.06em',
-                  color: 'rgba(255,255,255,0.80)',
+                  color: 'var(--text-primary)',
                 }}>
                   LNS Dataportal
                 </span>

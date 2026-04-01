@@ -93,13 +93,13 @@ export default function Sidebar() {
         background: 'rgba(10,22,40,0.65)',
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        borderRight: '1px solid var(--glass-bg)',
       }}
     >
       {/* Logo */}
       <div
         className={cn('flex flex-col items-center shrink-0', collapsed ? 'py-3' : 'px-4 py-4')}
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
         <img
           src="/logo/LNS-logo-hvit-gul-liten-RGB.png"
@@ -126,14 +126,14 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="p-1.5 rounded-md transition-colors"
-          style={{ color: 'rgba(255,255,255,0.50)' }}
+          style={{ color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)';
-            (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.90)';
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
           }}
           onMouseLeave={(e) => {
             (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-            (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.50)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
           }}
           aria-label={collapsed ? 'Utvid sidebar' : 'Skjul sidebar'}
         >
@@ -149,22 +149,22 @@ export default function Sidebar() {
           style={isActive('/dashboard') ? {
             background: 'var(--glass-gold-bg)',
             border: '1px solid var(--glass-gold-border)',
-            color: '#FFFFFF',
+            color: 'var(--text-primary)',
             borderLeft: '2px solid var(--gold)',
             paddingLeft: collapsed ? undefined : '10px',
           } : {
-            color: 'rgba(255,255,255,0.65)',
+            color: 'var(--text-secondary)',
           }}
           onMouseEnter={(e) => {
             if (!isActive('/dashboard')) {
-              (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.06)';
-              (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.90)';
+              (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)';
+              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)';
             }
           }}
           onMouseLeave={(e) => {
             if (!isActive('/dashboard')) {
               (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
-              (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.65)';
+              (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)';
             }
           }}
         >
@@ -175,11 +175,11 @@ export default function Sidebar() {
         {/* Workspaces heading */}
         {!collapsed && (
           <p className="px-3 pt-4 pb-1 text-[10px] font-bold tracking-widest uppercase"
-            style={{ color: 'rgba(255,255,255,0.45)' }}>
+            style={{ color: 'var(--text-muted)' }}>
             Workspaces
           </p>
         )}
-        {collapsed && <div className="my-2 mx-3 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />}
+        {collapsed && <div className="my-2 mx-3 h-px" style={{ background: 'var(--glass-bg)' }} />}
 
         {loadingWorkspaces ? (
           <div className="space-y-2 px-1 pt-1">
@@ -188,7 +188,7 @@ export default function Sidebar() {
           </div>
         ) : workspaces.length === 0 ? (
           !collapsed && (
-            <p className="px-3 py-1 text-xs italic" style={{ color: 'rgba(255,255,255,0.25)' }}>
+            <p className="px-3 py-1 text-xs italic" style={{ color: 'var(--text-muted)' }}>
               Ingen workspaces
             </p>
           )
@@ -204,8 +204,8 @@ export default function Sidebar() {
                     onClick={() => router.push(`/dashboard/workspace/${ws.id}`)}
                     title={ws.navn}
                     className="w-full flex items-center justify-center px-3 py-2 rounded-lg transition-colors"
-                    style={{ color: 'rgba(255,255,255,0.65)' }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)'; }}
+                    style={{ color: 'var(--text-secondary)' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                   >
                     <Building2 className="w-4 h-4 shrink-0" />
@@ -217,20 +217,20 @@ export default function Sidebar() {
                     style={wsActive ? {
                       background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-bg)',
-                      color: 'rgba(255,255,255,0.8)',
+                      color: 'var(--text-primary)',
                     } : {
-                      color: 'rgba(255,255,255,0.65)',
+                      color: 'var(--text-secondary)',
                     }}
                     onMouseEnter={(e) => {
                       if (!wsActive) {
-                        (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
-                        (e.currentTarget as HTMLDivElement).style.color = 'rgba(255,255,255,0.90)';
+                        (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)';
+                        (e.currentTarget as HTMLDivElement).style.color = 'var(--text-primary)';
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!wsActive) {
                         (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-                        (e.currentTarget as HTMLDivElement).style.color = 'rgba(255,255,255,0.65)';
+                        (e.currentTarget as HTMLDivElement).style.color = 'var(--text-secondary)';
                       }
                     }}
                   >
@@ -289,7 +289,7 @@ export default function Sidebar() {
                         <Skeleton className="h-5 w-3/4 opacity-10" />
                       </div>
                     ) : (rapporter[ws.id] ?? []).length === 0 ? (
-                      <p className="px-3 py-1 text-xs italic" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                      <p className="px-3 py-1 text-xs italic" style={{ color: 'var(--text-muted)' }}>
                         Ingen rapporter
                       </p>
                     ) : (
@@ -310,24 +310,24 @@ export default function Sidebar() {
                               borderLeft: '2px solid var(--gold)',
                               paddingLeft: '10px',
                             } : {
-                              color: 'rgba(255,255,255,0.55)',
+                              color: 'var(--text-secondary)',
                             }}
                             onMouseEnter={(e) => {
                               if (!active) {
-                                (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.05)';
-                                (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.90)';
+                                (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)';
+                                (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)';
                               }
                             }}
                             onMouseLeave={(e) => {
                               if (!active) {
                                 (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
-                                (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.55)';
+                                (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)';
                               }
                             }}
                           >
                             <span
                               className="w-1 h-1 rounded-full shrink-0"
-                              style={{ background: active ? 'var(--gold)' : 'rgba(255,255,255,0.40)' }}
+                              style={{ background: active ? 'var(--gold)' : 'var(--text-muted)' }}
                             />
                             <span className="truncate">{rapport.navn}</span>
                           </Link>

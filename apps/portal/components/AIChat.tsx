@@ -543,7 +543,7 @@ export default function AIChat({
             background: 'rgba(15,25,45,0.92)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255,255,255,0.10)',
+            border: '1px solid var(--glass-border)',
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           }}
         >
@@ -552,7 +552,7 @@ export default function AIChat({
             className="flex items-center justify-between px-4 py-3 shrink-0"
             style={{
               background: 'rgba(10,18,35,0.95)',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              borderBottom: '1px solid var(--glass-bg-hover)',
             }}
           >
             <div className="flex items-center gap-2.5">
@@ -575,7 +575,7 @@ export default function AIChat({
                 }}>
                   LNS Assistent
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
                   AI-drevet dataanalyse
                 </div>
               </div>
@@ -610,7 +610,7 @@ export default function AIChat({
                 style={{
                   background: autoOpplesing ? 'var(--glass-gold-bg)' : 'transparent',
                   border: autoOpplesing ? '1px solid var(--glass-gold-border)' : '1px solid transparent',
-                  color: autoOpplesing ? 'var(--gold)' : 'rgba(255,255,255,0.30)',
+                  color: autoOpplesing ? 'var(--gold)' : 'var(--text-muted)',
                 }}
               >
                 <Volume2 className="w-3.5 h-3.5" />
@@ -621,9 +621,9 @@ export default function AIChat({
                 title="Tale-innstillinger"
                 className="rounded p-1 transition-colors"
                 style={{
-                  background: visTTSInstillinger ? 'rgba(255,255,255,0.10)' : 'transparent',
+                  background: visTTSInstillinger ? 'var(--glass-border)' : 'transparent',
                   border: '1px solid transparent',
-                  color: visTTSInstillinger ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.30)',
+                  color: visTTSInstillinger ? 'var(--text-primary)' : 'var(--text-muted)',
                 }}
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -631,14 +631,14 @@ export default function AIChat({
               <button
                 onClick={() => setOpen(false)}
                 className="rounded p-1 transition-colors"
-                style={{ color: 'rgba(255,255,255,0.35)' }}
+                style={{ color: 'var(--text-muted)' }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)';
+                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)';
+                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.35)';
+                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
                 }}
               >
                 <X className="w-4 h-4" />
@@ -654,7 +654,7 @@ export default function AIChat({
                 top: 52,
                 right: 8,
                 background: 'rgba(12,20,38,0.98)',
-                border: '1px solid rgba(255,255,255,0.10)',
+                border: '1px solid var(--glass-border)',
                 borderRadius: 10,
                 padding: 14,
                 width: 240,
@@ -662,12 +662,12 @@ export default function AIChat({
                 boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.10em', marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.10em', marginBottom: 12 }}>
                 TALE-INNSTILLINGER
               </div>
 
               {/* Stemmevalg — Azure Neural */}
-              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', display: 'block', marginBottom: 4 }}>Stemme</label>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Stemme</label>
               <select
                 value={ttsInstillinger.stemmNavn}
                 onChange={(e) => {
@@ -677,8 +677,8 @@ export default function AIChat({
                 }}
                 style={{
                   width: '100%', marginBottom: 10, padding: '5px 8px', fontSize: 12,
-                  background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)',
-                  borderRadius: 6, color: 'rgba(255,255,255,0.80)',
+                  background: 'var(--glass-bg-hover)', border: '1px solid var(--glass-border-hover)',
+                  borderRadius: 6, color: 'var(--text-primary)',
                 }}
               >
                 {AZURE_STEMMER.map((s) => (
@@ -687,7 +687,7 @@ export default function AIChat({
               </select>
 
               {/* Hastighet */}
-              <label style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>
                 Hastighet: {ttsInstillinger.hastighet.toFixed(1)}x
               </label>
               <input
@@ -732,7 +732,7 @@ export default function AIChat({
               </div>
             )}
             {display.length === 0 && (
-              <p className="text-xs text-center mt-4" style={{ color: 'rgba(255,255,255,0.25)' }}>
+              <p className="text-xs text-center mt-4" style={{ color: 'var(--text-muted)' }}>
                 Spør meg om rapportdata eller be om å filtrere rapporten.
               </p>
             )}
@@ -754,7 +754,7 @@ export default function AIChat({
                   return (
                     <div style={{ textAlign: 'center', padding: '8px 0', fontSize: 22, fontWeight: 700, color: 'var(--gold)' }}>
                       {typeof val === 'number' ? val.toLocaleString('nb-NO') : String(val ?? '')}
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', fontWeight: 400 }}>{yCol}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>{yCol}</div>
                     </div>
                   );
                 }
@@ -781,7 +781,7 @@ export default function AIChat({
                         <rect key={`l${idx}`} x={80 + (idx % 2) * 100} y={8 + Math.floor(idx / 2) * 18} width={8} height={8} fill={colors[idx % colors.length]} rx={1} />
                       ))}
                       {slices.map((s, idx) => (
-                        <text key={`t${idx}`} x={92 + (idx % 2) * 100} y={16 + Math.floor(idx / 2) * 18} fontSize={9} fill="rgba(255,255,255,0.60)">{s.label.slice(0, 12)}</text>
+                        <text key={`t${idx}`} x={92 + (idx % 2) * 100} y={16 + Math.floor(idx / 2) * 18} fontSize={9} fill="var(--text-secondary)">{s.label.slice(0, 12)}</text>
                       ))}
                     </svg>
                   );
@@ -809,7 +809,7 @@ export default function AIChat({
                         return <circle key={idx} cx={x} cy={y} r={2.5} fill="var(--gold)" />;
                       })}
                       {preview.map((r, idx) => (
-                        <text key={`l${idx}`} x={pad + idx * barW + barW / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="rgba(255,255,255,0.35)">
+                        <text key={`l${idx}`} x={pad + idx * barW + barW / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="var(--text-muted)">
                           {String(r[xCol] ?? '').slice(0, 6)}
                         </text>
                       ))}
@@ -826,7 +826,7 @@ export default function AIChat({
                       return (
                         <g key={idx}>
                           <rect x={x} y={y} width={Math.max(1, barW - 2)} height={bh} fill="var(--gold)" opacity={0.75} rx={1} />
-                          <text x={x + (barW - 2) / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="rgba(255,255,255,0.35)">
+                          <text x={x + (barW - 2) / 2} y={H - 2} fontSize={7} textAnchor="middle" fill="var(--text-muted)">
                             {String(r[xCol] ?? '').slice(0, 6)}
                           </text>
                         </g>
@@ -849,11 +849,11 @@ export default function AIChat({
                       📊 {f.tittel}
                     </div>
                     {f.beskrivelse && (
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>
                         {f.beskrivelse}
                       </div>
                     )}
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                       {visTypeLabel[f.visualType] ?? f.visualType}
                       {f.xAkse ? ` · X: ${f.xAkse}` : ''}
                       {f.yAkse ? ` · Y: ${f.yAkse}` : ''}
@@ -885,13 +885,13 @@ export default function AIChat({
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); eksporterRapport(f); }}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                         style={{
-                          background: 'rgba(255,255,255,0.06)',
-                          border: '1px solid rgba(255,255,255,0.14)',
-                          color: 'rgba(255,255,255,0.55)',
+                          background: 'var(--glass-bg)',
+                          border: '1px solid var(--glass-border-hover)',
+                          color: 'var(--text-secondary)',
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.85)'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.55)'; }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
                       >
                         Eksporter
                       </button>
@@ -901,12 +901,12 @@ export default function AIChat({
                         className="px-3 py-1.5 rounded-lg text-xs transition-colors"
                         style={{
                           background: 'transparent',
-                          border: '1px solid rgba(255,255,255,0.10)',
-                          color: 'rgba(255,255,255,0.30)',
+                          border: '1px solid var(--glass-border)',
+                          color: 'var(--text-muted)',
                           cursor: 'pointer',
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.60)'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.30)'; }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)'; }}
                       >
                         Lukk
                       </button>
@@ -987,9 +987,9 @@ export default function AIChat({
                           padding: '2px 8px',
                           borderRadius: 5,
                           fontSize: 11,
-                          background: ttsAktivIdx === i ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.05)',
-                          border: ttsAktivIdx === i ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.10)',
-                          color: ttsAktivIdx === i ? '#ef4444' : 'rgba(255,255,255,0.35)',
+                          background: ttsAktivIdx === i ? 'rgba(239,68,68,0.10)' : 'var(--glass-bg)',
+                          border: ttsAktivIdx === i ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--glass-border)',
+                          color: ttsAktivIdx === i ? '#ef4444' : 'var(--text-muted)',
                           cursor: 'pointer',
                         }}
                       >
@@ -1021,7 +1021,7 @@ export default function AIChat({
           {/* Input */}
           <div
             className="p-3 flex gap-2 shrink-0"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,18,35,0.95)', position: 'relative' }}
+            style={{ borderTop: '1px solid var(--glass-bg-hover)', background: 'rgba(10,18,35,0.95)', position: 'relative' }}
           >
             <textarea
               ref={inputRef}
@@ -1040,14 +1040,14 @@ export default function AIChat({
                 maxHeight: 160,
                 lineHeight: '1.5',
                 padding: '8px 12px',
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'var(--glass-bg-hover)',
+                border: '1px solid var(--glass-border)',
                 borderRadius: 8,
-                color: 'rgba(255,255,255,0.85)',
+                color: 'var(--text-primary)',
                 transition: 'height 0.1s ease, border-color 0.15s',
               }}
               onFocus={(e) => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'var(--gold-dim)'; }}
-              onBlur={(e)  => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.12)'; }}
+              onBlur={(e)  => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'var(--glass-border)'; }}
             />
             {/* STEG 2 – Mikrofon-knapp */}
             <button
@@ -1061,11 +1061,11 @@ export default function AIChat({
                 borderRadius: 8,
                 border: lytter
                   ? '1px solid rgba(239,68,68,0.50)'
-                  : '1px solid rgba(255,255,255,0.12)',
+                  : '1px solid var(--glass-border)',
                 background: lytter
                   ? 'rgba(239,68,68,0.15)'
-                  : 'rgba(255,255,255,0.06)',
-                color: lytter ? '#ef4444' : 'rgba(255,255,255,0.45)',
+                  : 'var(--glass-bg)',
+                color: lytter ? '#ef4444' : 'var(--text-muted)',
                 animation: lytter ? 'mic-pulse 1.5s infinite' : 'none',
               }}
             >
@@ -1108,7 +1108,7 @@ export default function AIChat({
         style={{
           background: 'var(--gold)',
           border: 'none',
-          color: '#111D33',
+          color: 'var(--navy-dark)',
           boxShadow: '0 4px 20px var(--gold-dim)',
         }}
         onMouseEnter={(e) => {

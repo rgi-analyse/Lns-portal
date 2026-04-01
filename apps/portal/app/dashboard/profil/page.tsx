@@ -36,11 +36,11 @@ export default function ProfilPage() {
           <div className="text-center">
             <h1
               className="text-xl font-semibold"
-              style={{ color: 'rgba(255,255,255,0.92)' }}
+              style={{ color: 'var(--text-primary)' }}
             >
               {displayName}
             </h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
               Pålogget
             </p>
           </div>
@@ -49,7 +49,7 @@ export default function ProfilPage() {
         {/* Informasjonskort */}
         <div
           className="rounded-xl overflow-hidden"
-          style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ border: '1px solid var(--glass-bg-hover)' }}
         >
           {[
             { icon: User,   label: 'Navn',    value: displayName },
@@ -60,15 +60,15 @@ export default function ProfilPage() {
               key={label}
               className="flex items-center gap-4 px-5 py-4"
               style={{
-                background: 'rgba(255,255,255,0.03)',
-                borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : undefined,
+                background: 'var(--glass-bg)',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--glass-bg)' : undefined,
               }}
             >
-              <Icon className="w-4 h-4 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
-              <span className="text-sm w-20 shrink-0" style={{ color: 'rgba(255,255,255,0.40)' }}>
+              <Icon className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
+              <span className="text-sm w-20 shrink-0" style={{ color: 'var(--text-muted)' }}>
                 {label}
               </span>
-              <span className="text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>
+              <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
                 {value}
               </span>
             </div>

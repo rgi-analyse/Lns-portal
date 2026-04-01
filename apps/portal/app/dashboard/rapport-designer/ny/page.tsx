@@ -39,15 +39,15 @@ function NyRapportForm() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '11px 14px', fontSize: 14,
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 8, color: 'rgba(255,255,255,0.85)', outline: 'none',
+    background: 'var(--glass-bg)',
+    border: '1px solid var(--glass-border)',
+    borderRadius: 8, color: 'var(--text-primary)', outline: 'none',
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block', fontSize: 11, fontWeight: 700,
     letterSpacing: '0.12em', textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.40)', marginBottom: 6,
+    color: 'var(--text-muted)', marginBottom: 6,
   };
 
   return (
@@ -57,8 +57,8 @@ function NyRapportForm() {
     }}>
       <div style={{
         width: '100%', maxWidth: 480,
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'var(--glass-bg)',
+        border: '1px solid var(--glass-bg-hover)',
         borderRadius: 14, padding: 28,
       }}>
 
@@ -77,11 +77,11 @@ function NyRapportForm() {
             <h2 style={{
               fontFamily: 'Barlow Condensed, sans-serif',
               fontSize: 22, fontWeight: 800,
-              color: '#fff', textTransform: 'uppercase', margin: 0,
+              color: 'var(--text-primary)', textTransform: 'uppercase', margin: 0,
             }}>
               Ny rapport
             </h2>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>
               {visningsnavn}
             </p>
           </div>
@@ -99,7 +99,7 @@ function NyRapportForm() {
             <rect x="1" y="6" width="10" height="7" rx="1.5" stroke="var(--gold)" strokeWidth="1.2"/>
             <path d="M3.5 6V4a2.5 2.5 0 015 0v2" stroke="var(--gold)" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             Data fra{' '}
             <strong style={{ color: 'var(--gold)' }}>{visningsnavn}</strong>
             {prosjektNr && (
@@ -140,12 +140,12 @@ function NyRapportForm() {
             onClick={() => router.back()}
             style={{
               padding: '8px 18px', fontSize: 13, borderRadius: 7,
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'rgba(255,255,255,0.65)', cursor: 'pointer',
+              border: '1px solid var(--glass-border)',
+              background: 'var(--glass-bg)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
           >
             Avbryt
           </button>
@@ -156,7 +156,7 @@ function NyRapportForm() {
               padding: '8px 20px', fontSize: 13, borderRadius: 7,
               border: 'none',
               background: kanStart ? 'var(--gold)' : 'var(--glass-gold-border)',
-              color: kanStart ? '#1a1a1a' : 'rgba(255,255,255,0.35)',
+              color: kanStart ? '#1a1a1a' : 'var(--text-muted)',
               cursor: kanStart ? 'pointer' : 'not-allowed',
               fontWeight: 700,
             }}

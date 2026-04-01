@@ -158,8 +158,8 @@ export default function TenantsAdminPage() {
     <div className="p-8 max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'rgba(255,255,255,0.92)' }}>Tenants</h1>
-          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Tenants</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
             Administrer organisasjoner med separate databaser.
           </p>
         </div>
@@ -178,25 +178,25 @@ export default function TenantsAdminPage() {
       </div>
 
       {/* Tabell */}
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--glass-bg-hover)' }}>
         {loading ? (
-          <div className="p-10 text-center text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          <div className="p-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
             Laster tenants…
           </div>
         ) : tenants.length === 0 ? (
           <div className="p-16 text-center">
-            <Building className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(255,255,255,0.20)' }} />
-            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>Ingen tenants opprettet ennå.</p>
+            <Building className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Ingen tenants opprettet ennå.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+              <tr style={{ borderBottom: '1px solid var(--glass-bg)', background: 'var(--glass-bg)' }}>
                 {['Slug', 'Navn', 'Database', 'Opprettet', 'Status', ''].map((h) => (
                   <th
                     key={h}
                     className="px-5 py-3 text-left font-medium text-[11px] uppercase tracking-wide"
-                    style={{ color: 'rgba(255,255,255,0.35)' }}
+                    style={{ color: 'var(--text-muted)' }}
                   >
                     {h}
                   </th>
@@ -208,8 +208,8 @@ export default function TenantsAdminPage() {
                 <tr
                   key={t.id}
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    borderBottom: i < tenants.length - 1 ? '1px solid rgba(255,255,255,0.05)' : undefined,
+                    background: 'var(--glass-bg)',
+                    borderBottom: i < tenants.length - 1 ? '1px solid var(--glass-bg)' : undefined,
                   }}
                 >
                   <td className="px-5 py-3.5">
@@ -224,19 +224,19 @@ export default function TenantsAdminPage() {
                       {t.slug}
                     </code>
                   </td>
-                  <td className="px-5 py-3.5 font-medium" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                  <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--text-primary)' }}>
                     {t.navn}
                   </td>
                   <td className="px-5 py-3.5">
                     <span
                       className="font-mono text-xs"
-                      style={{ color: 'rgba(255,255,255,0.40)' }}
+                      style={{ color: 'var(--text-muted)' }}
                       title="Faktisk URL er skjult av sikkerhetsgrunner"
                     >
                       {maskUrl(t.slug === 'lns' ? 'sqlserver://…' : '(kryptert)')}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>
                     {formatDate(t.opprettet)}
                   </td>
                   <td className="px-5 py-3.5">
@@ -256,12 +256,12 @@ export default function TenantsAdminPage() {
                         onClick={() => åpneEdit(t)}
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs transition-colors"
                         style={{
-                          background: 'rgba(255,255,255,0.05)',
-                          border:     '1px solid rgba(255,255,255,0.10)',
-                          color:      'rgba(255,255,255,0.55)',
+                          background: 'var(--glass-bg)',
+                          border:     '1px solid var(--glass-border)',
+                          color:      'var(--text-secondary)',
                         }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.09)'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
                       >
                         <Pencil className="w-3 h-3" /> Rediger
                       </button>
@@ -291,7 +291,7 @@ export default function TenantsAdminPage() {
       <Dialog open={nyOpen} onClose={lukkNy} title="Ny tenant" className="max-w-lg">
         <form onSubmit={opprett} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.60)' }}>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
               Slug <span style={{ color: 'rgba(239,68,68,0.80)' }}>*</span>
             </label>
             <input
@@ -302,14 +302,14 @@ export default function TenantsAdminPage() {
               required
               autoFocus
               className="w-full px-3 py-2 text-sm rounded-lg font-mono"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.30)' }}>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               Brukes i subdomene (acme.portal.no) og x-tenant-id header. Kun a-z, 0-9 og bindestrek.
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.60)' }}>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
               Navn <span style={{ color: 'rgba(239,68,68,0.80)' }}>*</span>
             </label>
             <input
@@ -319,11 +319,11 @@ export default function TenantsAdminPage() {
               placeholder="Acme AS"
               required
               className="w-full px-3 py-2 text-sm rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.60)' }}>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
               Database-URL <span style={{ color: 'rgba(239,68,68,0.80)' }}>*</span>
             </label>
             <input
@@ -333,9 +333,9 @@ export default function TenantsAdminPage() {
               placeholder="sqlserver://server:1433;database=...;user=...;password=..."
               required
               className="w-full px-3 py-2 text-sm rounded-lg font-mono"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.30)' }}>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               Samme format som DATABASE_URL. Lagres kryptert i master-DB.
             </p>
           </div>
@@ -345,7 +345,7 @@ export default function TenantsAdminPage() {
             </p>
           )}
           <DialogFooter>
-            <button type="button" onClick={lukkNy} className="px-4 py-2 text-sm rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)' }}>
+            <button type="button" onClick={lukkNy} className="px-4 py-2 text-sm rounded-lg" style={{ border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
               Avbryt
             </button>
             <button
@@ -364,7 +364,7 @@ export default function TenantsAdminPage() {
       <Dialog open={!!editTenant} onClose={lukkEdit} title={`Rediger — ${editTenant?.slug ?? ''}`} className="max-w-lg">
         <form onSubmit={lagreEdit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.60)' }}>Navn</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Navn</label>
             <input
               type="text"
               value={editForm.navn}
@@ -372,12 +372,12 @@ export default function TenantsAdminPage() {
               required
               autoFocus
               className="w-full px-3 py-2 text-sm rounded-lg"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.60)' }}>
-              Ny database-URL <span className="font-normal" style={{ color: 'rgba(255,255,255,0.30)' }}>(la stå tom for å beholde eksisterende)</span>
+            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+              Ny database-URL <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(la stå tom for å beholde eksisterende)</span>
             </label>
             <input
               type="password"
@@ -385,7 +385,7 @@ export default function TenantsAdminPage() {
               onChange={(e) => setEditForm((f) => ({ ...f, databaseUrl: e.target.value }))}
               placeholder="sqlserver://…"
               className="w-full px-3 py-2 text-sm rounded-lg font-mono"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', outline: 'none' }}
+              style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             />
           </div>
           {editFeil && (
@@ -394,7 +394,7 @@ export default function TenantsAdminPage() {
             </p>
           )}
           <DialogFooter>
-            <button type="button" onClick={lukkEdit} className="px-4 py-2 text-sm rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)' }}>
+            <button type="button" onClick={lukkEdit} className="px-4 py-2 text-sm rounded-lg" style={{ border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
               Avbryt
             </button>
             <button

@@ -38,8 +38,8 @@ export default function AdminOverviewPage() {
       value: stats?.workspaces,
       icon: Building2,
       iconBg: 'rgba(27,42,74,0.60)',
-      iconBorder: 'rgba(255,255,255,0.10)',
-      iconColor: 'rgba(255,255,255,0.70)',
+      iconBorder: 'var(--glass-border)',
+      iconColor: 'var(--text-secondary)',
     },
     {
       label: 'Rapporter',
@@ -68,12 +68,12 @@ export default function AdminOverviewPage() {
             fontFamily: 'Barlow Condensed, sans-serif',
             fontWeight: 800,
             fontSize: 24,
-            color: 'rgba(255,255,255,0.90)',
+            color: 'var(--text-primary)',
           }}
         >
           Admin-oversikt
         </h1>
-        <p className="mt-1 text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
           Administrer workspaces, rapporter og tilganger.
         </p>
       </div>
@@ -85,10 +85,10 @@ export default function AdminOverviewPage() {
             key={label}
             className="rounded-2xl p-6 flex items-center gap-4"
             style={{
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--glass-bg)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--glass-bg-hover)',
             }}
           >
             <div
@@ -99,19 +99,19 @@ export default function AdminOverviewPage() {
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-widest font-semibold"
-                style={{ color: 'rgba(255,255,255,0.30)' }}>
+                style={{ color: 'var(--text-muted)' }}>
                 {label}
               </p>
               <p style={{
                 fontFamily: 'Barlow Condensed, sans-serif',
                 fontWeight: 800,
                 fontSize: 28,
-                color: 'rgba(255,255,255,0.90)',
+                color: 'var(--text-primary)',
                 lineHeight: 1,
                 marginTop: 2,
               }}>
                 {value === undefined
-                  ? <span className="inline-block w-8 h-7 rounded animate-pulse" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                  ? <span className="inline-block w-8 h-7 rounded animate-pulse" style={{ background: 'var(--glass-bg-hover)' }} />
                   : value}
               </p>
             </div>
@@ -123,21 +123,21 @@ export default function AdminOverviewPage() {
       <div
         className="rounded-2xl overflow-hidden"
         style={{
-          background: 'rgba(255,255,255,0.03)',
+          background: 'var(--glass-bg)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          border: '1px solid var(--glass-bg-hover)',
         }}
       >
         <div
           className="px-6 py-4 flex items-center justify-between"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'; }}
+          style={{ borderBottom: '1px solid var(--glass-bg)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'var(--glass-bg)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
         >
           <div>
-            <p className="font-medium text-sm" style={{ color: 'rgba(255,255,255,0.80)' }}>Workspaces</p>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>
+            <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Workspaces</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
               Administrer Power BI-workspaces og rapporter
             </p>
           </div>

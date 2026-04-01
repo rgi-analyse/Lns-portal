@@ -912,7 +912,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 rounded-full animate-spin"
             style={{ borderColor: 'var(--glass-gold-border)', borderTopColor: 'var(--gold)' }} />
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.40)' }}>Laster rapport...</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Laster rapport...</p>
         </div>
       </div>
     );
@@ -940,13 +940,13 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const btnTool =
     'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[12px] font-semibold';
   const btnStyle = {
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.10)',
-    color: 'rgba(255,255,255,0.88)',
+    background: 'var(--glass-bg)',
+    border: '1px solid var(--glass-border)',
+    color: 'var(--text-primary)',
     fontFamily: 'Barlow, system-ui, sans-serif',
   };
   const btnHover = {
-    background: 'rgba(255,255,255,0.10)',
+    background: 'var(--glass-border)',
     color: 'rgba(255,255,255,1)',
   };
 
@@ -966,7 +966,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   );
 
   const Divider = () => (
-    <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: 'rgba(255,255,255,0.15)' }} />
+    <div className="w-px h-4 mx-0.5 shrink-0" style={{ background: 'var(--glass-border-hover)' }} />
   );
 
   return (
@@ -978,14 +978,14 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
           background: 'rgba(10,22,40,0.60)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid var(--glass-bg)',
         }}
       >
 
         <div className="flex items-center justify-between">
           {/* Auto-lagret indikator */}
           {autoSaveStatus === 'pending' && (
-            <span className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 text-xs font-medium pointer-events-none" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            <span className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 text-xs font-medium pointer-events-none" style={{ color: 'var(--text-secondary)' }}>
               <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               Lagrer...
             </span>
@@ -1017,18 +1017,18 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                   style={{
                     minWidth: 280,
                     background: 'rgba(10,22,40,0.97)',
-                    border: '1px solid rgba(255,255,255,0.12)',
+                    border: '1px solid var(--glass-border)',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                   }}
                 >
-                  <div className="px-3 pt-3 pb-2 text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.5)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="px-3 pt-3 pb-2 text-xs font-semibold" style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--glass-bg-hover)' }}>
                     Velg visuals som skal eksporteres
                   </div>
                   <div className="max-h-60 overflow-y-auto py-1">
                     {excelLaster ? (
-                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Laster visuals...</div>
+                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'var(--text-muted)' }}>Laster visuals...</div>
                     ) : excelKandidater.length === 0 ? (
-                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>Ingen eksporterbare visuals funnet</div>
+                      <div className="px-3 py-4 text-xs text-center" style={{ color: 'var(--text-muted)' }}>Ingen eksporterbare visuals funnet</div>
                     ) : (
                       excelKandidater.map((k) => {
                         const key = `${k.pageKey}::${k.visualKey}`;
@@ -1039,7 +1039,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                             onClick={() => toggleExcelKandidat(key)}
                             className="flex items-center gap-2.5 px-3 py-2 cursor-pointer select-none transition-colors"
                             style={{ background: valgt ? 'var(--gold-dim)' : 'transparent' }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'var(--gold-dim)' : 'rgba(255,255,255,0.05)'; }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'var(--gold-dim)' : 'var(--glass-bg)'; }}
                             onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = valgt ? 'var(--gold-dim)' : 'transparent'; }}
                           >
                             <input
@@ -1051,23 +1051,23 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                               style={{ accentColor: 'var(--gold)' }}
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.88)' }}>{k.visualLabel}</p>
-                              <p className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.4)' }}>{k.pageLabel} · {k.type}</p>
+                              <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{k.visualLabel}</p>
+                              <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{k.pageLabel} · {k.type}</p>
                             </div>
                           </div>
                         );
                       })
                     )}
                   </div>
-                  <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2.5" style={{ borderTop: '1px solid var(--glass-bg-hover)' }}>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                       {excelValgte.size} / {excelKandidater.length} valgt
                     </span>
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => setExcelPickerOpen(false)}
                         className="px-2.5 py-1 text-xs rounded-md transition-colors"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.7)' }}
+                        style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}
                       >
                         Avbryt
                       </button>
@@ -1087,7 +1087,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             {refreshInfo && (
               <>
                 <Divider />
-                <span className="flex items-center gap-3 select-none" style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+                <span className="flex items-center gap-3 select-none" style={{ fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                   <span>
                     {refreshInfo.sisteRefresh.status === 'Failed' ? '❌' : '🕐'}{' '}
                     Sist oppdatert: {formaterDato(refreshInfo.sisteRefresh.tidspunkt)}
@@ -1106,7 +1106,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             </ToolBtn>
             <span
               className="px-2 py-1 text-xs font-mono min-w-[48px] text-center"
-              style={{ color: 'rgba(255,255,255,0.6)' }}
+              style={{ color: 'var(--text-secondary)' }}
             >
               {Math.round(zoomLevel * 100)}%
             </span>

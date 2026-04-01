@@ -20,18 +20,18 @@ interface Tema {
 const STANDARD_TEMA: Tema = {
   organisasjonNavn: 'LNS',
   primaryColor: '#F5A623',
-  backgroundColor: '#0a1628',
-  navyColor: '#1B2A4A',
-  accentColor: '#243556',
+  backgroundColor: 'var(--navy-darkest)',
+  navyColor: 'var(--navy)',
+  accentColor: 'var(--navy-mid)',
   textColor: '#FFFFFF',
-  textMutedColor: 'rgba(255,255,255,0.65)',
+  textMutedColor: 'var(--text-secondary)',
   logoUrl: null,
 };
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>{label}</label>
+      <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</label>
       <div className="flex items-center gap-2">
         <input
           type="color"
@@ -45,9 +45,9 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
           onChange={e => onChange(e.target.value)}
           className="flex-1 rounded px-3 py-1.5 text-sm font-mono"
           style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.88)',
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--text-primary)',
           }}
         />
       </div>
@@ -117,23 +117,23 @@ export default function TemaAdminPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-semibold mb-1" style={{ color: 'rgba(255,255,255,0.92)' }}>Tema</h1>
-      <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.50)' }}>
+      <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Tema</h1>
+      <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
         Tilpass farger og utseende. Endringer vises live og lagres for alle brukere.
       </p>
 
       <div className="rounded-xl p-6 mb-6 flex flex-col gap-5"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)' }}>
 
         {/* Organisasjonsnavn */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>Organisasjonsnavn</label>
+          <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Organisasjonsnavn</label>
           <input
             type="text"
             value={tema.organisasjonNavn}
             onChange={e => setTema(t => ({ ...t, organisasjonNavn: e.target.value }))}
             className="rounded px-3 py-1.5 text-sm"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.88)' }}
+            style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
           />
         </div>
 
@@ -145,17 +145,17 @@ export default function TemaAdminPage() {
           <ColorField label="Aksentfarge" value={tema.accentColor} onChange={v => setTema(t => ({ ...t, accentColor: v }))} />
           <ColorField label="Tekstfarge (overskrifter, innhold)" value={tema.textColor} onChange={v => setTema(t => ({ ...t, textColor: v }))} />
           <div className="flex flex-col gap-1">
-            <label className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>Dempet tekstfarge (beskrivelser, labels)</label>
+            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Dempet tekstfarge (beskrivelser, labels)</label>
             <input
               type="text"
               value={tema.textMutedColor}
               onChange={e => setTema(t => ({ ...t, textMutedColor: e.target.value }))}
-              placeholder="rgba(255,255,255,0.65)"
+              placeholder="var(--text-secondary)"
               className="flex-1 rounded px-3 py-1.5 text-sm font-mono"
               style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: 'rgba(255,255,255,0.88)',
+                background: 'var(--glass-bg)',
+                border: '1px solid var(--glass-border)',
+                color: 'var(--text-primary)',
               }}
             />
           </div>
@@ -163,23 +163,23 @@ export default function TemaAdminPage() {
 
         {/* Logo-URL */}
         <div className="flex flex-col gap-1">
-          <label className="text-xs" style={{ color: 'rgba(255,255,255,0.50)' }}>Logo-URL (valgfritt)</label>
+          <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Logo-URL (valgfritt)</label>
           <input
             type="text"
             value={tema.logoUrl ?? ''}
             placeholder="https://eksempel.no/logo.svg"
             onChange={e => setTema(t => ({ ...t, logoUrl: e.target.value || null }))}
             className="rounded px-3 py-1.5 text-sm"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.88)' }}
+            style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}
           />
         </div>
       </div>
 
       {/* Forhåndsvisning */}
       <div className="rounded-xl p-5 mb-6" style={{ background: tema.navyColor, border: `1px solid ${tema.primaryColor}33` }}>
-        <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.40)' }}>Forhåndsvisning</p>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Forhåndsvisning</p>
         <div className="flex items-center justify-between px-4 py-3 rounded-lg" style={{ background: tema.backgroundColor }}>
-          <span className="font-semibold text-sm" style={{ color: '#fff' }}>{tema.organisasjonNavn} Dataportal</span>
+          <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{tema.organisasjonNavn} Dataportal</span>
           <span className="text-xs font-medium px-3 py-1 rounded" style={{ background: tema.primaryColor, color: tema.backgroundColor }}>
             Ny rapport
           </span>

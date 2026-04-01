@@ -164,7 +164,7 @@ export default function RapportPage() {
             style={{
               width: 48, height: 48, borderRadius: '50%',
               background: 'var(--gold)',
-              border: 'none', color: '#0a1628',
+              border: 'none', color: 'var(--navy-darkest)',
               fontSize: 24, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 4px 16px var(--gold-dim)',

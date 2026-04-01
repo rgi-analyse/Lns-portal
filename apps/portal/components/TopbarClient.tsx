@@ -81,16 +81,16 @@ export default function TopbarClient() {
         background: 'rgba(17,29,51,0.97)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.10)',
+        border: '1px solid var(--glass-border)',
         borderRadius: 12,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         padding: '4px 0',
       }}
     >
       {/* Brukerinfo-header */}
-      <div className="px-3 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <p className="text-xs font-semibold truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{name}</p>
-        <p className="text-xs truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>{email ?? ''}</p>
+      <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--glass-bg)' }}>
+        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{name}</p>
+        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{email ?? ''}</p>
       </div>
 
       {/* Min profil */}
@@ -98,34 +98,34 @@ export default function TopbarClient() {
         href="/dashboard/profil"
         onClick={() => setOpen(false)}
         className="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-        style={{ color: 'rgba(255,255,255,0.60)' }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.85)'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.60)'; }}
+        style={{ color: 'var(--text-secondary)' }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)'; }}
       >
-        <User className="w-4 h-4 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
+        <User className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
         Min profil
       </Link>
 
       {/* Administrasjon — kun for admin */}
       {isAdmin && (
         <>
-          <div className="my-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+          <div className="my-1" style={{ borderTop: '1px solid var(--glass-bg)' }} />
           <Link
             href="/admin"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-            style={{ color: 'rgba(255,255,255,0.60)' }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.85)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.60)'; }}
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)'; }}
           >
-            <Settings className="w-4 h-4 shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }} />
+            <Settings className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
             Administrasjon
           </Link>
         </>
       )}
 
       {/* Logg ut */}
-      <div className="my-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+      <div className="my-1" style={{ borderTop: '1px solid var(--glass-bg)' }} />
       <button
         onClick={handleLogout}
         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
@@ -147,12 +147,12 @@ export default function TopbarClient() {
         onClick={handleToggle}
         className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors"
         style={{ background: 'transparent' }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'; }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <span className="text-sm hidden sm:block font-medium" style={{ color: 'rgba(255,255,255,0.40)' }}>
+        <span className="text-sm hidden sm:block font-medium" style={{ color: 'var(--text-muted)' }}>
           {name}
         </span>
         <div
@@ -167,7 +167,7 @@ export default function TopbarClient() {
         </div>
         <ChevronDown
           className={`w-4 h-4 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
-          style={{ color: 'rgba(255,255,255,0.30)' }}
+          style={{ color: 'var(--text-muted)' }}
         />
       </button>
 

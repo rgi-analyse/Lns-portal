@@ -111,13 +111,13 @@ export default function RedigerWorkspacePage() {
       <p className="text-sm text-gray-500 mb-6">Oppdater informasjonen om workspacet.</p>
 
       {loading ? (
-        <div className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid var(--glass-bg-hover)' }}>
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-9 w-full" />
         </div>
       ) : (
-        <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <form onSubmit={handleSubmit} noValidate className="space-y-5 rounded-xl p-6" style={{ background: 'rgba(17,29,51,0.65)', backdropFilter: 'blur(20px)', border: '1px solid var(--glass-bg-hover)' }}>
           <div>
             <Label htmlFor="navn">Navn <span className="text-red-500">*</span></Label>
             <Input
