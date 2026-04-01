@@ -96,7 +96,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             orderBy: { opprettetDato: 'desc' },
           });
           const merged = await slåSammenErPersonlig(workspaces);
-          return reply.send(merged);
+          // Personlige mapper er alltid private — admin ser kun sitt eget
+          const filtered = merged.filter(w => !w.erPersonlig || w.opprettetAv === (bruker?.id ?? ''));
+          return reply.send(filtered);
         }
 
         const identities = [
@@ -241,6 +243,19 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
         if (isAdmin || identities.length === 0) {
+          // Personlige mapper er alltid private — sjekk via raw SQL
+          const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+          try {
+            const rows = await queryAzureSQL(
+              `SELECT erPersonlig, opprettetAv FROM Workspace WHERE id = '${safeWsId}'`,
+            );
+            const erPersonlig = Boolean((rows[0] as { erPersonlig?: unknown })?.erPersonlig);
+            const opprettetAv = (rows[0] as { opprettetAv?: string })?.opprettetAv;
+            if (erPersonlig && opprettetAv !== bruker?.id) {
+              return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+            }
+          } catch { /* ikke kritisk — fortsett */ }
+
           const ids = workspace.rapporter.map((wr) => wr.rapport.id);
           const designerMap = await hentDesignerFlagg(ids);
           return reply.send({
