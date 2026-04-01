@@ -28,10 +28,21 @@ function extractSlug(request: FastifyRequest): string {
   return 'lns';
 }
 
+// Ruter som alltid skal bruke master-DB og aldri tenant-resolving
+const SKIP_TENANT_PATHS = [
+  '/api/me',
+  '/api/admin/',
+  '/api/auth/',
+  '/api/tema',
+  '/health',
+];
+
 export async function resolveTenant(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  if (SKIP_TENANT_PATHS.some(p => request.url.startsWith(p))) return;
+
   const slug = extractSlug(request);
   const tenant = await prisma.tenant.findFirst({ where: { slug, erAktiv: true } });
   if (!tenant) {
