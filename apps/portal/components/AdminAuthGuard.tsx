@@ -3,9 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { useRouter } from 'next/navigation';
-import { apiFetch } from '@/lib/apiClient';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function AdminAuthGuard({ children }: { children: React.ReactNode }) {
   const { accounts, inProgress } = useMsal();
@@ -24,12 +21,18 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
       return;
     }
 
-    apiFetch('/api/me', {
-      headers: { 'X-Entra-Object-Id': account.localAccountId },
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
+    fetch(`${apiUrl}/api/me`, {
+      headers: {
+        'x-tenant-id': 'lns',
+        'x-entra-object-id': account.localAccountId,
+      },
     })
       .then(async (r) => {
+        console.log('[AdminAuthGuard] /api/me status:', r.status);
         if (!r.ok) { setStatus('denied'); return; }
         const bruker = await r.json() as { rolle: string };
+        console.log('[AdminAuthGuard] bruker rolle:', bruker.rolle);
         const adminRoller = ['admin', 'tenantadmin'];
         setStatus(adminRoller.includes(bruker.rolle) ? 'ok' : 'denied');
       })
