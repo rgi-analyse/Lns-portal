@@ -6,7 +6,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 export default function AdminAuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, entraObjectId, rolle, isLocal } = usePortalAuth();
+  const { isAuthenticated, entraObjectId } = usePortalAuth();
   const [status, setStatus] = useState<'loading' | 'ok' | 'denied'>('loading');
 
   useEffect(() => {
@@ -15,14 +15,7 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
       return;
     }
 
-    // For lokale brukere: rolle er allerede tilgjengelig fra session
-    if (isLocal) {
-      const adminRoller = ['admin', 'tenantadmin'];
-      setStatus(adminRoller.includes(rolle ?? '') ? 'ok' : 'denied');
-      return;
-    }
-
-    // For Entra-brukere: hent rolle fra API
+    // Alltid sjekk mot API — ikke stol på cachet rolle fra session
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
     fetch(`${apiUrl}/api/me`, {
       headers: {
@@ -37,7 +30,7 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
         setStatus(adminRoller.includes(bruker.rolle) ? 'ok' : 'denied');
       })
       .catch(() => setStatus('denied'));
-  }, [isAuthenticated, entraObjectId, rolle, isLocal, router]);
+  }, [isAuthenticated, entraObjectId, router]);
 
   useEffect(() => {
     if (status === 'denied') router.replace('/dashboard');
