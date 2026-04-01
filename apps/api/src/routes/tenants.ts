@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
-import { requireBruker, requireAdmin } from '../middleware/auth';
+import { requireBruker, requireTenantAdmin } from '../middleware/auth';
 
 interface CreateTenantBody {
   slug: string;
@@ -18,7 +18,7 @@ export async function tenantRoutes(fastify: FastifyInstance) {
   // GET /api/admin/tenants
   fastify.get(
     '/api/admin/tenants',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [requireBruker, requireTenantAdmin] },
     async (_request, reply) => {
       try {
         const tenants = await prisma.tenant.findMany({
@@ -71,7 +71,7 @@ export async function tenantRoutes(fastify: FastifyInstance) {
   // PATCH /api/admin/tenants/:id
   fastify.patch<{ Params: { id: string }; Body: UpdateTenantBody }>(
     '/api/admin/tenants/:id',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [requireBruker, requireTenantAdmin] },
     async (request, reply) => {
       const { navn, databaseUrl, erAktiv } = request.body;
       try {
@@ -96,7 +96,7 @@ export async function tenantRoutes(fastify: FastifyInstance) {
   // DELETE /api/admin/tenants/:id  (soft-delete)
   fastify.delete<{ Params: { id: string } }>(
     '/api/admin/tenants/:id',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [requireBruker, requireTenantAdmin] },
     async (request, reply) => {
       try {
         await prisma.tenant.update({

@@ -32,7 +32,7 @@ export async function requireBruker(
 }
 
 /**
- * Krever at pålogget bruker har rolle 'admin'.
+ * Krever at pålogget bruker har rolle 'admin' eller 'tenantadmin'.
  * Må brukes etter requireBruker.
  */
 export async function requireAdmin(
@@ -40,8 +40,23 @@ export async function requireAdmin(
   reply: FastifyReply,
 ): Promise<void> {
   const bruker = (request as AuthRequest).bruker;
-  if (!bruker || bruker.rolle !== 'admin') {
+  const adminRoller = ['admin', 'tenantadmin'];
+  if (!bruker || !adminRoller.includes(bruker.rolle)) {
     return reply.status(403).send({ error: 'Krever admin-tilgang.' });
+  }
+}
+
+/**
+ * Krever at pålogget bruker har rolle 'tenantadmin'.
+ * Må brukes etter requireBruker.
+ */
+export async function requireTenantAdmin(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const bruker = (request as AuthRequest).bruker;
+  if (!bruker || bruker.rolle !== 'tenantadmin') {
+    return reply.status(403).send({ error: 'Krever tenantadmin-tilgang.' });
   }
 }
 

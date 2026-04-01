@@ -4,7 +4,7 @@ import { getGraphToken } from '../services/graphService';
 import { requireBruker, requireAdmin, resolveBruker, type AuthRequest } from '../middleware/auth';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
-const GYLDIGE_ROLLER = ['admin', 'redaktør', 'bruker'] as const;
+const GYLDIGE_ROLLER = ['tenantadmin', 'admin', 'redaktør', 'bruker'] as const;
 
 interface GraphUserDetail {
   id: string;
@@ -85,7 +85,7 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
                 required: ['entraObjectId'],
                 properties: {
                   entraObjectId: { type: 'string', minLength: 1 },
-                  rolle: { type: 'string', enum: ['admin', 'redaktør', 'bruker'] },
+                  rolle: { type: 'string', enum: ['tenantadmin', 'admin', 'redaktør', 'bruker'] },
                 },
                 additionalProperties: false,
               },

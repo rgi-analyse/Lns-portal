@@ -1,8 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, Database, LayoutDashboard, Palette, Settings2, Users, Globe } from 'lucide-react';
+import { Building2, Database, Globe, LayoutDashboard, Palette, Settings2, Users } from 'lucide-react';
+import { useMsal } from '@azure/msal-react';
+import { apiFetch } from '@/lib/apiClient';
 
 const nav = [
   { href: '/admin',            label: 'Oversikt',   icon: Settings2, exact: true },
@@ -10,11 +13,26 @@ const nav = [
   { href: '/admin/brukere',    label: 'Brukere',    icon: Users },
   { href: '/admin/metadata',   label: 'Metadata',   icon: Database },
   { href: '/admin/tema',       label: 'Tema',       icon: Palette },
-  { href: '/admin/tenants',   label: 'Tenants',    icon: Globe },
+  { href: '/admin/tenants',    label: 'Tenants',    icon: Globe, kreverRolle: 'tenantadmin' as const },
 ];
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const { accounts } = useMsal();
+  const [rolle, setRolle] = useState<string>('');
+
+  useEffect(() => {
+    const account = accounts[0];
+    if (!account) return;
+    apiFetch('/api/me', {
+      headers: { 'X-Entra-Object-Id': account.localAccountId },
+    })
+      .then(r => r.json())
+      .then((b: { rolle?: string }) => setRolle(b.rolle ?? ''))
+      .catch(() => {});
+  }, [accounts]);
+
+  const synligeNav = nav.filter(item => !item.kreverRolle || item.kreverRolle === rolle);
 
   return (
     <aside
@@ -64,7 +82,7 @@ export default function AdminSidebar() {
         </p>
       </div>
       <nav className="flex-1 px-2 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon, exact }) => {
+        {synligeNav.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link

@@ -30,7 +30,8 @@ export default function AdminAuthGuard({ children }: { children: React.ReactNode
       .then(async (r) => {
         if (!r.ok) { setStatus('denied'); return; }
         const bruker = await r.json() as { rolle: string };
-        setStatus(bruker.rolle === 'admin' ? 'ok' : 'denied');
+        const adminRoller = ['admin', 'tenantadmin'];
+        setStatus(adminRoller.includes(bruker.rolle) ? 'ok' : 'denied');
       })
       .catch(() => setStatus('denied'));
   }, [initialized, account, router]);
