@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/apiClient';
 
 interface Tema {
@@ -11,6 +11,17 @@ interface Tema {
   textColor?: string;
   textMutedColor?: string;
   logoUrl?: string | null;
+  organisasjonNavn?: string;
+}
+
+interface TemaContext {
+  organisasjonNavn: string;
+}
+
+const TemaCtx = createContext<TemaContext>({ organisasjonNavn: 'LNS' });
+
+export function useTema() {
+  return useContext(TemaCtx);
 }
 
 function hexToHSL(hex: string): { h: number; s: number; l: number } {
@@ -59,19 +70,30 @@ export function applyTheme(tema: Tema) {
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [organisasjonNavn, setOrganisasjonNavn] = useState('LNS');
+
   useEffect(() => {
     const hentTema = () => {
       apiFetch('/api/tema', { cache: 'no-store' })
         .then(res => res.ok ? res.json() as Promise<Tema> : null)
-        .then(tema => { if (tema) applyTheme(tema); })
+        .then(tema => {
+          if (tema) {
+            applyTheme(tema);
+            setOrganisasjonNavn(tema.organisasjonNavn ?? 'LNS');
+          }
+        })
         .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });
     };
 
-    hentTema(); // hent umiddelbart ved oppstart
+    hentTema();
 
-    const intervall = setInterval(hentTema, 30_000); // poll hvert 30. sek
-    return () => clearInterval(intervall); // rydd opp ved unmount
+    const intervall = setInterval(hentTema, 30_000);
+    return () => clearInterval(intervall);
   }, []);
 
-  return <>{children}</>;
+  return (
+    <TemaCtx.Provider value={{ organisasjonNavn }}>
+      {children}
+    </TemaCtx.Provider>
+  );
 }

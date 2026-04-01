@@ -6,6 +6,7 @@ import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settin
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
 import { apiFetch } from '@/lib/apiClient';
+import { useTema } from '@/components/ThemeProvider';
 
 export interface FilterConfig {
   table: string;
@@ -102,6 +103,7 @@ export default function AIChat({
   onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
+  const { organisasjonNavn } = useTema();
   const [open, setOpen]       = useState(false);
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
@@ -573,7 +575,7 @@ export default function AIChat({
                   fontSize: 15,
                   letterSpacing: '0.02em',
                 }}>
-                  LNS Assistent
+                  {organisasjonNavn} Assistent
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
                   AI-drevet dataanalyse

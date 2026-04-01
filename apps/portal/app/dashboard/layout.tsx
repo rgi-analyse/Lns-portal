@@ -1,7 +1,12 @@
+'use client';
+
 import Sidebar from '@/components/Sidebar';
 import TopbarClient from '@/components/TopbarClient';
+import { useTema } from '@/components/ThemeProvider';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { organisasjonNavn } = useTema();
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
@@ -27,7 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               textTransform: 'uppercase',
             }}
           >
-            LNS Dataportal
+            {organisasjonNavn} Dataportal
           </span>
           <TopbarClient />
         </header>
