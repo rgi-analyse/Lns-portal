@@ -18,7 +18,7 @@ interface LokalBrukerBody {
 
 interface ResetPassordBody { nyttPassord: string }
 
-const GYLDIGE_ROLLER = ['admin', 'redaktør', 'bruker'] as const;
+const GYLDIGE_ROLLER = ['tenantadmin', 'admin', 'redaktør', 'bruker'] as const;
 
 export async function authRoutes(fastify: FastifyInstance) {
 
@@ -155,7 +155,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     {
       preHandler: [requireBruker, async (req, rep) => {
         const b = (req as AuthRequest).bruker;
-        if (!b || b.rolle !== 'admin') return rep.status(403).send({ error: 'Krever admin-tilgang.' });
+        if (!b || !['admin', 'tenantadmin'].includes(b.rolle)) return rep.status(403).send({ error: 'Krever admin-tilgang.' });
       }],
       schema: {
         body: {
@@ -165,7 +165,7 @@ export async function authRoutes(fastify: FastifyInstance) {
             email:          { type: 'string', minLength: 1 },
             displayName:    { type: 'string', minLength: 1 },
             passord:        { type: 'string', minLength: 1 },
-            rolle:          { type: 'string', enum: ['admin', 'redaktør', 'bruker'] },
+            rolle:          { type: 'string', enum: ['tenantadmin', 'admin', 'redaktør', 'bruker'] },
             måByttePassord: { type: 'boolean' },
           },
           additionalProperties: false,
@@ -218,7 +218,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     {
       preHandler: [requireBruker, async (req, rep) => {
         const b = (req as AuthRequest).bruker;
-        if (!b || b.rolle !== 'admin') return rep.status(403).send({ error: 'Krever admin-tilgang.' });
+        if (!b || !['admin', 'tenantadmin'].includes(b.rolle)) return rep.status(403).send({ error: 'Krever admin-tilgang.' });
       }],
       schema: {
         body: {
