@@ -1,9 +1,13 @@
+'use client';
+
 import AdminAuthGuard from '@/components/AdminAuthGuard';
 import AdminSidebar from '@/components/AdminSidebar';
 import TopbarClient from '@/components/TopbarClient';
 import { Toaster } from '@/components/ui/toast';
+import { useTema } from '@/components/ThemeProvider';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const { organisasjonNavn } = useTema();
   return (
     <>
       <AdminAuthGuard>
@@ -27,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   letterSpacing: '0.06em',
                   color: 'var(--text-primary)',
                 }}>
-                  LNS Dataportal
+                  {organisasjonNavn} Dataportal
                 </span>
                 <span
                   className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
