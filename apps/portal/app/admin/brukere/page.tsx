@@ -11,11 +11,12 @@ import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-type Rolle = 'admin' | 'redaktør' | 'bruker';
+type Rolle = 'tenantadmin' | 'admin' | 'redaktør' | 'bruker';
 const ROLLER: { value: Rolle; label: string }[] = [
-  { value: 'admin',    label: 'Admin' },
-  { value: 'redaktør', label: 'Redaktør' },
-  { value: 'bruker',   label: 'Bruker' },
+  { value: 'tenantadmin', label: 'Tenant Admin' },
+  { value: 'admin',       label: 'Admin' },
+  { value: 'redaktør',    label: 'Redaktør' },
+  { value: 'bruker',      label: 'Bruker' },
 ];
 
 interface Bruker {
