@@ -49,7 +49,11 @@ function rolleLabel(rolle: string) {
 }
 
 export default function BrukerAdminPage() {
-  const { authHeaders } = usePortalAuth();
+  const { authHeaders, rolle: innloggetRolle } = usePortalAuth();
+
+  const tilgjengeligeRoller = innloggetRolle === 'tenantadmin'
+    ? ROLLER
+    : ROLLER.filter(r => r.value !== 'tenantadmin');
 
   const [brukere,  setBrukere]  = useState<Bruker[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -332,7 +336,7 @@ export default function BrukerAdminPage() {
                       onChange={(e) => patch(b, { rolle: e.target.value as Rolle })}
                       className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
-                      {ROLLER.map((r) => (
+                      {tilgjengeligeRoller.map((r) => (
                         <option key={r.value} value={r.value}>{r.label}</option>
                       ))}
                     </select>
@@ -400,7 +404,7 @@ export default function BrukerAdminPage() {
                         onChange={(e) => setValgRolle(u.id, e.target.value as Rolle)}
                         className="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-brand-500 flex-shrink-0"
                       >
-                        {ROLLER.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        {tilgjengeligeRoller.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     )}
                   </li>
@@ -494,7 +498,7 @@ export default function BrukerAdminPage() {
               className="w-full px-3 py-2 text-sm rounded-lg"
               style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', outline: 'none' }}
             >
-              {ROLLER.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              {tilgjengeligeRoller.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
           <label className="flex items-center gap-2.5 cursor-pointer">

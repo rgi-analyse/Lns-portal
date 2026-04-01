@@ -162,6 +162,20 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       fastify.log.info('[PATCH bruker] id=%s body=%j headers=%j', request.params.id, request.body, request.headers);
+      const innloggetBruker = (request as AuthRequest).bruker;
+      const nyRolle = request.body.rolle;
+
+      // Kun tenantadmin kan tildele tenantadmin-rollen
+      if (nyRolle === 'tenantadmin' && innloggetBruker.rolle !== 'tenantadmin') {
+        return reply.status(403).send({ error: 'Kun tenantadmin kan tildele tenantadmin-rollen.' });
+      }
+
+      // Kun tenantadmin kan endre rollen til en eksisterende tenantadmin
+      const målBruker = await prisma.bruker.findUnique({ where: { id: request.params.id } });
+      if (målBruker?.rolle === 'tenantadmin' && innloggetBruker.rolle !== 'tenantadmin') {
+        return reply.status(403).send({ error: 'Kun tenantadmin kan endre rollen til en tenantadmin.' });
+      }
+
       try {
         const bruker = await prisma.bruker.update({
           where: { id: request.params.id },
