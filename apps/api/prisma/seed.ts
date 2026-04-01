@@ -37,7 +37,7 @@ async function main() {
   const connectionString = process.env.DATABASE_URL!;
   await prisma.tenant.upsert({
     where: { slug: 'lns' },
-    update: {},
+    update: { databaseUrl: connectionString },
     create: { slug: 'lns', navn: 'LNS', databaseUrl: connectionString },
   });
   console.log('Tenant "lns" klar.');
