@@ -219,9 +219,24 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = ''): st
   }
 
   const erAggregert = cfg.aggregering !== 'NONE' && !isMed;
+
+  // Linje-serie for kombinert chart — aggregeres på samme måte som yAkse
+  const linjeKolNavn = (cfg.visualType === 'kombinert' && cfg.ekstraKolonner?.[0]) ? cfg.ekstraKolonner[0] : null;
+  const linjeKolEsc  = linjeKolNavn ? esc(linjeKolNavn) : null;
+  const linjeUttrykk = linjeKolEsc
+    ? (cfg.aggregering === 'NONE' ? linjeKolEsc
+      : cfg.aggregering === 'COUNT'          ? `COUNT(${linjeKolEsc})`
+      : cfg.aggregering === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
+      : cfg.aggregering === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
+      : cfg.aggregering === 'MAX'            ? `MAX(${linjeKolEsc})`
+      : cfg.aggregering === 'MIN'            ? `MIN(${linjeKolEsc})`
+      : `SUM(${linjeKolEsc})`)
+    : null;
+  const ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
+
   const selKols = grp
-    ? `${x}, ${grp}, ${yUttrykk} AS ${alias}`
-    : `${x}, ${yUttrykk} AS ${alias}`;
+    ? `${x}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
+    : `${x}, ${yUttrykk} AS ${alias}${ekstraSelect}`;
   const grpKols = grp ? `${x}, ${grp}` : x;
 
   const where = prosjektFilter ? ` ${prosjektFilter}` : '';
@@ -1303,7 +1318,7 @@ export default function RapportInteraktivPage() {
     console.log('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, aktiveFiltre]);
+  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, aktiveFiltre]);
 
   // ── Initialiser valgteKolonner ved skifte til tabell-visning ──
   useEffect(() => {
