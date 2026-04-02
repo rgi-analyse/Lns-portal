@@ -8,6 +8,10 @@ import { apiFetch } from '@/lib/apiClient';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 
 interface RapportForslag {
   tittel: string;
@@ -401,114 +405,82 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
   );
 }
 
-// ── Kombinert chart (stolpe + linje, dual Y-akse) ────────────────────────────
+// ── Kombinert chart (stolpe + linje, dual Y-akse) — recharts ─────────────────
 function KombinertChart({ data, xCol, stolpeKol, linjeKol }: {
   data: Record<string, unknown>[];
   xCol: string;
   stolpeKol: string;
   linjeKol: string;
 }) {
-  const W = 800, H = 400, padL = 80, padR = 70, padT = 20, padB = 80;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
-
-  const stolpeVals = data.map(r => Number(r[stolpeKol]) || 0);
-  const linjeVals  = linjeKol ? data.map(r => Number(r[linjeKol]) || 0) : [];
-  const maxStolpe  = Math.max(...stolpeVals, 1);
-  const maxLinje   = linjeVals.length ? Math.max(...linjeVals, 1) : 1;
-
-  const barW = Math.max(4, (plotW / Math.max(data.length, 1)) * 0.6);
-
-  const linjePts = data.map((r, i) => ({
-    x: padL + (i + 0.5) * (plotW / Math.max(data.length, 1)),
-    y: padT + plotH - (linjeVals[i] / maxLinje) * plotH,
-    label: String(r[xCol] ?? ''),
-  }));
-  const polyline = linjePts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const step = Math.max(1, Math.floor(data.length / 10));
+  const formatVerdi = (v: unknown) =>
+    typeof v === 'number'
+      ? new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 }).format(v)
+      : String(v ?? '');
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-      {/* Grid */}
-      {[0, 0.25, 0.5, 0.75, 1].map(t => {
-        const y = padT + plotH - t * plotH;
-        return (
-          <g key={t}>
-            <line x1={padL} y1={y} x2={padL + plotW} y2={y} stroke="var(--glass-bg-hover)" />
-            {/* Venstre Y-akse (stolpe) */}
-            <text x={padL - 6} y={y + 4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
-              {(t * maxStolpe).toLocaleString('nb-NO', { maximumFractionDigits: 0 })}
-            </text>
-            {/* Høyre Y-akse (linje) */}
-            {linjeKol && (
-              <text x={padL + plotW + 6} y={y + 4} fontSize={11} textAnchor="start" fill="rgba(110,231,183,0.7)">
-                {(t * maxLinje).toLocaleString('nb-NO', { maximumFractionDigits: 0 })}
-              </text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* Y-akse label venstre */}
-      <text x={14} y={padT + plotH / 2} fontSize={10} fill="var(--text-muted)" textAnchor="middle"
-        transform={`rotate(-90,14,${padT + plotH / 2})`}>{stolpeKol}</text>
-      {/* Y-akse label høyre */}
-      {linjeKol && (
-        <text x={W - 12} y={padT + plotH / 2} fontSize={10} fill="rgba(110,231,183,0.7)" textAnchor="middle"
-          transform={`rotate(90,${W - 12},${padT + plotH / 2})`}>{linjeKol}</text>
-      )}
-
-      {/* Stolper */}
-      {data.map((r, i) => {
-        const val = stolpeVals[i];
-        const bh  = Math.max(1, (val / maxStolpe) * plotH);
-        const slotW = plotW / Math.max(data.length, 1);
-        const bx  = padL + i * slotW + (slotW - barW) / 2;
-        const by  = padT + plotH - bh;
-        return (
-          <g key={i}>
-            <rect x={bx} y={by} width={barW} height={bh} fill="var(--gold)" opacity={0.85} rx={2} />
-            {bh > 20 && (
-              <text x={bx + barW / 2} y={by + 12} fontSize={9} textAnchor="middle" fill="var(--text-secondary)">
-                {val.toLocaleString('nb-NO', { maximumFractionDigits: 0 })}
-              </text>
-            )}
-            {i % step === 0 && (
-              <text x={padL + i * slotW + slotW / 2} y={padT + plotH + 16} fontSize={10} textAnchor="middle"
-                fill="var(--text-muted)" transform={`rotate(-30,${padL + i * slotW + slotW / 2},${padT + plotH + 16})`}>
-                {String(r[xCol] ?? '').slice(0, 12)}
-              </text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* Linje */}
-      {linjeKol && linjePts.length > 1 && (
-        <>
-          <polyline points={polyline} fill="none" stroke="rgba(110,231,183,0.9)" strokeWidth={2.5} />
-          {linjePts.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={3} fill="rgba(110,231,183,0.9)" />
-          ))}
-        </>
-      )}
-
-      {/* Akser */}
-      <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="var(--text-muted)" />
-      <line x1={padL} y1={padT + plotH} x2={padL + plotW} y2={padT + plotH} stroke="var(--text-muted)" />
-      {linjeKol && <line x1={padL + plotW} y1={padT} x2={padL + plotW} y2={padT + plotH} stroke="rgba(110,231,183,0.5)" />}
-
-      {/* Tegnforklaring */}
-      <rect x={padL} y={H - 18} width={10} height={10} fill="var(--gold)" opacity={0.85} rx={1} />
-      <text x={padL + 14} y={H - 9} fontSize={11} fill="var(--text-secondary)">{stolpeKol}</text>
-      {linjeKol && (
-        <>
-          <line x1={padL + 160} y1={H - 13} x2={padL + 180} y2={H - 13} stroke="rgba(110,231,183,0.9)" strokeWidth={2.5} />
-          <circle cx={padL + 170} cy={H - 13} r={3} fill="rgba(110,231,183,0.9)" />
-          <text x={padL + 184} y={H - 9} fontSize={11} fill="var(--text-secondary)">{linjeKol}</text>
-        </>
-      )}
-    </svg>
+    <ResponsiveContainer width="100%" height={400}>
+      <ComposedChart data={data} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
+        <XAxis
+          dataKey={xCol}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          angle={-35}
+          textAnchor="end"
+          interval={0}
+        />
+        <YAxis
+          yAxisId="stolpe"
+          orientation="left"
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          tickFormatter={(v) =>
+            new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)
+          }
+        />
+        {linjeKol && (
+          <YAxis
+            yAxisId="linje"
+            orientation="right"
+            tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+            tickFormatter={(v) =>
+              new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)
+            }
+          />
+        )}
+        <Tooltip
+          contentStyle={{
+            background: 'var(--navy-dark)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: 8,
+            color: 'var(--text-primary)',
+            fontSize: 12,
+          }}
+          formatter={(value: unknown, name: string) => [formatVerdi(value), name]}
+        />
+        <Legend
+          wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }}
+        />
+        <Bar
+          yAxisId="stolpe"
+          dataKey={stolpeKol}
+          fill="var(--gold)"
+          opacity={0.85}
+          radius={[3, 3, 0, 0]}
+          name={stolpeKol}
+        />
+        {linjeKol && (
+          <Line
+            yAxisId="linje"
+            type="monotone"
+            dataKey={linjeKol}
+            stroke="rgba(110,231,183,0.9)"
+            strokeWidth={2.5}
+            dot={{ fill: 'rgba(110,231,183,0.9)', r: 3 }}
+            activeDot={{ r: 5 }}
+            name={linjeKol}
+          />
+        )}
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }
 
