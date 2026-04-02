@@ -454,7 +454,8 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol }: {
             color: 'var(--text-primary)',
             fontSize: 12,
           }}
-          formatter={(value: unknown, name: string) => [formatVerdi(value), name]}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={((value: unknown, name: unknown) => [formatVerdi(value), String(name ?? '')]) as any}
         />
         <Legend
           wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }}
