@@ -33,16 +33,28 @@ interface RapportForslag {
   laastFilter?: { kolonne: string; verdi: string } | null;
 }
 
+interface KombinertSerie {
+  id:           string;
+  navn:         string;
+  kolonne:      string;
+  aggregering:  string;
+  filterKol:    string;
+  filterOp:     string;
+  filterVerdi:  string;
+  visningsType: 'stolpe' | 'linje';
+}
+
 interface RedigertConfig {
-  visualType:     string;
-  xAkse:          string;
-  yAkse:          string;
-  aggregering:    string;
-  grupperPaa:     string | null;
-  ekstraKolonner: string[];
-  sorterPaa:      string | null;
-  sorterRetning:  string;
-  maksRader:      number;
+  visualType:       string;
+  xAkse:            string;
+  yAkse:            string;
+  aggregering:      string;
+  grupperPaa:       string | null;
+  ekstraKolonner:   string[];
+  kombinertSerier:  KombinertSerie[];
+  sorterPaa:        string | null;
+  sorterRetning:    string;
+  maksRader:        number;
 }
 
 interface AktivFilter {
@@ -220,22 +232,39 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   const erAggregert = cfg.aggregering !== 'NONE' && !isMed;
 
-  // Linje-serie for kombinert chart — bruk COUNT for ikke-numeriske kolonner
-  const linjeKolNavn = (cfg.visualType === 'kombinert' && cfg.ekstraKolonner?.[0]) ? cfg.ekstraKolonner[0] : null;
-  const linjeKolEsc  = linjeKolNavn ? esc(linjeKolNavn) : null;
-  const linjeKolType = linjeKolNavn ? kolonnTyper[linjeKolNavn] : null;
-  const erNumeriskLinje = linjeKolType?.startsWith('measure');
-  const linjeAgg = erNumeriskLinje ? cfg.aggregering : 'COUNT';
-  const linjeUttrykk = linjeKolEsc
-    ? (linjeAgg === 'NONE'           ? linjeKolEsc
-      : linjeAgg === 'COUNT'          ? `COUNT(${linjeKolEsc})`
-      : linjeAgg === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
-      : linjeAgg === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
-      : linjeAgg === 'MAX'            ? `MAX(${linjeKolEsc})`
-      : linjeAgg === 'MIN'            ? `MIN(${linjeKolEsc})`
-      : `SUM(${linjeKolEsc})`)
-    : null;
-  const ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
+  // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne
+  const kombSerier = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
+  let ekstraSelect = '';
+  if (kombSerier.length > 0) {
+    // Generer CASE WHEN-kolonner fra definerte serier
+    ekstraSelect = kombSerier.map(s => {
+      const fKol = `[${s.filterKol.replace(/[\[\]]/g, '')}]`;
+      const vKol = `[${s.kolonne.replace(/[\[\]]/g, '')}]`;
+      const sNavn = `[${s.navn.replace(/[\[\]]/g, '')}]`;
+      const op = s.filterOp === 'LIKE'
+        ? `${fKol} LIKE '${s.filterVerdi}'`
+        : `${fKol} ${s.filterOp} '${s.filterVerdi}'`;
+      const agg = s.aggregering || cfg.aggregering;
+      return `, ${agg}(CASE WHEN ${op} THEN ${vKol} ELSE 0 END) AS ${sNavn}`;
+    }).join('');
+  } else {
+    // Fallback: enkel linje-kolonne
+    const linjeKolNavn = cfg.ekstraKolonner?.[0] ?? null;
+    const linjeKolEsc  = linjeKolNavn ? esc(linjeKolNavn) : null;
+    const linjeKolType = linjeKolNavn ? kolonnTyper[linjeKolNavn] : null;
+    const erNumeriskLinje = linjeKolType?.startsWith('measure');
+    const linjeAgg = erNumeriskLinje ? cfg.aggregering : 'COUNT';
+    const linjeUttrykk = linjeKolEsc
+      ? (linjeAgg === 'NONE'           ? linjeKolEsc
+        : linjeAgg === 'COUNT'          ? `COUNT(${linjeKolEsc})`
+        : linjeAgg === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
+        : linjeAgg === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
+        : linjeAgg === 'MAX'            ? `MAX(${linjeKolEsc})`
+        : linjeAgg === 'MIN'            ? `MIN(${linjeKolEsc})`
+        : `SUM(${linjeKolEsc})`)
+      : null;
+    ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
+  }
 
   const selKols = grp
     ? `${x}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
@@ -424,16 +453,25 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
 }
 
 // ── Kombinert chart (stolpe + linje, dual Y-akse) — recharts ─────────────────
-function KombinertChart({ data, xCol, stolpeKol, linjeKol }: {
-  data: Record<string, unknown>[];
-  xCol: string;
+const STOLPE_FARGER = ['var(--gold)', 'rgba(59,130,246,0.85)', 'rgba(16,185,129,0.85)', 'rgba(245,101,101,0.85)'];
+const LINJE_FARGER  = ['rgba(110,231,183,0.9)', 'rgba(251,191,36,0.9)', 'rgba(167,139,250,0.9)', 'rgba(249,115,22,0.9)'];
+
+function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
+  data:      Record<string, unknown>[];
+  xCol:      string;
   stolpeKol: string;
-  linjeKol: string;
+  linjeKol:  string;
+  serier?:   KombinertSerie[];
 }) {
   const formatVerdi = (v: unknown) =>
     typeof v === 'number'
       ? new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 }).format(v)
       : String(v ?? '');
+
+  const harSerier    = serier && serier.length > 0;
+  const stolpeSerier = serier?.filter(s => s.visningsType === 'stolpe') ?? [];
+  const linjeSerier  = serier?.filter(s => s.visningsType === 'linje')  ?? [];
+  const harLinjeAkse = harSerier ? linjeSerier.length > 0 : !!linjeKol;
 
   return (
     <ResponsiveContainer width="100%" height={400}>
@@ -450,18 +488,14 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol }: {
           yAxisId="stolpe"
           orientation="left"
           tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-          tickFormatter={(v) =>
-            new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)
-          }
+          tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
         />
-        {linjeKol && (
+        {harLinjeAkse && (
           <YAxis
             yAxisId="linje"
             orientation="right"
             tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-            tickFormatter={(v) =>
-              new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)
-            }
+            tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
           />
         )}
         <Tooltip
@@ -475,28 +509,58 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol }: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={((value: unknown, name: unknown) => [formatVerdi(value), String(name ?? '')]) as any}
         />
-        <Legend
-          wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }}
-        />
-        <Bar
-          yAxisId="stolpe"
-          dataKey={stolpeKol}
-          fill="var(--gold)"
-          opacity={0.85}
-          radius={[3, 3, 0, 0]}
-          name={stolpeKol}
-        />
-        {linjeKol && (
-          <Line
-            yAxisId="linje"
-            type="monotone"
-            dataKey={linjeKol}
-            stroke="rgba(110,231,183,0.9)"
-            strokeWidth={2.5}
-            dot={{ fill: 'rgba(110,231,183,0.9)', r: 3 }}
-            activeDot={{ r: 5 }}
-            name={linjeKol}
-          />
+        <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
+
+        {harSerier ? (
+          <>
+            {stolpeSerier.map((s, i) => (
+              <Bar
+                key={s.id}
+                yAxisId="stolpe"
+                dataKey={s.navn}
+                fill={STOLPE_FARGER[i % STOLPE_FARGER.length]}
+                opacity={0.85}
+                radius={[3, 3, 0, 0] as [number, number, number, number]}
+                name={s.navn}
+              />
+            ))}
+            {linjeSerier.map((s, i) => (
+              <Line
+                key={s.id}
+                yAxisId="linje"
+                type="monotone"
+                dataKey={s.navn}
+                stroke={LINJE_FARGER[i % LINJE_FARGER.length]}
+                strokeWidth={2.5}
+                dot={{ fill: LINJE_FARGER[i % LINJE_FARGER.length], r: 3 }}
+                activeDot={{ r: 5 }}
+                name={s.navn}
+              />
+            ))}
+          </>
+        ) : (
+          <>
+            <Bar
+              yAxisId="stolpe"
+              dataKey={stolpeKol}
+              fill="var(--gold)"
+              opacity={0.85}
+              radius={[3, 3, 0, 0] as [number, number, number, number]}
+              name={stolpeKol}
+            />
+            {linjeKol && (
+              <Line
+                yAxisId="linje"
+                type="monotone"
+                dataKey={linjeKol}
+                stroke="rgba(110,231,183,0.9)"
+                strokeWidth={2.5}
+                dot={{ fill: 'rgba(110,231,183,0.9)', r: 3 }}
+                activeDot={{ r: 5 }}
+                name={linjeKol}
+              />
+            )}
+          </>
         )}
       </ComposedChart>
     </ResponsiveContainer>
@@ -883,7 +947,7 @@ export default function RapportInteraktivPage() {
         visualType: f.visualType, xAkse, yAkse,
         aggregering: 'SUM',
         grupperPaa: f.grupperPaa ?? null,
-        ekstraKolonner: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
       });
 
       setAktiveFiltre(parseFiltreTilObjekter(f.sql ?? '', f.prosjektFilter ?? '', f.prosjektKolonne));
@@ -952,7 +1016,7 @@ export default function RapportInteraktivPage() {
 
       // Nullstill alltid config ved ny sesjon — forhindrer at forrige rapport sine kolonner lever videre
       sessionStorage.removeItem('rapport_forslag');
-      setConfig({ visualType: 'bar', xAkse: '', yAkse: '', aggregering: 'SUM', grupperPaa: null, ekstraKolonner: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50 });
+      setConfig({ visualType: 'bar', xAkse: '', yAkse: '', aggregering: 'SUM', grupperPaa: null, ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50 });
       setAktivData([]);
       setAktiveFiltre([]);
 
@@ -1045,7 +1109,7 @@ export default function RapportInteraktivPage() {
       const nyConfig: RedigertConfig = {
         visualType: 'bar', xAkse, yAkse,
         aggregering: 'SUM', grupperPaa: null,
-        ekstraKolonner: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
       };
 
       nyRapportAutoFetch.current = true; // Bloker debounced effect under init
@@ -1222,8 +1286,9 @@ export default function RapportInteraktivPage() {
         yAkse:          (cfg.yAkse as string) ?? '',
         aggregering:    (cfg.aggregering as string) ?? 'SUM',
         grupperPaa:     (cfg.grupperPaa as string | null) ?? null,
-        ekstraKolonner: (cfg.ekstraKolonner as string[]) ?? [],
-        sorterPaa:      (cfg.sorterPaa as string | null) ?? null,
+        ekstraKolonner:  (cfg.ekstraKolonner as string[]) ?? [],
+        kombinertSerier: (cfg.kombinertSerier as KombinertSerie[]) ?? [],
+        sorterPaa:       (cfg.sorterPaa as string | null) ?? null,
         sorterRetning:  (cfg.sorterRetning as string) ?? 'DESC',
         maksRader:      (cfg.maksRader as number) ?? 50,
       };
@@ -1321,7 +1386,7 @@ export default function RapportInteraktivPage() {
     console.log('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, aktiveFiltre]);
+  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre]);
 
   // ── Initialiser valgteKolonner ved skifte til tabell-visning ──
   useEffect(() => {
@@ -1673,7 +1738,7 @@ export default function RapportInteraktivPage() {
       case 'pie':       return <PieChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse}/>;
       case 'card':      return <CardChart      data={behandletData} yCol={config.yAkse} yLabel={yAkseLabel}/>;
       case 'table':     return null;
-      case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''}/>;
+      case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''} serier={config.kombinertSerier.length > 0 ? config.kombinertSerier : undefined}/>;
       default:          return <BarChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel}/>;
     }
   }
@@ -1924,20 +1989,172 @@ export default function RapportInteraktivPage() {
                 </div>
               )}
 
-              {/* Linje-serie (kun for kombinert) */}
+              {/* Serier (kun for kombinert) */}
               {config.visualType === 'kombinert' && (
-                <div>
-                  <label style={labelStyle}>Linje-serie (Y2-akse)</label>
-                  <select
-                    value={config.ekstraKolonner?.[0] ?? ''}
-                    onChange={e => setConfig(p => p ? { ...p, ekstraKolonner: e.target.value ? [e.target.value] : [] } : p)}
-                    style={selectStyle}
+                <div style={{ marginTop: 12 }}>
+                  <p style={labelStyle}>SERIER</p>
+
+                  {config.kombinertSerier.map((serie, idx) => (
+                    <div key={serie.id} style={{
+                      background: 'var(--glass-bg)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 8,
+                      padding: '10px 12px',
+                      marginBottom: 8,
+                    }}>
+                      {/* Navn + stolpe/linje-toggle */}
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                        <input
+                          type="text"
+                          value={serie.navn}
+                          placeholder="Serienavn, f.eks. RUH"
+                          onChange={e => {
+                            const oppdatert = [...config.kombinertSerier];
+                            oppdatert[idx] = { ...serie, navn: e.target.value };
+                            setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                          }}
+                          style={{ ...fvInputStyle, flex: 1, fontSize: 12, padding: '5px 8px' }}
+                        />
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {(['stolpe', 'linje'] as const).map(type => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => {
+                                const oppdatert = [...config.kombinertSerier];
+                                oppdatert[idx] = { ...serie, visningsType: type };
+                                setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                              }}
+                              style={{
+                                padding: '3px 8px', fontSize: 11, borderRadius: 5,
+                                border: '1px solid var(--glass-border)',
+                                background: serie.visningsType === type ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
+                                color: serie.visningsType === type ? 'var(--gold)' : 'var(--text-muted)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {type === 'stolpe' ? '▊' : '╱'} {type}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Kolonne som aggregeres */}
+                      <select
+                        value={serie.kolonne}
+                        onChange={e => {
+                          const oppdatert = [...config.kombinertSerier];
+                          oppdatert[idx] = { ...serie, kolonne: e.target.value };
+                          setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                        }}
+                        style={{ ...selectStyle, marginBottom: 6, fontSize: 12 }}
+                      >
+                        <option value="">— Velg kolonne —</option>
+                        {kolGroups.measures.map(k => <option key={k} value={k}>{k}</option>)}
+                      </select>
+
+                      {/* Filter: kolonne + operator + verdi */}
+                      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                        <select
+                          value={serie.filterKol}
+                          onChange={e => {
+                            const oppdatert = [...config.kombinertSerier];
+                            oppdatert[idx] = { ...serie, filterKol: e.target.value };
+                            setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                          }}
+                          style={{ ...selectStyle, flex: 2, fontSize: 11 }}
+                        >
+                          <option value="">— Filter-kolonne —</option>
+                          {kolGroups.dimensjoner.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                        <select
+                          value={serie.filterOp}
+                          onChange={e => {
+                            const oppdatert = [...config.kombinertSerier];
+                            oppdatert[idx] = { ...serie, filterOp: e.target.value };
+                            setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                          }}
+                          style={{ ...selectStyle, flex: 1, fontSize: 11 }}
+                        >
+                          {['=', '!=', '>', '<', 'LIKE'].map(op => (
+                            <option key={op} value={op}>{op}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <input
+                          type="text"
+                          value={serie.filterVerdi}
+                          placeholder="Verdi, f.eks. RUH"
+                          onChange={e => {
+                            const oppdatert = [...config.kombinertSerier];
+                            oppdatert[idx] = { ...serie, filterVerdi: e.target.value };
+                            setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                          }}
+                          style={{ ...fvInputStyle, flex: 1, fontSize: 12, padding: '5px 8px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setConfig(p => p ? {
+                            ...p,
+                            kombinertSerier: config.kombinertSerier.filter((_, i) => i !== idx),
+                          } : p)}
+                          style={{
+                            padding: '4px 8px', fontSize: 12, borderRadius: 5,
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            background: 'rgba(239,68,68,0.1)',
+                            color: 'rgba(252,165,165,0.9)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Legg til ny serie */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nySerie: KombinertSerie = {
+                        id: crypto.randomUUID(),
+                        navn: '',
+                        kolonne: kolGroups.measures[0] ?? '',
+                        aggregering: config.aggregering,
+                        filterKol: kolGroups.dimensjoner[0] ?? '',
+                        filterOp: '=',
+                        filterVerdi: '',
+                        visningsType: config.kombinertSerier.length === 0 ? 'stolpe' : 'linje',
+                      };
+                      setConfig(p => p ? { ...p, kombinertSerier: [...config.kombinertSerier, nySerie] } : p);
+                    }}
+                    style={{
+                      width: '100%', padding: '6px', fontSize: 12, borderRadius: 6,
+                      border: '1px dashed var(--glass-gold-border)',
+                      background: 'var(--glass-gold-bg)',
+                      color: 'var(--gold)', cursor: 'pointer', marginTop: 4,
+                    }}
                   >
-                    <option value="">— Ingen linje —</option>
-                    {kolGroups.measures
-                      .filter(k => k !== config.xAkse && k !== config.yAkse)
-                      .map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
+                    + Legg til serie
+                  </button>
+
+                  {/* Enkel linje-serie (fallback) */}
+                  <div style={{ marginTop: 12 }}>
+                    <p style={{ ...labelStyle, color: 'var(--text-muted)', fontSize: 10 }}>
+                      ELLER — ENKEL LINJE-SERIE (Y2-AKSE)
+                    </p>
+                    <select
+                      value={config.ekstraKolonner?.[0] ?? ''}
+                      onChange={e => setConfig(p => p ? { ...p, ekstraKolonner: e.target.value ? [e.target.value] : [] } : p)}
+                      style={{ ...selectStyle, fontSize: 12 }}
+                    >
+                      <option value="">— Ingen enkel linje —</option>
+                      {kolGroups.measures
+                        .filter(k => k !== config.xAkse && k !== config.yAkse)
+                        .map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -2046,7 +2263,7 @@ export default function RapportInteraktivPage() {
                   isFirstFetch.current = true;
                   setAktivData(forslag.data ?? []);
                   setAktiveFiltre(parseFiltreTilObjekter(forslag.sql ?? '', forslag.prosjektFilter ?? '', forslag.prosjektKolonne));
-                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], sorterPaa:null, sorterRetning:'DESC', maksRader:50 });
+                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:null, sorterRetning:'DESC', maksRader:50 });
                 }}
                 style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-muted)' }}>
                 Tilbakestill til AI-forslag
