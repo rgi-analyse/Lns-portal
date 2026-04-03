@@ -42,6 +42,7 @@ interface KombinertSerie {
   filterOp:     string;
   filterVerdi:  string;
   visningsType: 'stolpe' | 'linje';
+  kumulativ:    boolean;
 }
 
 interface RedigertConfig {
@@ -456,6 +457,24 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
 const STOLPE_FARGER = ['var(--gold)', 'rgba(59,130,246,0.85)', 'rgba(16,185,129,0.85)', 'rgba(245,101,101,0.85)'];
 const LINJE_FARGER  = ['rgba(110,231,183,0.9)', 'rgba(251,191,36,0.9)', 'rgba(167,139,250,0.9)', 'rgba(249,115,22,0.9)'];
 
+function beregnKumulativ(
+  data: Record<string, unknown>[],
+  serier: KombinertSerie[],
+): Record<string, unknown>[] {
+  const kumulative = serier.filter(s => s.kumulativ);
+  if (kumulative.length === 0) return data;
+  const akkumulator: Record<string, number> = {};
+  return data.map(rad => {
+    const nyRad = { ...rad };
+    for (const serie of kumulative) {
+      const verdi = Number(rad[serie.navn] ?? 0);
+      akkumulator[serie.navn] = (akkumulator[serie.navn] ?? 0) + verdi;
+      nyRad[serie.navn] = akkumulator[serie.navn];
+    }
+    return nyRad;
+  });
+}
+
 function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   data:      Record<string, unknown>[];
   xCol:      string;
@@ -463,19 +482,15 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   linjeKol:  string;
   serier?:   KombinertSerie[];
 }) {
-  const formatVerdi = (v: unknown) =>
-    typeof v === 'number'
-      ? new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 }).format(v)
-      : String(v ?? '');
-
   const harSerier    = serier && serier.length > 0;
   const stolpeSerier = serier?.filter(s => s.visningsType === 'stolpe') ?? [];
   const linjeSerier  = serier?.filter(s => s.visningsType === 'linje')  ?? [];
   const harLinjeAkse = harSerier ? linjeSerier.length > 0 : !!linjeKol;
+  const behandletData = harSerier ? beregnKumulativ(data, serier ?? []) : data;
 
   return (
     <ResponsiveContainer width="100%" height={400}>
-      <ComposedChart data={data} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
+      <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
         <XAxis
           dataKey={xCol}
@@ -507,7 +522,14 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
             fontSize: 12,
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={((value: unknown, name: unknown) => [formatVerdi(value), String(name ?? '')]) as any}
+          formatter={((value: unknown, name: unknown) => {
+            const navnStr = String(name ?? '');
+            const erKumulativ = serier?.find(s => s.navn === navnStr)?.kumulativ ?? false;
+            const formatertVerdi = typeof value === 'number'
+              ? new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 2 }).format(value)
+              : String(value ?? '');
+            return [formatertVerdi, erKumulativ ? `${navnStr} (∑)` : navnStr];
+          }) as any}
         />
         <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
 
@@ -2110,6 +2132,48 @@ export default function RapportInteraktivPage() {
                           ✕
                         </button>
                       </div>
+
+                      {/* Kumulativ toggle */}
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        marginTop: 6, paddingTop: 6,
+                        borderTop: '1px solid var(--glass-border)',
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const oppdatert = [...config.kombinertSerier];
+                            oppdatert[idx] = { ...serie, kumulativ: !serie.kumulativ };
+                            setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
+                          }}
+                          style={{
+                            width: 32, height: 18, borderRadius: 9,
+                            border: 'none', cursor: 'pointer',
+                            background: serie.kumulativ ? 'var(--gold)' : 'var(--glass-bg-hover)',
+                            position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute', top: 2,
+                            left: serie.kumulativ ? 16 : 2,
+                            width: 14, height: 14, borderRadius: '50%',
+                            background: 'white', transition: 'left 0.2s',
+                          }} />
+                        </button>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          Kumulativ (løpende sum)
+                        </span>
+                        {serie.kumulativ && (
+                          <span style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 4,
+                            background: 'var(--glass-gold-bg)',
+                            border: '1px solid var(--glass-gold-border)',
+                            color: 'var(--gold)',
+                          }}>
+                            ∑ akkumulert
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
 
@@ -2126,6 +2190,7 @@ export default function RapportInteraktivPage() {
                         filterOp: '=',
                         filterVerdi: '',
                         visningsType: config.kombinertSerier.length === 0 ? 'stolpe' : 'linje',
+                        kumulativ:    false,
                       };
                       setConfig(p => p ? { ...p, kombinertSerier: [...config.kombinertSerier, nySerie] } : p);
                     }}
