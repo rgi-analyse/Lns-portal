@@ -1,4 +1,5 @@
 'use client';
+// v2 — kumulativ sum per serie
 
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
