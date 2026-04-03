@@ -190,7 +190,7 @@ function byggWhereKlausul(
 }
 
 // ── SQL builder ───────────────────────────────────────────────────────────────
-function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = ''): string {
+function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kolonnTyper: Record<string, string> = {}): string {
   const esc   = (s: string) => `[${s.replace(/[\[\]]/g, '')}]`;
   const x     = esc(cfg.xAkse);
   const y     = esc(cfg.yAkse);
@@ -220,16 +220,19 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = ''): st
 
   const erAggregert = cfg.aggregering !== 'NONE' && !isMed;
 
-  // Linje-serie for kombinert chart — aggregeres på samme måte som yAkse
+  // Linje-serie for kombinert chart — bruk COUNT for ikke-numeriske kolonner
   const linjeKolNavn = (cfg.visualType === 'kombinert' && cfg.ekstraKolonner?.[0]) ? cfg.ekstraKolonner[0] : null;
   const linjeKolEsc  = linjeKolNavn ? esc(linjeKolNavn) : null;
+  const linjeKolType = linjeKolNavn ? kolonnTyper[linjeKolNavn] : null;
+  const erNumeriskLinje = linjeKolType?.startsWith('measure');
+  const linjeAgg = erNumeriskLinje ? cfg.aggregering : 'COUNT';
   const linjeUttrykk = linjeKolEsc
-    ? (cfg.aggregering === 'NONE' ? linjeKolEsc
-      : cfg.aggregering === 'COUNT'          ? `COUNT(${linjeKolEsc})`
-      : cfg.aggregering === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
-      : cfg.aggregering === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
-      : cfg.aggregering === 'MAX'            ? `MAX(${linjeKolEsc})`
-      : cfg.aggregering === 'MIN'            ? `MIN(${linjeKolEsc})`
+    ? (linjeAgg === 'NONE'           ? linjeKolEsc
+      : linjeAgg === 'COUNT'          ? `COUNT(${linjeKolEsc})`
+      : linjeAgg === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
+      : linjeAgg === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
+      : linjeAgg === 'MAX'            ? `MAX(${linjeKolEsc})`
+      : linjeAgg === 'MIN'            ? `MIN(${linjeKolEsc})`
       : `SUM(${linjeKolEsc})`)
     : null;
   const ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
@@ -1166,7 +1169,7 @@ export default function RapportInteraktivPage() {
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
       } else {
-        sql = byggSQL(cfg, vn, where);
+        sql = byggSQL(cfg, vn, where, kolonnTyperRef.current);
       }
       console.log('[rapport-interaktiv] hentData SQL:', sql);
       const res = await apiFetch('/api/pbi/query-sql', {
@@ -1931,7 +1934,7 @@ export default function RapportInteraktivPage() {
                     style={selectStyle}
                   >
                     <option value="">— Ingen linje —</option>
-                    {alleCols
+                    {kolGroups.measures
                       .filter(k => k !== config.xAkse && k !== config.yAkse)
                       .map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
