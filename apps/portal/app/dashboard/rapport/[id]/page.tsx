@@ -8,6 +8,7 @@ import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
 import type { FilterConfig, SlicerConfig } from '@/components/AIChat';
 import LagRapportModal from '@/components/LagRapportModal';
+import { useLisens } from '@/components/LisensProvider';
 
 const PowerBIReport = dynamic(() => import('@/components/PowerBIReport'), { ssr: false });
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
@@ -33,8 +34,8 @@ export default function RapportPage() {
 
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
+  const lisens = useLisens();
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
-  const [chatAktivert,      setChatAktivert]      = useState(true);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
   const [slicerConfig,  setSlicerConfig]  = useState<SlicerConfig | undefined>(undefined);
@@ -85,9 +86,8 @@ export default function RapportPage() {
         try {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
-            const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
+            const meg = await megRes.json() as { rolle?: string };
             setKanLageRapport(['admin', 'tenantadmin'].includes(meg.rolle ?? '') || meg.rolle === 'redaktør');
-            setChatAktivert(meg.chatAktivert ?? true);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -145,7 +145,7 @@ export default function RapportPage() {
         onAktivSideChange={setAktivSide}
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
-      {chatAktivert && (
+      {lisens.chatAktivert && (
         <AIChat
           entraObjectId={entraObjectId}
           rapportId={rapport.id}

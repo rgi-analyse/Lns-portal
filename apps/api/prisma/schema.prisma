@@ -121,13 +121,25 @@ model UserEvent {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
-  slug        String   @unique @db.NVarChar(100)
-  navn        String   @db.NVarChar(200)
-  databaseUrl String   @db.NVarChar(500)
-  erAktiv     Boolean  @default(true)
-  opprettet   DateTime @default(now())
-  oppdatert   DateTime @updatedAt
+  id          String    @id @default(uuid())
+  slug        String    @unique @db.NVarChar(100)
+  navn        String    @db.NVarChar(200)
+  databaseUrl String    @db.NVarChar(500)
+  erAktiv     Boolean   @default(true)
+  opprettet   DateTime  @default(now())
+  oppdatert   DateTime  @updatedAt
+
+  // Lisens
+  lisens                 String    @default("standard") @db.NVarChar(50)
+  maxBrukere             Int       @default(50)
+  lisensUtløper          DateTime?
+
+  // Modul-flagg
+  chatAktivert           Boolean   @default(true)
+  designerAktivert       Boolean   @default(true)
+  kombinertChartAktivert Boolean   @default(true)
+  personalAiAktivert     Boolean   @default(false)
+  eksportAktivert        Boolean   @default(true)
 }
 
 model OrganisasjonTema {

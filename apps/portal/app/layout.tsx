@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import MsalWrapper from '@/components/MsalWrapper';
 import ThemeProvider from '@/components/ThemeProvider';
+import LisensProvider from '@/components/LisensProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <MsalWrapper>
           <ThemeProvider>
-            {children}
+            <LisensProvider>
+              {children}
+            </LisensProvider>
           </ThemeProvider>
         </MsalWrapper>
       </body>

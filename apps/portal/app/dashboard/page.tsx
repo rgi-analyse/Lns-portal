@@ -6,6 +6,7 @@ import { Clock, FileBarChart2, RefreshCw, Star } from 'lucide-react';
 import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { useLisens } from '@/components/LisensProvider';
 
 interface Workspace {
   id: string;
@@ -54,7 +55,7 @@ export default function DashboardPage() {
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [filter,           setFilter]            = useState<'alle' | 'favoritter'>('favoritter');
   const [favoritter,       setFavoritter]        = useState<string[]>([]);
-  const [chatAktivert,     setChatAktivert]      = useState(true);
+  const lisens = useLisens();
   const togglingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -90,15 +91,6 @@ export default function DashboardPage() {
       .catch(() => setAktivitet(null));
   }, [isAuthenticated, entraObjectId, authHeaders]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !entraObjectId) return;
-    apiFetch('/api/meg', { headers: authHeaders })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data: { chatAktivert?: boolean } | null) => {
-        if (data) setChatAktivert(data.chatAktivert ?? true);
-      })
-      .catch(() => {});
-  }, [isAuthenticated, entraObjectId, authHeaders]);
 
   async function toggleFavoritt(e: React.MouseEvent, workspaceId: string) {
     e.stopPropagation();
@@ -457,7 +449,7 @@ export default function DashboardPage() {
           );
         })()}
       </div>
-      {chatAktivert && <AIChat entraObjectId={entraObjectId} />}
+      {lisens.chatAktivert && <AIChat entraObjectId={entraObjectId} />}
     </>
   );
 }
