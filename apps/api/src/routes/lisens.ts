@@ -72,10 +72,9 @@ export async function lisensRoutes(fastify: FastifyInstance) {
         const tenant = await prisma.tenant.findUnique({
           where: { slug },
           select: {
-            id:                     true,
-            slug:                   true,
-            navn:                   true,
-            erAktiv:                true,
+            id:      true,
+            slug:    true,
+            erAktiv: true,
             ...LISENS_SELECT,
           },
         });
