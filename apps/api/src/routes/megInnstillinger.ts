@@ -23,10 +23,11 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
   fastify.get('/api/meg', { preHandler: [requireBruker] }, async (request, reply) => {
     const bruker = (request as AuthRequest).bruker;
     return reply.send({
-      id:          bruker.id,
-      rolle:       bruker.rolle,
-      displayName: bruker.displayName,
-      email:       bruker.email,
+      id:           bruker.id,
+      rolle:        bruker.rolle,
+      displayName:  bruker.displayName,
+      email:        bruker.email,
+      chatAktivert: bruker.chatAktivert,
     });
   });
 

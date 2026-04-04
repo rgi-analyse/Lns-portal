@@ -22,9 +22,10 @@ interface ImportBody {
 }
 
 interface PatchBody {
-  erAktiv?: boolean;
-  lisensType?: string;
-  rolle?: string;
+  erAktiv?:      boolean;
+  lisensType?:   string;
+  rolle?:        string;
+  chatAktivert?: boolean;
 }
 
 export async function brukerAdminRoutes(fastify: FastifyInstance) {
@@ -152,9 +153,10 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
         body: {
           type: 'object',
           properties: {
-            erAktiv:   { type: 'boolean' },
-            lisensType: { type: 'string' },
-            rolle:     { type: 'string', enum: ['tenantadmin', 'admin', 'redaktør', 'bruker'] },
+            erAktiv:      { type: 'boolean' },
+            lisensType:   { type: 'string' },
+            rolle:        { type: 'string', enum: ['tenantadmin', 'admin', 'redaktør', 'bruker'] },
+            chatAktivert: { type: 'boolean' },
           },
           additionalProperties: false,
         },

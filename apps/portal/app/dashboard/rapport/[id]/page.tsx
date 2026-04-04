@@ -34,6 +34,7 @@ export default function RapportPage() {
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
+  const [chatAktivert,      setChatAktivert]      = useState(true);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
   const [slicerConfig,  setSlicerConfig]  = useState<SlicerConfig | undefined>(undefined);
@@ -84,8 +85,9 @@ export default function RapportPage() {
         try {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
-            const meg = await megRes.json() as { rolle?: string };
+            const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
             setKanLageRapport(['admin', 'tenantadmin'].includes(meg.rolle ?? '') || meg.rolle === 'redaktør');
+            setChatAktivert(meg.chatAktivert ?? true);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -143,21 +145,23 @@ export default function RapportPage() {
         onAktivSideChange={setAktivSide}
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
-      <AIChat
-        entraObjectId={entraObjectId}
-        rapportId={rapport.id}
-        pbiReportId={rapport.pbiReportId}
-        rapportNavn={rapport.navn}
-        slicers={slicers}
-        slicerValues={slicerValues}
-        activeSlicerState={activeSlicerState}
-        availableTables={availableTables}
-        aktivSide={aktivSide}
-        onSetFilter={setFilterConfig}
-        onSetSlicer={setSlicerConfig}
-        onClearSlicer={setClearSlicerTitle}
-        getVisualsData={() => getVisualsDataRef.current?.() ?? Promise.resolve({})}
-      />
+      {chatAktivert && (
+        <AIChat
+          entraObjectId={entraObjectId}
+          rapportId={rapport.id}
+          pbiReportId={rapport.pbiReportId}
+          rapportNavn={rapport.navn}
+          slicers={slicers}
+          slicerValues={slicerValues}
+          activeSlicerState={activeSlicerState}
+          availableTables={availableTables}
+          aktivSide={aktivSide}
+          onSetFilter={setFilterConfig}
+          onSetSlicer={setSlicerConfig}
+          onClearSlicer={setClearSlicerTitle}
+          getVisualsData={() => getVisualsDataRef.current?.() ?? Promise.resolve({})}
+        />
+      )}
 
       {/* Flytende Lag rapport-knapp — over chat-knappen */}
       {kanLageRapport && (

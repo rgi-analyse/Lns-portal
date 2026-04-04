@@ -95,6 +95,7 @@ model Bruker {
   opprettet         DateTime  @default(now())
   sistInnlogget     DateTime?
   forrigeInnlogget  DateTime?  @map("forrigeInnlogget")
+  chatAktivert      Boolean    @default(true) @map("chatAktivert")
 }
 
 model UserProfile {

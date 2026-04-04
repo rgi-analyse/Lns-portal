@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [filter,           setFilter]            = useState<'alle' | 'favoritter'>('favoritter');
   const [favoritter,       setFavoritter]        = useState<string[]>([]);
+  const [chatAktivert,     setChatAktivert]      = useState(true);
   const togglingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -87,6 +88,16 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((data: Aktivitet | null) => setAktivitet(data))
       .catch(() => setAktivitet(null));
+  }, [isAuthenticated, entraObjectId, authHeaders]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !entraObjectId) return;
+    apiFetch('/api/meg', { headers: authHeaders })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { chatAktivert?: boolean } | null) => {
+        if (data) setChatAktivert(data.chatAktivert ?? true);
+      })
+      .catch(() => {});
   }, [isAuthenticated, entraObjectId, authHeaders]);
 
   async function toggleFavoritt(e: React.MouseEvent, workspaceId: string) {
@@ -446,7 +457,7 @@ export default function DashboardPage() {
           );
         })()}
       </div>
-      <AIChat entraObjectId={entraObjectId} />
+      {chatAktivert && <AIChat entraObjectId={entraObjectId} />}
     </>
   );
 }

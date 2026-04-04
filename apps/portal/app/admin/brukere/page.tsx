@@ -30,6 +30,7 @@ interface Bruker {
   erEntraBruker: boolean;
   opprettet:     string;
   sistInnlogget: string | null;
+  chatAktivert:  boolean;
 }
 
 interface GraphUser {
@@ -94,7 +95,7 @@ export default function BrukerAdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authHeaders['X-Entra-Object-Id']]);
 
-  const patch = useCallback(async (bruker: Bruker, data: Partial<Pick<Bruker, 'erAktiv' | 'rolle'>>) => {
+  const patch = useCallback(async (bruker: Bruker, data: Partial<Pick<Bruker, 'erAktiv' | 'rolle' | 'chatAktivert'>>) => {
     const snapshot = { ...bruker };
     setBrukere((prev) => prev.map((b) => (b.id === bruker.id ? { ...b, ...data } : b)));
     try {
@@ -360,6 +361,22 @@ export default function BrukerAdminPage() {
                           </button>
                         </Tooltip>
                       )}
+                      <button
+                        onClick={() => patch(b, { chatAktivert: !b.chatAktivert })}
+                        title={b.chatAktivert ? 'Deaktiver chat' : 'Aktiver chat'}
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded border transition-colors"
+                        style={{
+                          borderColor: b.chatAktivert ? 'rgba(16,185,129,0.3)' : 'rgb(229,231,235)',
+                          background:  b.chatAktivert ? 'rgba(16,185,129,0.08)' : 'transparent',
+                          color:       b.chatAktivert ? 'rgba(110,231,183,0.9)' : 'rgb(107,114,128)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          {!b.chatAktivert && <line x1="4" y1="4" x2="20" y2="20"/>}
+                        </svg>
+                        {b.chatAktivert ? 'Chat på' : 'Chat av'}
+                      </button>
                       <button
                         onClick={() => patch(b, { erAktiv: !b.erAktiv })}
                         className="text-xs px-3 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
