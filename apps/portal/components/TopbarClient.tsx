@@ -20,8 +20,9 @@ export default function TopbarClient() {
     .join('')
     .toUpperCase();
 
-  const [isAdmin,  setIsAdmin]  = useState(false);
-  const [open,     setOpen]     = useState(false);
+  const [isAdmin,      setIsAdmin]      = useState(false);
+  const [rolleLastet,  setRolleLastet]  = useState(false);
+  const [open,         setOpen]         = useState(false);
   const [dropPos,  setDropPos]  = useState({ top: 0, right: 0 });
   const triggerRef  = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -29,18 +30,20 @@ export default function TopbarClient() {
   useEffect(() => {
     // Lokale brukere: rolle er allerede kjent fra sessionStorage
     if (isLocal) {
-      setIsAdmin(localRolle === 'admin');
+      setIsAdmin(['admin', 'tenantadmin'].includes(localRolle ?? ''));
+      setRolleLastet(true);
       return;
     }
     // Entra-brukere: hent rolle fra /api/me
     if (!authHeaders['X-Entra-Object-Id']) return;
     apiFetch('/api/me', { headers: authHeaders })
       .then(async (r) => {
-        if (!r.ok) return;
+        if (!r.ok) { setRolleLastet(true); return; }
         const bruker = await r.json() as { rolle: string };
         setIsAdmin(['admin', 'tenantadmin'].includes(bruker.rolle));
+        setRolleLastet(true);
       })
-      .catch(() => {});
+      .catch(() => { setRolleLastet(true); });
   }, [authHeaders, isLocal, localRolle]);
 
   // Lukk ved klikk utenfor — ekskluder både trigger og dropdown-panelet
@@ -106,8 +109,8 @@ export default function TopbarClient() {
         Min profil
       </Link>
 
-      {/* Administrasjon — kun for admin */}
-      {isAdmin && (
+      {/* Administrasjon — kun for admin, vis først når rollen er bekreftet */}
+      {rolleLastet && isAdmin && (
         <>
           <div className="my-1" style={{ borderTop: '1px solid var(--glass-bg)' }} />
           <Link
