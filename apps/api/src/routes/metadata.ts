@@ -108,12 +108,12 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   );
 
   // PUT /api/admin/metadata/views/:id — oppdater view-metadata
-  fastify.put<{ Params: { id: string }; Body: { visningsnavn?: string; beskrivelse?: string; område?: string; prosjekter?: string; prosjekt_kolonne?: string | null; prosjekt_kolonne_type?: string } }>(
+  fastify.put<{ Params: { id: string }; Body: { visningsnavn?: string; beskrivelse?: string; område?: string; prosjekter?: string; prosjekt_kolonne?: string | null; prosjekt_kolonne_type?: string; er_aktiv?: boolean } }>(
     '/api/admin/metadata/views/:id',
     { preHandler: [requireBruker, requireAdmin] },
     async (request, reply) => {
       const { id } = request.params;
-      const { visningsnavn, beskrivelse, område, prosjekter, prosjekt_kolonne, prosjekt_kolonne_type } = request.body;
+      const { visningsnavn, beskrivelse, område, prosjekter, prosjekt_kolonne, prosjekt_kolonne_type, er_aktiv } = request.body;
 
       const validProjektTyper = ['number', 'string', 'name'];
       const setParts: string[] = [];
@@ -125,6 +125,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       if (prosjekt_kolonne_type !== undefined && validProjektTyper.includes(prosjekt_kolonne_type)) {
         setParts.push(`prosjekt_kolonne_type = '${esc(prosjekt_kolonne_type)}'`);
       }
+      if (er_aktiv !== undefined) setParts.push(`er_aktiv = ${er_aktiv ? 1 : 0}`);
 
       if (setParts.length === 0) return reply.status(400).send({ error: 'Ingen felter å oppdatere' });
 

@@ -94,7 +94,7 @@ export default function MetadataAdminPage() {
 
   // Dialog: edit view
   const [editView, setEditView] = useState<MetadataView | null>(null);
-  const [editForm, setEditForm] = useState({ visningsnavn: '', beskrivelse: '', område: '', prosjekter: '', prosjekt_kolonne: '', prosjekt_kolonne_type: 'number' });
+  const [editForm, setEditForm] = useState({ visningsnavn: '', beskrivelse: '', område: '', prosjekter: '', prosjekt_kolonne: '', prosjekt_kolonne_type: 'number', erAktiv: true });
 
   // Dialog: edit kolonne
   const [editKolonne, setEditKolonne] = useState<{ viewId: string; kol: Kolonne } | null>(null);
@@ -267,6 +267,7 @@ export default function MetadataAdminPage() {
       prosjekter: view.prosjekter ?? '',
       prosjekt_kolonne: view.prosjekt_kolonne ?? '',
       prosjekt_kolonne_type: view.prosjekt_kolonne_type ?? 'number',
+      erAktiv: view.er_aktiv !== false,
     });
   };
 
@@ -278,6 +279,7 @@ export default function MetadataAdminPage() {
       body: JSON.stringify({
         ...editForm,
         prosjekt_kolonne: editForm.prosjekt_kolonne || null,
+        er_aktiv: editForm.erAktiv,
       }),
     });
     const updated = await res.json();
@@ -770,6 +772,38 @@ export default function MetadataAdminPage() {
                 {editForm.prosjekt_kolonne_type === 'number' ? ' = [prosjektnr]' : " LIKE '%[søk]%'"}
               </p>
             )}
+          </div>
+
+          {/* Aktiv/Inaktiv-toggle */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 14px', borderRadius: 8,
+            background: 'var(--glass-bg-hover)',
+          }}>
+            <div>
+              <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>Aktiv</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                Inaktive views vises ikke i AI-chat eller rapport-designer
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditForm(f => ({ ...f, erAktiv: !f.erAktiv }))}
+              style={{
+                width: 40, height: 22, borderRadius: 11,
+                border: 'none', cursor: 'pointer',
+                position: 'relative', transition: 'background 0.2s',
+                background: editForm.erAktiv ? 'var(--gold)' : 'var(--glass-border)',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 3,
+                left: editForm.erAktiv ? 20 : 3,
+                width: 16, height: 16, borderRadius: '50%',
+                background: 'white', transition: 'left 0.2s',
+              }} />
+            </button>
           </div>
         </div>
         <DialogFooter>
