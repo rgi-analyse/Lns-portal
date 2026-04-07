@@ -906,9 +906,12 @@ export default function RapportInteraktivPage() {
   const [lasterData, setLasterData] = useState(false);
   const [tilgjengeligeKolonner, setTilgjengeligeKolonner] = useState<string[]>([]);
   const [kolonnTyper, setKolonnTyper] = useState<Record<string, string>>({});
-  const [visTabell,    setVisTabell]    = useState(false);
-  const [visRediger,   setVisRediger]   = useState(false);
-  const [eksporterer,  setEksporterer]  = useState(false);
+  const [visTabell,          setVisTabell]          = useState(false);
+  const [visRediger,         setVisRediger]         = useState(false);
+  const [eksporterer,        setEksporterer]        = useState(false);
+  const [autoRefresh,        setAutoRefresh]        = useState(true);
+  const [ventendePåRefresh,  setVentendePåRefresh]  = useState(false);
+  const [storViewAdvarsel,   setStorViewAdvarsel]   = useState(false);
   const [lagrer,       setLagrer]       = useState(false);
   const [lagret,       setLagret]       = useState(false);
   const [eksisterendeRapportId, setEksisterendeRapportId] = useState<string | null>(null);
@@ -1142,6 +1145,15 @@ export default function RapportInteraktivPage() {
       setTilgjengeligeKolonner(alleKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
 
+      // Deaktiver auto-refresh automatisk for sannsynlig store views
+      const erSannsynligStortView = viewNavn?.toLowerCase().includes('fact') ||
+                                    viewNavn?.toLowerCase().includes('trans');
+      if (erSannsynligStortView) {
+        setAutoRefresh(false);
+        setStorViewAdvarsel(true);
+        setTimeout(() => setStorViewAdvarsel(false), 6000);
+      }
+
       // Steg 5: Hent data med lokale variabler — omgår stale closure helt
       if (xAkse && yAkse) {
         // Bygg WHERE-klausul korrekt: kombiner prosjektfilter og IS NOT NULL
@@ -1206,6 +1218,7 @@ export default function RapportInteraktivPage() {
 
   // ── Direkte fetch med eksplisitt config (brukes av xAkse onChange og reset) ──
   const hentData = useCallback(async (cfg: RedigertConfig, overstyrFiltre?: AktivFilter[], overstyrKolonner?: string[]) => {
+    setVentendePåRefresh(false);
     if (!initialiseringFerdig.current) {
       console.log('[hentData] blokkert — initialisering pågår');
       return;
@@ -1406,10 +1419,16 @@ export default function RapportInteraktivPage() {
     const erTabell = cfg.visualType === 'table';
     if (erTabell && valgteKolonnerRef.current.length === 0) return;
     if (!erTabell && (!cfg.xAkse || !cfg.yAkse)) return;
+
+    if (!autoRefresh) {
+      setVentendePåRefresh(true);
+      return;
+    }
+
     console.log('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre]);
+  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre, autoRefresh]);
 
   // ── Initialiser valgteKolonner ved skifte til tabell-visning ──
   useEffect(() => {
@@ -1428,10 +1447,11 @@ export default function RapportInteraktivPage() {
     if (configRef.current?.visualType !== 'table') return;
     if (valgteKolonnerRef.current.length === 0) return;
     const cfg = configRef.current;
+    if (!autoRefresh) { setVentendePåRefresh(true); return; }
     console.log('[Designer] valgteKolonner endret, oppdaterer tabell');
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valgteKolonner]);
+  }, [valgteKolonner, autoRefresh]);
 
   // Tabell-kolonner styres nå av valgteKolonner state + valgteKolonner-useEffect
 
@@ -1912,6 +1932,83 @@ export default function RapportInteraktivPage() {
         <button type="button" onClick={leggTilFilter}
           style={{ background:'var(--glass-bg)', border:'1px dashed var(--glass-border-hover)', color:'var(--text-muted)', borderRadius:6, padding:'4px 12px', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', gap:4 }}>
           + Filter
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Stor view-advarsel */}
+        {storViewAdvarsel && (
+          <div style={{
+            fontSize: 12, color: 'rgba(251,191,36,0.9)',
+            background: 'rgba(251,191,36,0.08)',
+            border: '1px solid rgba(251,191,36,0.25)',
+            borderRadius: 6, padding: '4px 10px',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            ⚠️ Stort datasett — legg til filtre og trykk Oppdater
+          </div>
+        )}
+
+        {/* Auto-refresh toggle */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '3px 8px', borderRadius: 6,
+          background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+        }}>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh(v => !v)}
+            title={autoRefresh ? 'Slå av auto-refresh' : 'Slå på auto-refresh'}
+            style={{
+              width: 32, height: 18, borderRadius: 9,
+              border: 'none', cursor: 'pointer',
+              position: 'relative', transition: 'background 0.2s',
+              background: autoRefresh ? 'var(--gold)' : 'var(--glass-border)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: 2,
+              left: autoRefresh ? 16 : 2,
+              width: 14, height: 14, borderRadius: '50%',
+              background: 'white', transition: 'left 0.2s',
+            }} />
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            Auto
+          </span>
+        </div>
+
+        {/* Oppdater data-knapp */}
+        <button
+          type="button"
+          onClick={() => { const cfg = configRef.current; if (cfg) hentData(cfg); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 12px', borderRadius: 6,
+            border: ventendePåRefresh ? '1px solid var(--glass-gold-border)' : '1px solid var(--glass-border)',
+            background: ventendePåRefresh ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
+            color: ventendePåRefresh ? 'var(--gold)' : 'var(--text-secondary)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            transition: 'all 0.2s', whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--glass-gold-border)';
+            (e.currentTarget as HTMLButtonElement).style.color = 'var(--gold)';
+          }}
+          onMouseLeave={e => {
+            if (!ventendePåRefresh) {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--glass-border)';
+              (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+            }
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          {ventendePåRefresh ? 'Oppdater data ●' : 'Oppdater data'}
         </button>
       </div>
 
