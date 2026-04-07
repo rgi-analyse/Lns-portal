@@ -8,14 +8,20 @@ datasource db {
 }
 
 model Workspace {
-  id            String             @id @default(uuid())
-  navn          String
-  beskrivelse   String?
-  opprettetAv   String
-  opprettetDato DateTime           @default(now())
-  oppdatert     DateTime           @updatedAt
-  rapporter     WorkspaceRapport[]
-  tilgang       Tilgang[]
+  id               String             @id @default(uuid())
+  navn             String
+  beskrivelse      String?
+  opprettetAv      String
+  opprettetDato    DateTime           @default(now())
+  oppdatert        DateTime           @updatedAt
+  rapporter        WorkspaceRapport[]
+  tilgang          Tilgang[]
+
+  // Kontekst-parameter: brukes som fast filter når bruker åpner rapport-designer fra dette workspacet
+  kontekstType     String?            @db.NVarChar(50)
+  kontekstKolonne  String?            @db.NVarChar(100)
+  kontekstVerdi    String?            @db.NVarChar(200)
+  kontekstLabel    String?            @db.NVarChar(200)
 }
 
 model Rapport {

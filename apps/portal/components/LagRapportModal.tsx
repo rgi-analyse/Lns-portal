@@ -17,7 +17,13 @@ interface ViewInfo {
 interface LagRapportModalProps {
   rapportId: string;
   rapportNavn: string;
-  prosjektNr?: string | null;   // Arvet fra rapport-kontekst — aldri fra bruker
+  // Workspace-kontekst — brukes som fast filter i rapport-designer
+  kontekstVerdi?:   string | null;  // f.eks. prosjektnummer
+  kontekstKolonne?: string | null;  // f.eks. "ProsjektNr"
+  kontekstType?:    string | null;  // "number" | "string"
+  kontekstLabel?:   string | null;  // visningsnavn på konteksten
+  /** @deprecated Bruk kontekstVerdi — beholdes for bakoverkompatibilitet */
+  prosjektNr?: string | null;
   authHeaders: Record<string, string>;
   onLukk: () => void;
 }
@@ -27,10 +33,18 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function LagRapportModal({
   rapportId,
   rapportNavn,
+  kontekstVerdi,
+  kontekstKolonne,
+  kontekstType,
+  kontekstLabel,
   prosjektNr,
   authHeaders,
   onLukk,
 }: LagRapportModalProps) {
+  // Kontekst-verdi: bruk eksplisitt workspace-kontekst, fall tilbake til legacy prosjektNr
+  const effektivKontekstVerdi   = kontekstVerdi   ?? prosjektNr ?? null;
+  const effektivKontekstKolonne = kontekstKolonne ?? null;
+  const effektivKontekstType    = kontekstType    ?? 'number';
   const router = useRouter();
   const [views, setViews] = useState<ViewInfo[]>([]);
   const [valgtViewId, setValgtViewId] = useState<string>('');
@@ -69,21 +83,29 @@ export default function LagRapportModal({
   const brukView = () => {
     if (!valgtView || ingenViews) return;
     setNavigerer(true);
+
+    // Workspace-kontekst har prioritet over view-metadata
+    const kolonne = effektivKontekstKolonne ?? valgtView.prosjekt_kolonne ?? null;
+    const kolType = effektivKontekstKolonne
+      ? effektivKontekstType
+      : (valgtView.prosjekt_kolonne_type ?? 'number');
+
     console.log('[Modal] sender params:', {
       viewNavn: `${valgtView.schema_name}.${valgtView.view_name}`,
-      prosjektNr: prosjektNr ?? '(null — workspace-navn mangler tall)',
-      prosjektKolonne: valgtView.prosjekt_kolonne,
+      kontekstVerdi: effektivKontekstVerdi,
+      kontekstKolonne: kolonne,
     });
+
     const params = new URLSearchParams({
       viewNavn:    `${valgtView.schema_name}.${valgtView.view_name}`,
       visningsnavn: valgtView.visningsnavn ?? valgtView.view_name,
       fraRapportId: rapportId,
       laast:        'true',
     });
-    if (valgtView.prosjekt_kolonne)      params.set('prosjektKolonne',     valgtView.prosjekt_kolonne);
-    if (valgtView.prosjekt_kolonne_type) params.set('prosjektKolonneType', valgtView.prosjekt_kolonne_type);
-    // prosjektNr er ALLTID fra rapport-kontekst, aldri fra bruker-input
-    if (prosjektNr)                      params.set('prosjektNr',          prosjektNr);
+    if (kolonne)                  params.set('prosjektKolonne',     kolonne);
+    if (kolType)                  params.set('prosjektKolonneType', kolType);
+    if (effektivKontekstVerdi)    params.set('prosjektNr',          effektivKontekstVerdi);
+    if (kontekstLabel)            params.set('kontekstLabel',       kontekstLabel);
     console.log('[Modal] full URL:', `/dashboard/rapport-designer/ny?${params.toString()}`);
     router.push(`/dashboard/rapport-designer/ny?${params.toString()}`);
   };

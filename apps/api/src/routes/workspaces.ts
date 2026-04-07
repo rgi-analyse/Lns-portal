@@ -13,13 +13,21 @@ function isNotFound(error: unknown): boolean {
 }
 
 interface CreateWorkspaceBody {
-  navn: string;
-  beskrivelse?: string;
+  navn:            string;
+  beskrivelse?:    string;
+  kontekstType?:   string;
+  kontekstKolonne?: string;
+  kontekstVerdi?:  string;
+  kontekstLabel?:  string;
 }
 
 interface UpdateWorkspaceBody {
-  navn?: string;
-  beskrivelse?: string;
+  navn?:            string;
+  beskrivelse?:     string;
+  kontekstType?:    string | null;
+  kontekstKolonne?: string | null;
+  kontekstVerdi?:   string | null;
+  kontekstLabel?:   string | null;
 }
 
 // Slår opp erDesignerRapport for en liste av rapport-IDer.
@@ -83,6 +91,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
               opprettetAv: true,
               opprettetDato: true,
               oppdatert: true,
+              kontekstType: true,
+              kontekstKolonne: true,
+              kontekstVerdi: true,
+              kontekstLabel: true,
               _count: { select: { rapporter: { where: { rapport: { erAktiv: true } } }, tilgang: true } },
               rapporter: {
                 where: { rapport: { erAktiv: true } },
@@ -117,6 +129,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           opprettetAv: true,
           opprettetDato: true,
           oppdatert: true,
+          kontekstType: true,
+          kontekstKolonne: true,
+          kontekstVerdi: true,
+          kontekstLabel: true,
           _count: { select: { rapporter: { where: { rapport: { erAktiv: true } } }, tilgang: true } },
           rapporter: {
             where: { rapport: { erAktiv: true } },
@@ -196,8 +212,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           type: 'object',
           required: ['navn'],
           properties: {
-            navn: { type: 'string', minLength: 1 },
-            beskrivelse: { type: 'string' },
+            navn:            { type: 'string', minLength: 1 },
+            beskrivelse:     { type: 'string' },
+            kontekstType:    { type: 'string' },
+            kontekstKolonne: { type: 'string' },
+            kontekstVerdi:   { type: 'string' },
+            kontekstLabel:   { type: 'string' },
           },
           additionalProperties: false,
         },
@@ -334,8 +354,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         body: {
           type: 'object',
           properties: {
-            navn: { type: 'string', minLength: 1 },
-            beskrivelse: { type: 'string' },
+            navn:            { type: 'string', minLength: 1 },
+            beskrivelse:     { type: ['string', 'null'] },
+            kontekstType:    { type: ['string', 'null'] },
+            kontekstKolonne: { type: ['string', 'null'] },
+            kontekstVerdi:   { type: ['string', 'null'] },
+            kontekstLabel:   { type: ['string', 'null'] },
           },
           additionalProperties: false,
         },

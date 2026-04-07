@@ -9,10 +9,12 @@ import { apiFetch } from '@/lib/apiClient';
 import { useLisens } from '@/components/LisensProvider';
 
 interface Workspace {
-  id: string;
-  navn: string;
-  beskrivelse?: string | null;
-  erPersonlig?: boolean;
+  id:              string;
+  navn:            string;
+  beskrivelse?:    string | null;
+  erPersonlig?:    boolean;
+  kontekstVerdi?:  string | null;
+  kontekstLabel?:  string | null;
   _count?: { rapporter: number; tilgang: number };
 }
 
@@ -403,9 +405,20 @@ export default function DashboardPage() {
                     <div className="truncate" style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
                       {ws.navn}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                      {ws._count?.rapporter ?? 0} rapporter
-                      {ws.beskrivelse ? ` · ${ws.beskrivelse}` : ''}
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span>{ws._count?.rapporter ?? 0} rapporter</span>
+                      {ws.beskrivelse && <span>· {ws.beskrivelse}</span>}
+                      {(ws.kontekstVerdi || ws.kontekstLabel) && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600,
+                          padding: '1px 6px', borderRadius: 4,
+                          background: 'var(--glass-gold-bg)',
+                          border: '1px solid var(--glass-gold-border)',
+                          color: 'var(--gold)',
+                        }}>
+                          {ws.kontekstLabel ?? ws.kontekstVerdi}
+                        </span>
+                      )}
                     </div>
                   </div>
 

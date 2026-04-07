@@ -24,7 +24,16 @@ interface LinkRapportBody {
   rapportId: string;
 }
 
-const workspaceSelect = { select: { id: true, navn: true } };
+const workspaceSelect = {
+  select: {
+    id:              true,
+    navn:            true,
+    kontekstType:    true,
+    kontekstKolonne: true,
+    kontekstVerdi:   true,
+    kontekstLabel:   true,
+  },
+};
 
 export async function rapportRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', resolveTenant);

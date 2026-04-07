@@ -96,25 +96,52 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         const safeFraId = safeId(fraRapportId);
         try {
           const wsRows = await queryAzureSQL(`
-            SELECT TOP 1 w.navn AS workspace_navn
+            SELECT TOP 1
+              w.navn             AS workspace_navn,
+              w.kontekstKolonne  AS kontekstKolonne,
+              w.kontekstVerdi    AS kontekstVerdi,
+              w.kontekstType     AS kontekstType
             FROM WorkspaceRapport wr
             JOIN Workspace w ON w.id = wr.workspaceId
             WHERE wr.rapportId = '${safeFraId}'
           `);
-          const wsNavn = (wsRows[0] as { workspace_navn?: string } | undefined)?.workspace_navn ?? '';
-          const match = wsNavn.match(/\b(\d{4,5})\b/);
-          if (match) {
-            const prosjektNrFromDb = match[1];
-            config.prosjektNr = prosjektNrFromDb;
-            if (config.prosjektKolonne) {
-              const isNum = config.prosjektKolonneType !== 'string';
-              config.prosjektFilter = `WHERE [${config.prosjektKolonne}] = ${isNum ? prosjektNrFromDb : `'${prosjektNrFromDb}'`}`;
-              config.laastFilter = { kolonne: config.prosjektKolonne, verdi: prosjektNrFromDb };
+          const ws = wsRows[0] as {
+            workspace_navn?: string;
+            kontekstKolonne?: string;
+            kontekstVerdi?: string;
+            kontekstType?: string;
+          } | undefined;
+
+          // Bruk eksplisitt kontekst-kolonne/-verdi fra workspace hvis satt
+          const kontekstKolonne = ws?.kontekstKolonne ?? null;
+          const kontekstVerdi   = ws?.kontekstVerdi   ?? null;
+          const kontekstType    = ws?.kontekstType     ?? null;
+
+          if (kontekstKolonne && kontekstVerdi) {
+            config.prosjektNr       = kontekstVerdi;
+            config.prosjektKolonne  = kontekstKolonne;
+            config.prosjektKolonneType = kontekstType === 'string' ? 'string' : 'number';
+            const isNum = config.prosjektKolonneType !== 'string';
+            config.prosjektFilter   = `WHERE [${kontekstKolonne}] = ${isNum ? kontekstVerdi : `'${kontekstVerdi}'`}`;
+            config.laastFilter      = { kolonne: kontekstKolonne, verdi: kontekstVerdi };
+            console.log('[Designer] kontekst fra workspace:', { kontekstKolonne, kontekstVerdi, kontekstType });
+          } else {
+            // Fallback: trekk ut tall fra workspace-navn (bakoverkompatibilitet)
+            const wsNavn = ws?.workspace_navn ?? '';
+            const match = wsNavn.match(/\b(\d{4,5})\b/);
+            if (match) {
+              const prosjektNrFromDb = match[1];
+              config.prosjektNr = prosjektNrFromDb;
+              if (config.prosjektKolonne) {
+                const isNum = config.prosjektKolonneType !== 'string';
+                config.prosjektFilter = `WHERE [${config.prosjektKolonne}] = ${isNum ? prosjektNrFromDb : `'${prosjektNrFromDb}'`}`;
+                config.laastFilter = { kolonne: config.prosjektKolonne, verdi: prosjektNrFromDb };
+              }
+              console.log('[Designer] prosjektNr fra workspace-navn (fallback):', prosjektNrFromDb);
             }
-            console.log('[Designer] prosjektNr hentet fra DB (fraRapportId):', prosjektNrFromDb);
           }
         } catch (err) {
-          console.error('[Designer] kunne ikke hente prosjektNr fra fraRapportId:', err);
+          console.error('[Designer] kunne ikke hente kontekst fra fraRapportId:', err);
         }
       }
 

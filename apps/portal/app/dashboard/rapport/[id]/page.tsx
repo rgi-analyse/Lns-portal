@@ -13,14 +13,23 @@ import { useLisens } from '@/components/LisensProvider';
 const PowerBIReport = dynamic(() => import('@/components/PowerBIReport'), { ssr: false });
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
 
+interface WorkspaceKontekst {
+  id:              string;
+  navn:            string;
+  kontekstType?:   string | null;
+  kontekstKolonne?: string | null;
+  kontekstVerdi?:  string | null;
+  kontekstLabel?:  string | null;
+}
+
 interface Rapport {
-  id: string;
-  navn: string;
-  beskrivelse: string | null;
-  pbiReportId: string;
-  pbiDatasetId: string;
+  id:             string;
+  navn:           string;
+  beskrivelse:    string | null;
+  pbiReportId:    string;
+  pbiDatasetId:   string;
   pbiWorkspaceId: string;
-  workspaces: Array<{ workspace: { id: string; navn: string } }>;
+  workspaces:     Array<{ workspace: WorkspaceKontekst }>;
   erDesignerRapport?: boolean;
 }
 
@@ -193,15 +202,21 @@ export default function RapportPage() {
         </div>
       )}
 
-      {visLagRapportModal && (
-        <LagRapportModal
-          rapportId={rapport.id}
-          rapportNavn={rapport.navn}
-          prosjektNr={rapport.workspaces[0]?.workspace.navn.match(/\b(\d{4,5})\b/)?.[1] ?? null}
-          authHeaders={authHeaders}
-          onLukk={() => setVisLagRapportModal(false)}
-        />
-      )}
+      {visLagRapportModal && (() => {
+        const ws = rapport.workspaces[0]?.workspace;
+        return (
+          <LagRapportModal
+            rapportId={rapport.id}
+            rapportNavn={rapport.navn}
+            kontekstVerdi={ws?.kontekstVerdi ?? ws?.navn.match(/\b(\d{4,5})\b/)?.[1] ?? null}
+            kontekstKolonne={ws?.kontekstKolonne ?? null}
+            kontekstType={ws?.kontekstType ?? null}
+            kontekstLabel={ws?.kontekstLabel ?? null}
+            authHeaders={authHeaders}
+            onLukk={() => setVisLagRapportModal(false)}
+          />
+        );
+      })()}
     </div>
   );
 }

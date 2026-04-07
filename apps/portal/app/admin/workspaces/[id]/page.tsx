@@ -13,9 +13,13 @@ import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';
 
 interface Workspace {
-  id: string;
-  navn: string;
-  beskrivelse: string | null;
+  id:              string;
+  navn:            string;
+  beskrivelse:     string | null;
+  kontekstType:    string | null;
+  kontekstKolonne: string | null;
+  kontekstVerdi:   string | null;
+  kontekstLabel:   string | null;
 }
 
 interface FormErrors {
@@ -28,11 +32,15 @@ export default function RedigerWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [navn, setNavn] = useState('');
-  const [beskrivelse, setBeskrivelse] = useState('');
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [submitting, setSubmitting] = useState(false);
+  const [loading,          setLoading]          = useState(true);
+  const [navn,             setNavn]             = useState('');
+  const [beskrivelse,      setBeskrivelse]      = useState('');
+  const [kontekstType,     setKontekstType]     = useState<string>('number');
+  const [kontekstKolonne,  setKontekstKolonne]  = useState('');
+  const [kontekstVerdi,    setKontekstVerdi]    = useState('');
+  const [kontekstLabel,    setKontekstLabel]    = useState('');
+  const [errors,           setErrors]           = useState<FormErrors>({});
+  const [submitting,       setSubmitting]       = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -50,6 +58,10 @@ export default function RedigerWorkspacePage() {
         const ws = await r.json() as Workspace;
         setNavn(ws.navn);
         setBeskrivelse(ws.beskrivelse ?? '');
+        setKontekstType(ws.kontekstType ?? 'number');
+        setKontekstKolonne(ws.kontekstKolonne ?? '');
+        setKontekstVerdi(ws.kontekstVerdi ?? '');
+        setKontekstLabel(ws.kontekstLabel ?? '');
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Ukjent feil';
         console.error('[RedigerWorkspacePage] feil ved henting av workspace:', msg);
@@ -77,8 +89,12 @@ export default function RedigerWorkspacePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          navn: navn.trim(),
-          beskrivelse: beskrivelse.trim() || null,
+          navn:            navn.trim(),
+          beskrivelse:     beskrivelse.trim() || null,
+          kontekstType:    kontekstKolonne.trim() ? kontekstType : null,
+          kontekstKolonne: kontekstKolonne.trim() || null,
+          kontekstVerdi:   kontekstVerdi.trim()   || null,
+          kontekstLabel:   kontekstLabel.trim()   || null,
         }),
       });
       if (!r.ok) {
@@ -137,6 +153,60 @@ export default function RedigerWorkspacePage() {
             />
           </div>
 
+          {/* Kontekst-parameter */}
+          <div className="pt-2" style={{ borderTop: '1px solid var(--glass-bg-hover)' }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--text-muted)' }}>
+              Kontekst-parameter
+            </p>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Definerer et fast filter som settes automatisk når brukere lager rapporter fra dette workspacet.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="kontekstKolonne">Kolonne (f.eks. ProsjektNr)</Label>
+                <Input
+                  id="kontekstKolonne"
+                  placeholder="Kolonne i view, f.eks. ProsjektNr"
+                  value={kontekstKolonne}
+                  onChange={(e) => setKontekstKolonne(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="kontekstVerdi">Verdi (f.eks. 12345)</Label>
+                <Input
+                  id="kontekstVerdi"
+                  placeholder="Filterverdi, f.eks. 12345"
+                  value={kontekstVerdi}
+                  onChange={(e) => setKontekstVerdi(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="kontekstType">Type</Label>
+                <select
+                  id="kontekstType"
+                  value={kontekstType}
+                  onChange={(e) => setKontekstType(e.target.value)}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 6, fontSize: 13,
+                    background: 'var(--glass-bg-hover)', border: '1px solid var(--glass-border)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <option value="number">Tall (WHERE [kol] = 12345)</option>
+                  <option value="string">Tekst (WHERE [kol] = &apos;verdi&apos;)</option>
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="kontekstLabel">Visningsnavn (valgfritt)</Label>
+                <Input
+                  id="kontekstLabel"
+                  placeholder="F.eks. Prosjekt 12345 – Broen"
+                  value={kontekstLabel}
+                  onChange={(e) => setKontekstLabel(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => router.push('/admin/workspaces')}>
