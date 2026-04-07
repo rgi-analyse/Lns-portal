@@ -15,17 +15,15 @@ interface ViewInfo {
 }
 
 interface LagRapportModalProps {
-  rapportId: string;
-  rapportNavn: string;
-  // Workspace-kontekst — brukes som fast filter i rapport-designer
-  kontekstVerdi?:   string | null;  // f.eks. prosjektnummer
-  kontekstKolonne?: string | null;  // f.eks. "ProsjektNr"
-  kontekstType?:    string | null;  // "number" | "string"
-  kontekstLabel?:   string | null;  // visningsnavn på konteksten
-  /** @deprecated Bruk kontekstVerdi — beholdes for bakoverkompatibilitet */
-  prosjektNr?: string | null;
-  authHeaders: Record<string, string>;
-  onLukk: () => void;
+  rapportId:        string;
+  rapportNavn:      string;
+  prosjektNr?:      string | null;
+  authHeaders:      Record<string, string>;
+  onLukk:           () => void;
+  kontekstType?:    string | null;
+  kontekstKolonne?: string | null;
+  kontekstVerdi?:   string | null;
+  kontekstLabel?:   string | null;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -33,18 +31,14 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function LagRapportModal({
   rapportId,
   rapportNavn,
-  kontekstVerdi,
-  kontekstKolonne,
-  kontekstType,
-  kontekstLabel,
   prosjektNr,
   authHeaders,
   onLukk,
+  kontekstType,
+  kontekstKolonne,
+  kontekstVerdi,
+  kontekstLabel,
 }: LagRapportModalProps) {
-  // Kontekst-verdi: bruk eksplisitt workspace-kontekst, fall tilbake til legacy prosjektNr
-  const effektivKontekstVerdi   = kontekstVerdi   ?? prosjektNr ?? null;
-  const effektivKontekstKolonne = kontekstKolonne ?? null;
-  const effektivKontekstType    = kontekstType    ?? 'number';
   const router = useRouter();
   const [views, setViews] = useState<ViewInfo[]>([]);
   const [valgtViewId, setValgtViewId] = useState<string>('');
@@ -84,29 +78,29 @@ export default function LagRapportModal({
     if (!valgtView || ingenViews) return;
     setNavigerer(true);
 
-    // Workspace-kontekst har prioritet over view-metadata
-    const kolonne = effektivKontekstKolonne ?? valgtView.prosjekt_kolonne ?? null;
-    const kolType = effektivKontekstKolonne
-      ? effektivKontekstType
-      : (valgtView.prosjekt_kolonne_type ?? 'number');
-
-    console.log('[Modal] sender params:', {
-      viewNavn: `${valgtView.schema_name}.${valgtView.view_name}`,
-      kontekstVerdi: effektivKontekstVerdi,
-      kontekstKolonne: kolonne,
-    });
-
     const params = new URLSearchParams({
-      viewNavn:    `${valgtView.schema_name}.${valgtView.view_name}`,
+      viewNavn:     `${valgtView.schema_name}.${valgtView.view_name}`,
       visningsnavn: valgtView.visningsnavn ?? valgtView.view_name,
       fraRapportId: rapportId,
-      laast:        'true',
     });
-    if (kolonne)                  params.set('prosjektKolonne',     kolonne);
-    if (kolType)                  params.set('prosjektKolonneType', kolType);
-    if (effektivKontekstVerdi)    params.set('prosjektNr',          effektivKontekstVerdi);
-    if (kontekstLabel)            params.set('kontekstLabel',       kontekstLabel);
-    console.log('[Modal] full URL:', `/dashboard/rapport-designer/ny?${params.toString()}`);
+
+    // Bakoverkompatibilitet: behold prosjektNr og view-kolonne hvis satt
+    if (prosjektNr) {
+      params.set('prosjektNr',          prosjektNr);
+      if (valgtView.prosjekt_kolonne)      params.set('prosjektKolonne',     valgtView.prosjekt_kolonne);
+      if (valgtView.prosjekt_kolonne_type) params.set('prosjektKolonneType', valgtView.prosjekt_kolonne_type);
+    }
+
+    // Ny kontekst-logikk: eksplisitte workspace-kontekst-felter
+    if (kontekstKolonne && kontekstVerdi) {
+      params.set('kontekstKolonne', kontekstKolonne);
+      params.set('kontekstVerdi',   kontekstVerdi);
+      params.set('kontekstType',    kontekstType    ?? 'prosjekt');
+      params.set('kontekstLabel',   kontekstLabel   ?? kontekstVerdi);
+      params.set('laast',           'true');
+    }
+
+    console.log('[Modal] sender params til rapport-designer/ny:', Object.fromEntries(params));
     router.push(`/dashboard/rapport-designer/ny?${params.toString()}`);
   };
 

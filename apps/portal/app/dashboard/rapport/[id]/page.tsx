@@ -208,12 +208,13 @@ export default function RapportPage() {
           <LagRapportModal
             rapportId={rapport.id}
             rapportNavn={rapport.navn}
-            kontekstVerdi={ws?.kontekstVerdi ?? ws?.navn.match(/\b(\d{4,5})\b/)?.[1] ?? null}
-            kontekstKolonne={ws?.kontekstKolonne ?? null}
-            kontekstType={ws?.kontekstType ?? null}
-            kontekstLabel={ws?.kontekstLabel ?? null}
+            prosjektNr={ws?.navn.match(/\b(\d{4,5})\b/)?.[1] ?? null}
             authHeaders={authHeaders}
             onLukk={() => setVisLagRapportModal(false)}
+            kontekstType={ws?.kontekstType ?? null}
+            kontekstKolonne={ws?.kontekstKolonne ?? null}
+            kontekstVerdi={ws?.kontekstVerdi ?? null}
+            kontekstLabel={ws?.kontekstLabel ?? null}
           />
         );
       })()}

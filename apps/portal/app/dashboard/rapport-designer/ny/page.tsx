@@ -7,13 +7,18 @@ function NyRapportForm() {
   const router  = useRouter();
   const params  = useSearchParams();
 
-  // Alle prosjekt-parametre er skrivebeskyttet — satt av LagRapportModal, aldri av bruker
+  // Alle parametre er skrivebeskyttet — satt av LagRapportModal, aldri av bruker
   const viewNavn            = params.get('viewNavn') ?? '';
   const visningsnavn        = params.get('visningsnavn') ?? viewNavn;
-  const prosjektNr          = params.get('prosjektNr') ?? null;        // Låst fra kontekst
-  const prosjektKolonne     = params.get('prosjektKolonne') ?? null;   // Låst fra view-metadata
+  const prosjektNr          = params.get('prosjektNr') ?? null;
+  const prosjektKolonne     = params.get('prosjektKolonne') ?? null;
   const prosjektKolonneType = params.get('prosjektKolonneType') ?? 'number';
   const fraRapportId        = params.get('fraRapportId') ?? null;
+  // Workspace-kontekst (ny flyt)
+  const kontekstKolonne     = params.get('kontekstKolonne') ?? null;
+  const kontekstVerdi       = params.get('kontekstVerdi')   ?? null;
+  const kontekstType        = params.get('kontekstType')    ?? null;
+  const kontekstLabel       = params.get('kontekstLabel')   ?? null;
 
   const [tittel,      setTittel]      = useState('');
   const [beskrivelse, setBeskrivelse] = useState('');
@@ -28,12 +33,24 @@ function NyRapportForm() {
       tittel: tittel.trim(),
       laast: 'true',
     });
-    if (beskrivelse.trim())  qp.set('beskrivelse', beskrivelse.trim());
-    if (prosjektKolonne)     qp.set('prosjektKolonne', prosjektKolonne);
-    if (prosjektKolonneType) qp.set('prosjektKolonneType', prosjektKolonneType);
-    if (fraRapportId)        qp.set('fraRapportId', fraRapportId);
-    // prosjektNr videresendes umodifisert fra rapport-kontekst — aldri fra bruker-input
-    if (prosjektNr)          qp.set('prosjektNr', prosjektNr);
+    if (beskrivelse.trim()) qp.set('beskrivelse', beskrivelse.trim());
+    if (fraRapportId)       qp.set('fraRapportId', fraRapportId);
+
+    // Kontekst-felter har prioritet; fall tilbake til legacy prosjektNr/prosjektKolonne
+    const effektivKolonne = kontekstKolonne ?? prosjektKolonne;
+    const effektivVerdi   = kontekstVerdi   ?? prosjektNr;
+    const effektivType    = kontekstType === 'string' ? 'string' : prosjektKolonneType;
+
+    if (effektivKolonne)  qp.set('prosjektKolonne',     effektivKolonne);
+    if (effektivType)     qp.set('prosjektKolonneType', effektivType);
+    if (effektivVerdi)    qp.set('prosjektNr',          effektivVerdi);
+
+    // Videresend rå kontekst-felter for visning og lagring nedstrøms
+    if (kontekstKolonne) qp.set('kontekstKolonne', kontekstKolonne);
+    if (kontekstVerdi)   qp.set('kontekstVerdi',   kontekstVerdi);
+    if (kontekstType)    qp.set('kontekstType',    kontekstType);
+    if (kontekstLabel)   qp.set('kontekstLabel',   kontekstLabel);
+
     router.push(`/dashboard/rapport-interaktiv?${qp.toString()}`);
   };
 
@@ -102,8 +119,8 @@ function NyRapportForm() {
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             Data fra{' '}
             <strong style={{ color: 'var(--gold)' }}>{visningsnavn}</strong>
-            {prosjektNr && (
-              <> · Prosjekt <strong style={{ color: 'var(--gold)' }}>{prosjektNr}</strong></>
+            {(kontekstLabel ?? kontekstVerdi ?? prosjektNr) && (
+              <> · <strong style={{ color: 'var(--gold)' }}>{kontekstLabel ?? kontekstVerdi ?? prosjektNr}</strong></>
             )}
           </span>
         </div>
