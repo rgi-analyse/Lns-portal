@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
 import AIChat from '@/components/AIChat';
+import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
@@ -27,10 +28,14 @@ function formaterDato(dato: string | null | undefined): string {
 }
 
 interface WorkspaceDetail {
-  id: string;
-  navn: string;
-  beskrivelse?: string | null;
-  rapporter: Array<{ rapport: Rapport; rekkefølge: number }>;
+  id:               string;
+  navn:             string;
+  beskrivelse?:     string | null;
+  kontekstType?:    string | null;
+  kontekstKolonne?: string | null;
+  kontekstVerdi?:   string | null;
+  kontekstLabel?:   string | null;
+  rapporter:        Array<{ rapport: Rapport; rekkefølge: number }>;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -46,12 +51,14 @@ export default function WorkspacePage() {
   const router                             = useRouter();
   const { isAuthenticated, entraObjectId, authHeaders, grupper } = usePortalAuth();
 
-  const [workspace,     setWorkspace]     = useState<WorkspaceDetail | null>(null);
-  const [rapporter,     setRapporter]     = useState<Rapport[]>([]);
-  const [error,         setError]         = useState<string | null>(null);
+  const [workspace,        setWorkspace]        = useState<WorkspaceDetail | null>(null);
+  const [rapporter,        setRapporter]        = useState<Rapport[]>([]);
+  const [error,            setError]            = useState<string | null>(null);
+  const [kanLageRapport,   setKanLageRapport]   = useState(false);
+  const [visNyRapportModal, setVisNyRapportModal] = useState(false);
   // Inline redigering
-  const [redigererId,   setRedigererId]   = useState<string | null>(null);
-  const [redigererNavn, setRedigererNavn] = useState('');
+  const [redigererId,      setRedigererId]      = useState<string | null>(null);
+  const [redigererNavn,    setRedigererNavn]    = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -77,6 +84,17 @@ export default function WorkspacePage() {
       if (rRes.ok) {
         const rapporter = await rRes.json() as Rapport[];
         setRapporter(rapporter);
+      }
+
+      // Hent rolle for å avgjøre om "Ny rapport"-knappen skal vises
+      if (entraObjectId) {
+        try {
+          const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
+          if (megRes.ok) {
+            const meg = await megRes.json() as { rolle?: string };
+            setKanLageRapport(['admin', 'tenantadmin', 'redaktør'].includes(meg.rolle ?? ''));
+          }
+        } catch { /* ikke kritisk */ }
       }
     }
 
@@ -187,6 +205,7 @@ export default function WorkspacePage() {
           <>
             {/* Header */}
             <div className="flex items-center gap-4 mb-2">
+              {/* Ikon */}
               <div
                 className="flex items-center justify-center shrink-0"
                 style={{
@@ -217,6 +236,26 @@ export default function WorkspacePage() {
                   </p>
                 )}
               </div>
+
+              {/* Ny rapport-knapp — kun for admin/redaktør */}
+              {kanLageRapport && (
+                <button
+                  onClick={() => setVisNyRapportModal(true)}
+                  style={{
+                    marginLeft: 'auto',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+                    background: 'var(--glass-gold-bg)',
+                    border: '1px solid var(--glass-gold-border)',
+                    color: 'var(--gold)', fontSize: 13, fontWeight: 600,
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(245,166,35,0.15)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-bg)'; }}
+                >
+                  + Ny rapport
+                </button>
+              )}
             </div>
 
             {/* Meta */}
@@ -417,6 +456,14 @@ export default function WorkspacePage() {
         )}
       </div>
       <AIChat entraObjectId={entraObjectId} />
+
+      {visNyRapportModal && workspace && (
+        <NyRapportModal
+          workspace={workspace}
+          authHeaders={authHeaders}
+          onLukk={() => setVisNyRapportModal(false)}
+        />
+      )}
     </>
   );
 }

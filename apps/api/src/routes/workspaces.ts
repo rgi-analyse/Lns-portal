@@ -396,4 +396,58 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  // GET /api/workspaces/:id/views
+  // Returnerer unike views fra alle rapporter i workspacet (PBI + designer)
+  fastify.get<{ Params: { id: string } }>(
+    '/api/workspaces/:id/views',
+    async (request, reply) => {
+      const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+      try {
+        const rows = await queryAzureSQL(`
+          -- Views fra PBI-rapporter via metadata-kobling
+          SELECT DISTINCT
+            v.schema_name + '.' + v.view_name AS viewNavn,
+            v.visningsnavn                    AS visningsnavn
+          FROM ai_metadata_views v
+          JOIN ai_rapport_view_kobling k ON k.view_id = v.id
+          JOIN WorkspaceRapport wr ON wr.rapportId = k.rapport_id
+          WHERE wr.workspaceId = '${safeWsId}' AND v.er_aktiv = 1
+
+          UNION
+
+          -- Views fra designer-rapporter via designerConfig JSON
+          SELECT DISTINCT
+            JSON_VALUE(r.designerConfig, '$.viewNavn')                                          AS viewNavn,
+            COALESCE(JSON_VALUE(r.designerConfig, '$.visningsnavn'),
+                     JSON_VALUE(r.designerConfig, '$.viewNavn'))                                AS visningsnavn
+          FROM Rapport r
+          JOIN WorkspaceRapport wr ON wr.rapportId = r.id
+          WHERE wr.workspaceId = '${safeWsId}'
+            AND r.erAktiv = 1
+            AND r.erDesignerRapport = 1
+            AND JSON_VALUE(r.designerConfig, '$.viewNavn') IS NOT NULL
+        `);
+
+        // Dedup og bygg svarliste
+        const viewMap = new Map<string, string>();
+        for (const row of rows) {
+          const r = row as { viewNavn?: string; visningsnavn?: string };
+          if (r.viewNavn && !viewMap.has(r.viewNavn)) {
+            viewMap.set(r.viewNavn, r.visningsnavn ?? r.viewNavn);
+          }
+        }
+
+        const views = Array.from(viewMap.entries()).map(([viewNavn, visningsnavn]) => ({
+          viewNavn,
+          visningsnavn,
+        }));
+
+        return reply.send(views);
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: 'Kunne ikke hente views.' });
+      }
+    },
+  );
 }
