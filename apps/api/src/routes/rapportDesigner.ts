@@ -422,10 +422,10 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
   );
 
   // GET /api/rapport-designer/kolonneverdier
-  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string; kaskadefiltere?: string } }>(
+  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string; kaskadefiltere?: string; limit?: string; offset?: string } }>(
     '/api/rapport-designer/kolonneverdier',
     async (request, reply) => {
-      const { viewNavn, kolonne, prosjektFilter, kaskadefiltere } = request.query;
+      const { viewNavn, kolonne, prosjektFilter, kaskadefiltere, limit: limitStr, offset: offsetStr } = request.query;
 
       console.log('[kolonneverdier] viewNavn:', viewNavn, '| kolonne:', kolonne);
 
@@ -466,8 +466,22 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         }
       }
 
+      const limit  = Math.min(Math.max(parseInt(limitStr  ?? '200'), 1), 500);
+      const offset = Math.max(parseInt(offsetStr ?? '0'), 0);
+
       const where = `WHERE ${whereParts.join(' AND ')}`;
-      const sql = `SELECT DISTINCT TOP 200 [${safeKolonne}] AS verdi FROM ${viewNavn} ${where} ORDER BY [${safeKolonne}]`;
+      // Azure SQL: DISTINCT + OFFSET/FETCH må wrappes — DISTINCT kjøres i subquery,
+      // deretter pagineres resultatet med OFFSET/FETCH i ytre spørring
+      const sql = `
+        SELECT verdi FROM (
+          SELECT DISTINCT [${safeKolonne}] AS verdi
+          FROM ${viewNavn}
+          ${where}
+        ) _d
+        ORDER BY verdi
+        OFFSET ${offset} ROWS
+        FETCH NEXT ${limit} ROWS ONLY
+      `.replace(/\s+/g, ' ').trim();
       console.log('[kolonneverdier] SQL:', sql);
 
       try {
@@ -475,7 +489,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         const verdier = rows
           .map(r => (r as { verdi: unknown }).verdi)
           .filter(v => v !== null && v !== undefined && String(v) !== '');
-        console.log('[kolonneverdier] returnerer', verdier.length, 'verdier');
+        console.log('[kolonneverdier] returnerer', verdier.length, 'verdier (offset:', offset, ')');
         return reply.send({ verdier });
       } catch (err) {
         console.error('[kolonneverdier] SQL feil:', err);

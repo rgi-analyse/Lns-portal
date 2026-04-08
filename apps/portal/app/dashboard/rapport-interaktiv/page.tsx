@@ -736,6 +736,9 @@ function FilterVerdiInput({
 }: FilterVerdiInputProps) {
   const [verdier,         setVerdier]         = useState<string[]>([]);
   const [laster,          setLaster]          = useState(false);
+  const [harFlere,        setHarFlere]        = useState(false);
+  const [lasterFlere,     setLasterFlere]     = useState(false);
+  const [side,            setSide]            = useState(0);
   const [visSok,          setVisSok]          = useState(false);
   const [sok,             setSok]             = useState('');
   const [dropdownRetning, setDropdownRetning] = useState<'left' | 'right'>('left');
@@ -751,36 +754,40 @@ function FilterVerdiInput({
 
   console.log('[FilterVerdi] kolonne:', kolonne, '| type:', type, '| datatype:', kolonneMeta?.datatype ?? '?', '| erTekst:', erTekst);
 
-  // Hent unike verdier fra view for tekst-kolonner (ikke LIKE)
+  // Hent verdier med lazy-loading-støtte (offset-basert paginering)
+  const hentVerdier = useCallback(async (offset: number, reset: boolean) => {
+    if (!erTekst || !kolonne || !viewNavn) return;
+    if (offset === 0) setLaster(true); else setLasterFlere(true);
+
+    const params = new URLSearchParams({ viewNavn, kolonne, limit: '200', offset: String(offset) });
+    if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
+    const andreFiltre = (aktiveFiltre ?? []).filter(f => f.kolonne && f.verdi && f.kolonne !== kolonne);
+    if (andreFiltre.length > 0) params.set('kaskadefiltere', JSON.stringify(andreFiltre));
+
+    try {
+      const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
+      if (!r.ok) { if (reset) setVerdier([]); return; }
+      const d = await r.json() as { verdier: unknown[] };
+      const nyeVerdier = (d.verdier ?? []).map(String);
+      if (reset) setVerdier(nyeVerdier); else setVerdier(prev => [...prev, ...nyeVerdier]);
+      setHarFlere(nyeVerdier.length === 200);
+      setSide(Math.floor(offset / 200) + 1);
+    } catch (err) {
+      console.error('[FilterVerdi] fetch feil:', err);
+      if (reset) setVerdier([]);
+    } finally {
+      if (offset === 0) setLaster(false); else setLasterFlere(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [erTekst, kolonne, viewNavn, prosjektFilter, JSON.stringify(aktiveFiltre)]);
+
+  // Initial last ved endring av kolonne, view, operator eller aktive filtre
   useEffect(() => {
     if (!erTekst || !kolonne || !viewNavn) { setVerdier([]); return; }
     if (operator === 'LIKE' || operator === 'NOT LIKE') { setVerdier([]); return; }
-
-    setLaster(true);
-    const params = new URLSearchParams({ viewNavn, kolonne });
-    if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
-
-    // Kaskadefiltrering: send aktive filtre for andre kolonner slik at
-    // dropdown-listen begrenses til gyldige verdier gitt eksisterende filtre
-    const andreFiltre = (aktiveFiltre ?? []).filter(
-      f => f.kolonne && f.verdi && f.kolonne !== kolonne,
-    );
-    if (andreFiltre.length > 0) {
-      params.set('kaskadefiltere', JSON.stringify(andreFiltre));
-    }
-
-    apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' })
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.text().catch(() => '');
-          console.error('[FilterVerdi] API feil', r.status, body);
-          return { verdier: [] as unknown[] };
-        }
-        return r.json() as Promise<{ verdier: unknown[] }>;
-      })
-      .then(d => setVerdier((d.verdier ?? []).map(String)))
-      .catch(err => { console.error('[FilterVerdi] fetch feil:', err); setVerdier([]); })
-      .finally(() => setLaster(false));
+    setSide(0);
+    setHarFlere(false);
+    void hentVerdier(0, true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kolonne, viewNavn, erTekst, operator, JSON.stringify(aktiveFiltre)]);
 
@@ -871,7 +878,16 @@ function FilterVerdiInput({
                 fontSize: 11, outline: 'none', boxSizing: 'border-box',
               }} />
           </div>
-          <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+          <div
+            style={{ maxHeight: 180, overflowY: 'auto' }}
+            onScroll={e => {
+              const el = e.currentTarget;
+              const nærBunn = el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+              if (nærBunn && harFlere && !lasterFlere) {
+                void hentVerdier(side * 200, false);
+              }
+            }}
+          >
             <div onClick={() => { onChange(''); setVisSok(false); setSok(''); }}
               style={{
                 padding: '6px 10px', fontSize: 11, color: 'var(--text-muted)',
@@ -899,13 +915,21 @@ function FilterVerdiInput({
                 {v}
               </div>
             ))}
+            {lasterFlere && (
+              <div style={{
+                padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)',
+                textAlign: 'center', borderTop: '1px solid var(--glass-bg)',
+              }}>
+                Laster flere...
+              </div>
+            )}
           </div>
           {verdier.length > 0 && (
             <div style={{
               padding: '4px 10px', fontSize: 10, color: 'var(--text-muted)',
               borderTop: '1px solid var(--glass-bg)', textAlign: 'right',
             }}>
-              {filtrerte.length} av {verdier.length} verdier
+              {filtrerte.length} av {verdier.length}{harFlere ? '+' : ''} verdier
             </div>
           )}
         </div>
