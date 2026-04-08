@@ -31,7 +31,6 @@ function extractSlug(request: FastifyRequest): string {
 // Ruter som alltid skal bruke master-DB og aldri tenant-resolving
 const SKIP_TENANT_PATHS = [
   '/api/me',
-  '/api/admin/',
   '/api/auth/',
   '/api/tema',
   '/api/lisens',
