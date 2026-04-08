@@ -728,7 +728,7 @@ export default function MetadataAdminPage() {
             <input
               value={editForm.område}
               onChange={e => setEditForm(f => ({ ...f, område: e.target.value }))}
-              placeholder="f.eks. HMS, Produksjon"
+              placeholder="f.eks. Økonomi, HR, Produksjon"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -737,7 +737,7 @@ export default function MetadataAdminPage() {
             <input
               value={editForm.prosjekter}
               onChange={e => setEditForm(f => ({ ...f, prosjekter: e.target.value }))}
-              placeholder="alle  eller  4200,6040,6050"
+              placeholder="alle  eller  ID1, ID2, ID3"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -763,7 +763,7 @@ export default function MetadataAdminPage() {
               >
                 <option value="number">Nummer (= 6050)</option>
                 <option value="string">Tekst (LIKE %6050%)</option>
-                <option value="name">Navn (LIKE %Hemsil%)</option>
+                <option value="name">Navn (LIKE %søk%)</option>
               </select>
             </div>
             {editForm.prosjekt_kolonne && (
