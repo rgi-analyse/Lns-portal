@@ -133,6 +133,7 @@ export default function MetadataAdminPage() {
   }, [entraObjectId]);
 
   useEffect(() => {
+    if (!entraObjectId) return;
     hentViews();
     apiFetch('/api/admin/rapporter/alle', { headers: authHeaders })
       .then(r => r.json())
