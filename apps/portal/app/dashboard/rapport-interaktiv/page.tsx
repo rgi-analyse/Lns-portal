@@ -727,11 +727,12 @@ interface FilterVerdiInputProps {
   kolonneTyper:     Record<string, string>;
   alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; datatype?: string }[];
   onEnter?:         () => void;
+  aktiveFiltre?:    AktivFilter[];
 }
 
 function FilterVerdiInput({
   kolonne, operator, verdi, onChange,
-  viewNavn, prosjektFilter, kolonneTyper, alleViewKolonner, onEnter,
+  viewNavn, prosjektFilter, kolonneTyper, alleViewKolonner, onEnter, aktiveFiltre,
 }: FilterVerdiInputProps) {
   const [verdier,         setVerdier]         = useState<string[]>([]);
   const [laster,          setLaster]          = useState(false);
@@ -758,6 +759,16 @@ function FilterVerdiInput({
     setLaster(true);
     const params = new URLSearchParams({ viewNavn, kolonne });
     if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
+
+    // Kaskadefiltrering: send aktive filtre for andre kolonner slik at
+    // dropdown-listen begrenses til gyldige verdier gitt eksisterende filtre
+    const andreFiltre = (aktiveFiltre ?? []).filter(
+      f => f.kolonne && f.verdi && f.kolonne !== kolonne,
+    );
+    if (andreFiltre.length > 0) {
+      params.set('kaskadefiltere', JSON.stringify(andreFiltre));
+    }
+
     apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' })
       .then(async r => {
         if (!r.ok) {
@@ -771,7 +782,7 @@ function FilterVerdiInput({
       .catch(err => { console.error('[FilterVerdi] fetch feil:', err); setVerdier([]); })
       .finally(() => setLaster(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kolonne, viewNavn, erTekst, operator]);
+  }, [kolonne, viewNavn, erTekst, operator, JSON.stringify(aktiveFiltre)]);
 
   // Lukk dropdown ved klikk utenfor
   useEffect(() => {
@@ -1943,6 +1954,7 @@ export default function RapportInteraktivPage() {
                 kolonneTyper={kolonnTyper}
                 alleViewKolonner={forslag?.alleViewKolonner ?? []}
                 onEnter={() => { const cfg = configRef.current; if (cfg) hentData(cfg, aktiveFiltre); }}
+                aktiveFiltre={aktiveFiltre.filter((_, filterIdx) => filterIdx !== idx)}
               />
               <button type="button" onClick={() => fjernFilter(idx)}
                 style={{ background:'none', border:'none', color:'rgba(255,100,100,0.6)', cursor:'pointer', fontSize:13, padding:'0 2px', lineHeight:1, flexShrink:0 }}>

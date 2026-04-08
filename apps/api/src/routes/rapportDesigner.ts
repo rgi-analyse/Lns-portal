@@ -422,10 +422,10 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
   );
 
   // GET /api/rapport-designer/kolonneverdier
-  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string } }>(
+  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string; kaskadefiltere?: string } }>(
     '/api/rapport-designer/kolonneverdier',
     async (request, reply) => {
-      const { viewNavn, kolonne, prosjektFilter } = request.query;
+      const { viewNavn, kolonne, prosjektFilter, kaskadefiltere } = request.query;
 
       console.log('[kolonneverdier] viewNavn:', viewNavn, '| kolonne:', kolonne);
 
@@ -437,11 +437,36 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       const safeKolonne = kolonne.replace(/[\[\]']/g, '');
       if (!safeKolonne) return reply.status(400).send({ error: 'Ugyldig kolonnenavn.' });
 
-      const projKlausul = prosjektFilter ? prosjektFilter.replace(/^WHERE\s+/i, '').trim() : '';
-      const whereParts = [`[${safeKolonne}] IS NOT NULL`, `CAST([${safeKolonne}] AS NVARCHAR(MAX)) <> ''`];
-      if (projKlausul) whereParts.push(projKlausul);
-      const where = `WHERE ${whereParts.join(' AND ')}`;
+      const whereParts: string[] = [
+        `[${safeKolonne}] IS NOT NULL`,
+        `CAST([${safeKolonne}] AS NVARCHAR(MAX)) <> ''`,
+      ];
 
+      if (prosjektFilter) {
+        whereParts.push(prosjektFilter.replace(/^WHERE\s+/i, '').trim());
+      }
+
+      // Kaskadefiltrering: begrens verdier til gyldige gitt aktive filtre fra klient
+      if (kaskadefiltere) {
+        try {
+          const filtre = JSON.parse(kaskadefiltere) as { kolonne: string; operator: string; verdi: string }[];
+          for (const f of filtre) {
+            if (!f.kolonne || !f.verdi) continue;
+            const kol = `[${f.kolonne.replace(/[\[\]']/g, '')}]`;
+            const erNumerisk = f.verdi.trim() !== '' && !isNaN(Number(f.verdi));
+            const val = (f.operator === 'LIKE' || f.operator === 'NOT LIKE')
+              ? `'%${f.verdi.replace(/'/g, "''")}%'`
+              : erNumerisk
+                ? f.verdi
+                : `'${f.verdi.replace(/'/g, "''")}'`;
+            whereParts.push(`${kol} ${f.operator} ${val}`);
+          }
+        } catch {
+          fastify.log.warn('[kolonneverdier] ugyldig kaskadefiltere JSON — ignorerer');
+        }
+      }
+
+      const where = `WHERE ${whereParts.join(' AND ')}`;
       const sql = `SELECT DISTINCT TOP 200 [${safeKolonne}] AS verdi FROM ${viewNavn} ${where} ORDER BY [${safeKolonne}]`;
       console.log('[kolonneverdier] SQL:', sql);
 
