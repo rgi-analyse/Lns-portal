@@ -182,11 +182,18 @@ function byggWhereKlausul(
   }
   filtre
     .filter(f => {
-      if (!f.kolonne || !f.verdi) return false;
+      if (!f.kolonne) return false;
+      // IS NOT NULL / IS NULL trenger ingen verdi
+      if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') return true;
+      if (!f.verdi) return false;
       if (prosjektKolonne && f.kolonne === prosjektKolonne) return false;
       return true;
     })
     .forEach(f => {
+      if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') {
+        betingelser.push(`[${f.kolonne}] ${f.operator}`);
+        return;
+      }
       let verdi: string;
       if (f.operator === 'LIKE' || f.operator === 'NOT LIKE') {
         verdi = `'%${f.verdi}%'`;
@@ -912,6 +919,7 @@ export default function RapportInteraktivPage() {
   const [autoRefresh,        setAutoRefresh]        = useState(true);
   const [ventendePåRefresh,  setVentendePåRefresh]  = useState(false);
   const [storViewAdvarsel,   setStorViewAdvarsel]   = useState(false);
+  const [queryFeil,          setQueryFeil]          = useState<string | null>(null);
   const [lagrer,       setLagrer]       = useState(false);
   const [lagret,       setLagret]       = useState(false);
   const [eksisterendeRapportId, setEksisterendeRapportId] = useState<string | null>(null);
@@ -1177,8 +1185,10 @@ export default function RapportInteraktivPage() {
             setForslag(prev => prev ? { ...prev, data: d.rows ?? [] } : prev);
             console.log('[Designer] data lastet:', d.rows?.length, 'rader');
           } else {
-            const errText = await res.text();
-            console.error('[Designer] data API feil:', res.status, errText);
+            const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}`, detail: '' })) as { error?: string; detail?: string };
+            const melding = errBody.detail || errBody.error || `HTTP ${res.status}`;
+            console.error('[Designer] data API feil:', res.status, melding);
+            setQueryFeil(melding);
           }
         } catch (err) {
           console.error('[Designer] initial datahenting feil:', err);
@@ -1240,10 +1250,16 @@ export default function RapportInteraktivPage() {
     if (pKol && !pNr) console.error('[hentData] FEIL: prosjektKolonne satt men prosjektNr mangler!');
 
     setLasterData(true);
+    setQueryFeil(null);
     try {
       const filtre = overstyrFiltre ?? aktiveFiltre;
       // byggWhereKlausul prioriterer pKol+pNr over prosjektFilter-streng
-      const where = byggWhereKlausul(null, filtre, pKol, pNr, forslag?.alleViewKolonner);
+      // Legg alltid til IS NOT NULL for xAkse i bar/pie-modus for å unngå null-kategorier og lette server-lasten
+      const xAkseFilter: AktivFilter[] =
+        cfg.visualType !== 'table' && cfg.xAkse && !pKol && !pNr && filtre.length === 0
+          ? [{ kolonne: cfg.xAkse, operator: 'IS NOT NULL', verdi: '' }]
+          : [];
+      const where = byggWhereKlausul(null, [...xAkseFilter, ...filtre], pKol, pNr, forslag?.alleViewKolonner);
 
       let sql: string;
       if (cfg.visualType === 'table') {
@@ -1280,9 +1296,15 @@ export default function RapportInteraktivPage() {
       if (res.ok) {
         const d = await res.json() as { rows: Record<string,unknown>[] };
         setAktivData(d.rows ?? []);
+      } else {
+        const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}`, detail: '' })) as { error?: string; detail?: string };
+        const melding = errBody.detail || errBody.error || `HTTP ${res.status}`;
+        console.error('[rapport-interaktiv] hentData SQL-feil:', res.status, melding);
+        setQueryFeil(melding);
       }
     } catch (e) {
       console.warn('[rapport-interaktiv] hentData feil:', e);
+      setQueryFeil(e instanceof Error ? e.message : 'Ukjent feil');
     } finally {
       setLasterData(false);
     }
@@ -2024,6 +2046,21 @@ export default function RapportInteraktivPage() {
               <div style={{ borderRadius:12, padding:16, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)' }}>
                 {lasterData
                   ? <div style={{ color:'var(--text-muted)', padding:40, textAlign:'center' }}>Henter data...</div>
+                  : queryFeil
+                    ? (
+                      <div style={{ padding:'32px 24px', textAlign:'center' }}>
+                        <div style={{ fontSize:22, marginBottom:10 }}>⚠️</div>
+                        <div style={{ fontSize:13, fontWeight:700, color:'rgba(255,100,100,0.9)', marginBottom:8 }}>
+                          SQL-feil ved datahenting
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', fontFamily:'monospace', background:'rgba(0,0,0,0.3)', borderRadius:6, padding:'8px 12px', maxWidth:520, margin:'0 auto', wordBreak:'break-all' }}>
+                          {queryFeil}
+                        </div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:12 }}>
+                          Prøv å legge til filtre for å begrense datasettet, eller velg en annen datakilde.
+                        </div>
+                      </div>
+                    )
                   : renderChart()
                 }
               </div>

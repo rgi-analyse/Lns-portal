@@ -127,16 +127,17 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
             console.log('[Designer] kontekst fra workspace:', { kontekstKolonne, kontekstVerdi, kontekstType });
           } else {
             // Fallback: trekk ut tall fra workspace-navn (bakoverkompatibilitet)
+            // Kun sett prosjektNr hvis prosjektKolonne allerede er satt i config —
+            // ellers ville globale views få prosjektNr uten kolonne, noe som
+            // ødelegger WHERE-klausulen og gir full table scan ved hentData.
             const wsNavn = ws?.workspace_navn ?? '';
             const match = wsNavn.match(/\b(\d{4,5})\b/);
-            if (match) {
+            if (match && config.prosjektKolonne) {
               const prosjektNrFromDb = match[1];
               config.prosjektNr = prosjektNrFromDb;
-              if (config.prosjektKolonne) {
-                const isNum = config.prosjektKolonneType !== 'string';
-                config.prosjektFilter = `WHERE [${config.prosjektKolonne}] = ${isNum ? prosjektNrFromDb : `'${prosjektNrFromDb}'`}`;
-                config.laastFilter = { kolonne: config.prosjektKolonne, verdi: prosjektNrFromDb };
-              }
+              const isNum = config.prosjektKolonneType !== 'string';
+              config.prosjektFilter = `WHERE [${config.prosjektKolonne}] = ${isNum ? prosjektNrFromDb : `'${prosjektNrFromDb}'`}`;
+              config.laastFilter = { kolonne: config.prosjektKolonne, verdi: prosjektNrFromDb };
               console.log('[Designer] prosjektNr fra workspace-navn (fallback):', prosjektNrFromDb);
             }
           }

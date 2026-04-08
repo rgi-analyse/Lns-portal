@@ -61,10 +61,10 @@ export default function NyRapportModal({ workspace, authHeaders, onLukk }: Props
       viewNavn:     view,
       visningsnavn,
       tittel:       tittel.trim(),
-      laast:        'true',
     });
 
     if (workspace.kontekstKolonne && workspace.kontekstVerdi) {
+      params.set('laast',           'true');
       params.set('kontekstType',    workspace.kontekstType    ?? 'prosjekt');
       params.set('kontekstKolonne', workspace.kontekstKolonne);
       params.set('kontekstVerdi',   workspace.kontekstVerdi);
