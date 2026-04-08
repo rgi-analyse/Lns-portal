@@ -300,10 +300,13 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'Kun ai_gold views tillatt.' });
       }
 
-      const parts  = viewNavn.split('.');
-      const schema = (parts[0] ?? '').replace(/[^a-zA-Z0-9_]/g, '');
-      const view   = (parts[1] ?? '').replace(/[^a-zA-Z0-9_]/g, '');
-      console.log('[view-kolonner] schema:', schema, '| view:', view);
+      // Bruk indexOf for å håndtere view-navn som inneholder punktum
+      const dotIdx = viewNavn.indexOf('.');
+      const schema = (dotIdx !== -1 ? viewNavn.slice(0, dotIdx) : 'dbo').replace(/[^a-zA-Z0-9_]/g, '');
+      // Behold norske bokstaver (æøå) — kun fjern tegn som er farlige i SQL-kontekst.
+      // Alle metadata-spørringer bruker @view-parameter, så ingen injeksjonsrisiko.
+      const view   = (dotIdx !== -1 ? viewNavn.slice(dotIdx + 1) : viewNavn).replace(/['";\x00-\x1f]/g, '');
+      console.log('[view-kolonner] schema:', schema, '| view:', view, '| original:', viewNavn);
       if (!schema || !view) return reply.status(400).send({ error: 'Ugyldig viewNavn.' });
 
       try {
@@ -349,6 +352,17 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         }
 
         console.warn('[view-kolonner] ingen metadata funnet — fallback til INFORMATION_SCHEMA');
+
+        // Diagnose: vis hvilke view-navn som faktisk finnes med lignende navn
+        const diagnose = await queryAzureSQL(
+          `SELECT DISTINCT TOP 10 TABLE_SCHEMA, TABLE_NAME
+           FROM INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_SCHEMA = @schema
+             AND TABLE_NAME LIKE @likePat`,
+          { schema, likePat: `${view.substring(0, Math.min(10, view.length))}%` },
+        );
+        console.log('[view-kolonner] INFORMATION_SCHEMA diagnose (like-søk):', JSON.stringify(diagnose));
+
         const rows = await queryAzureSQL(
           `SELECT
              COLUMN_NAME      AS kolonne_navn,
@@ -370,7 +384,36 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           { schema, view },
         );
         console.log('[view-kolonner] INFORMATION_SCHEMA kolonner:', rows.length);
-        return reply.send({ kolonner: rows, kilde: 'information_schema' });
+
+        if (rows.length > 0) {
+          return reply.send({ kolonner: rows, kilde: 'information_schema' });
+        }
+
+        // Fallback: hent kolonner direkte fra viewet via SELECT TOP 1
+        // Nyttig når TABLE_NAME i INFORMATION_SCHEMA har annen encoding enn view-navnet vi fikk
+        console.warn('[view-kolonner] INFORMATION_SCHEMA ga 0 treff — prøver direkte SELECT TOP 1');
+        try {
+          const safeSchema = schema.replace(/[^a-zA-Z0-9_]/g, '');
+          const safeView   = view.replace(/\]/g, '');  // bare fjern ] for bracket-escaping
+          const sample = await queryAzureSQL(
+            `SELECT TOP 1 * FROM [${safeSchema}].[${safeView}]`,
+          );
+          if (sample.length > 0) {
+            const kolonner = Object.keys(sample[0]).map(k => ({
+              kolonne_navn: k,
+              kolonne_type: 'dimensjon' as string,
+              datatype:     'varchar',
+              sort_order:   0,
+            }));
+            console.log('[view-kolonner] fallback direkte SELECT kolonner:', kolonner.length);
+            return reply.send({ kolonner, kilde: 'direkte_select' });
+          }
+          console.warn('[view-kolonner] direkte SELECT ga 0 rader — view er tomt eller ikke tilgjengelig');
+          return reply.send({ kolonner: [], kilde: 'direkte_select' });
+        } catch (fallbackErr) {
+          console.error('[view-kolonner] direkte SELECT feilet:', fallbackErr);
+          return reply.send({ kolonner: [], kilde: 'information_schema' });
+        }
       } catch (err) {
         console.error('[view-kolonner] feil:', err);
         return reply.status(500).send({ error: 'Kunne ikke hente kolonner.' });
