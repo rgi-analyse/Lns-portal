@@ -742,14 +742,14 @@ export default function MetadataAdminPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Prosjektfilter-kolonne</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Filterkolonne</label>
             <div className="flex gap-2">
               <select
                 value={editForm.prosjekt_kolonne}
                 onChange={e => setEditForm(f => ({ ...f, prosjekt_kolonne: e.target.value }))}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
               >
-                <option value="">Ingen (globalt view)</option>
+                <option value="">Ingen (globalt)</option>
                 {(editView?.kolonner ?? []).map(k => (
                   <option key={k.kolonne_navn} value={k.kolonne_navn}>
                     {k.kolonne_navn} ({k.datatype ?? '?'})
