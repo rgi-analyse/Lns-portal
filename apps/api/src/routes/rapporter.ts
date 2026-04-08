@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL } from '../services/azureSqlService';
 
@@ -36,12 +36,11 @@ const workspaceSelect = {
 };
 
 export async function rapportRoutes(fastify: FastifyInstance) {
-  fastify.addHook('preHandler', resolveTenant);
 
   // ── Globale rapport-ruter ──────────────────────────────────────────────────
 
   // GET /api/rapporter
-  fastify.get('/api/rapporter', async (request, reply) => {
+  fastify.get('/api/rapporter', { preHandler: [resolveTenant] }, async (request, reply) => {
     const db = (request as TenantRequest).tenantPrisma;
     try {
       const rapporter = await db.rapport.findMany({
@@ -61,6 +60,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // GET /api/rapporter/:id
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
@@ -91,6 +91,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: CreateRapportBody }>(
     '/api/rapporter',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -125,6 +126,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   }>(
     '/api/rapporter/:id',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -164,6 +166,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // DELETE /api/rapporter/:id
   fastify.delete<{ Params: { id: string } }>(
     '/api/rapporter/:id',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
@@ -207,7 +210,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // GET /api/admin/rapporter/alle
   fastify.get(
     '/api/admin/rapporter/alle',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [requireBruker, requireAdmin, resolveTenantAdmin] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
@@ -237,6 +240,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // DELETE /api/admin/rapporter/:id  (soft delete)
   fastify.delete<{ Params: { id: string } }>(
     '/api/admin/rapporter/:id',
+    { preHandler: [requireBruker, requireAdmin, resolveTenantAdmin] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
@@ -258,6 +262,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // GET /api/workspaces/:id/rapporter
   fastify.get<{ Params: { id: string }; Querystring: { grupper?: string } }>(
     '/api/workspaces/:id/rapporter',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
@@ -366,6 +371,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   fastify.post<{ Params: { id: string }; Body: LinkRapportBody }>(
     '/api/workspaces/:id/rapporter',
     {
+      preHandler: [resolveTenant],
       schema: {
         body: {
           type: 'object',
@@ -407,6 +413,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // DELETE /api/workspaces/:id/rapporter/:rapportId
   fastify.delete<{ Params: { id: string; rapportId: string } }>(
     '/api/workspaces/:id/rapporter/:rapportId',
+    { preHandler: [resolveTenant] },
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {

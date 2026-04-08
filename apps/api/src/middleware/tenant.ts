@@ -31,6 +31,7 @@ function extractSlug(request: FastifyRequest): string {
 // Ruter som alltid skal bruke master-DB og aldri tenant-resolving
 const SKIP_TENANT_PATHS = [
   '/api/me',
+  '/api/admin/',
   '/api/auth/',
   '/api/tema',
   '/api/lisens',
@@ -44,6 +45,22 @@ export async function resolveTenant(
 ): Promise<void> {
   if (SKIP_TENANT_PATHS.some(p => request.url.startsWith(p))) return;
 
+  const slug = extractSlug(request);
+  const tenant = await prisma.tenant.findFirst({ where: { slug, erAktiv: true } });
+  if (!tenant) {
+    return reply.status(404).send({ error: `Tenant '${slug}' ikke funnet.` });
+  }
+  (request as TenantRequest).tenantPrisma = getPrismaForTenant(tenant.databaseUrl);
+}
+
+/**
+ * Samme som resolveTenant men uten URL-basert skip-sjekk.
+ * Brukes på admin-ruter som eksplisitt trenger tenantPrisma.
+ */
+export async function resolveTenantAdmin(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
   const slug = extractSlug(request);
   const tenant = await prisma.tenant.findFirst({ where: { slug, erAktiv: true } });
   if (!tenant) {
