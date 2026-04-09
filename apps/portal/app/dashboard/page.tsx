@@ -57,6 +57,7 @@ export default function DashboardPage() {
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(true);
   const [filter,           setFilter]            = useState<'alle' | 'favoritter'>('favoritter');
   const [favoritter,       setFavoritter]        = useState<string[]>([]);
+  const [brukerChatAktivert, setBrukerChatAktivert] = useState(true);
   const lisens = useLisens();
   const togglingRef = useRef<Set<string>>(new Set());
 
@@ -91,6 +92,16 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((data: Aktivitet | null) => setAktivitet(data))
       .catch(() => setAktivitet(null));
+  }, [isAuthenticated, entraObjectId, authHeaders]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !entraObjectId) return;
+    apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { chatAktivert?: boolean } | null) => {
+        if (data && data.chatAktivert === false) setBrukerChatAktivert(false);
+      })
+      .catch(() => { /* ikke kritisk */ });
   }, [isAuthenticated, entraObjectId, authHeaders]);
 
 
@@ -462,7 +473,7 @@ export default function DashboardPage() {
           );
         })()}
       </div>
-      {lisens.chatAktivert && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
+      {lisens.chatAktivert && brukerChatAktivert && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
     </>
   );
 }

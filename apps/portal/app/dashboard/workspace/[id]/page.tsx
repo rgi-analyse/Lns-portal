@@ -8,6 +8,7 @@ import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
+import { useLisens } from '@/components/LisensProvider';
 
 interface Rapport {
   id: string;
@@ -50,8 +51,10 @@ export default function WorkspacePage() {
   const { id }                             = useParams<{ id: string }>();
   const router                             = useRouter();
   const { isAuthenticated, entraObjectId, authHeaders, grupper } = usePortalAuth();
+  const lisens = useLisens();
 
   const [workspace,        setWorkspace]        = useState<WorkspaceDetail | null>(null);
+  const [brukerChatAktivert, setBrukerChatAktivert] = useState(true);
   const [rapporter,        setRapporter]        = useState<Rapport[]>([]);
   const [error,            setError]            = useState<string | null>(null);
   const [kanLageRapport,   setKanLageRapport]   = useState(false);
@@ -91,8 +94,9 @@ export default function WorkspacePage() {
         try {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
-            const meg = await megRes.json() as { rolle?: string };
+            const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
             setKanLageRapport(['admin', 'tenantadmin', 'redaktør'].includes(meg.rolle ?? ''));
+            if (meg.chatAktivert === false) setBrukerChatAktivert(false);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -455,7 +459,7 @@ export default function WorkspacePage() {
           </>
         )}
       </div>
-      <AIChat entraObjectId={entraObjectId} grupper={grupper} />
+      {lisens.chatAktivert && brukerChatAktivert && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
 
       {visNyRapportModal && workspace && (
         <NyRapportModal
