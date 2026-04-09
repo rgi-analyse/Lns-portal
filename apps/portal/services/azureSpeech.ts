@@ -65,7 +65,7 @@ export async function startAzureSTT(
     '8000',
   );
   // Dikteringsmodus — optimalisert for lengre setninger med tegnsetting
-  speechConfig.enableDictationMode();
+  speechConfig.enableDictation();
 
   const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
   const recognizer  = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
