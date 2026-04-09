@@ -7,7 +7,7 @@ import type { FilterConfig, SlicerConfig } from './AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   FileText, Presentation, Table,
-  Maximize, RefreshCw, Bookmark, RotateCcw,
+  Maximize, RefreshCw, RotateCcw,
   ZoomIn, ZoomOut, Scan, Maximize2,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -1123,10 +1123,6 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               Tilpass
             </ToolBtn>
             <Divider />
-            <ToolBtn onClick={handleSaveBookmark} disabled={!report || !pbiReportId}>
-              <Bookmark className="w-3.5 h-3.5" />
-              Lagre visning
-            </ToolBtn>
             <ToolBtn onClick={handleResetBookmark} disabled={!report || !pbiReportId}>
               <RotateCcw className="w-3.5 h-3.5" />
               Nullstill
