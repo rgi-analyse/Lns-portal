@@ -387,6 +387,7 @@ export default function AIChat({
       grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
     };
+    console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));
     console.log('[AIChat] sender body activeSlicerState:', JSON.stringify(requestBody.activeSlicerState));
 

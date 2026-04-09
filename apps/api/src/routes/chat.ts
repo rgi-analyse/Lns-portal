@@ -531,8 +531,16 @@ export async function chatRoutes(fastify: FastifyInstance) {
             const db = (request as TenantRequest).tenantPrisma;
             const grupper: string[] = request.body.grupper ?? [];
             const identities = [entraObjectId, ...grupper].filter(Boolean);
+            console.log('[Chat] rapport-liste | entraId:', entraObjectId,
+              '| grupper:', grupper.length, '| identities:', identities.length);
+            const orFilter = [];
+            if (identities.length > 0) {
+              orFilter.push({ tilgang: { some: { entraId: { in: identities } } } });
+            }
+            // Inkluder workspaces brukeren har opprettet (lokal bruker / personlig workspace)
+            orFilter.push({ opprettetAv: entraObjectId });
             const tilgjengeligeWorkspaces = await db.workspace.findMany({
-              where: { tilgang: { some: { entraId: { in: identities } } } },
+              where: { OR: orFilter },
               select: {
                 navn: true,
                 rapporter: {
@@ -547,6 +555,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             const rapporter = tilgjengeligeWorkspaces.flatMap(ws =>
               ws.rapporter.map(wr => ({ ...wr.rapport, workspace_navn: ws.navn }))
             );
+            console.log('[Chat] tilgjengeligeWorkspaces:', tilgjengeligeWorkspaces.length);
             if (rapporter.length > 0) {
               rapportListeSection = '\n\n## Tilgjengelige rapporter\n' +
                 'Du kan hjelpe brukeren med å finne og navigere til disse:\n\n' +
@@ -555,6 +564,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
                   return `${i + 1}. **${r.navn}** (${r.område ?? r.workspace_navn}) [rapport_id:${r.id}]${besk}`;
                 }).join('\n');
               console.log(`[Chat] rapport-liste: ${rapporter.length} rapporter for bruker`);
+            } else {
+              console.log('[Chat] rapport-liste: ingen rapporter funnet');
             }
           } catch (err) {
             console.warn('[Chat] rapport-liste feil:', err);
