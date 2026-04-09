@@ -43,7 +43,7 @@ export default function RapportPage() {
 
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
-  const [brukerChatAktivert, setBrukerChatAktivert] = useState(true);
+  const [brukerChatAktivert, setBrukerChatAktivert] = useState<boolean | null>(null);
   const lisens = useLisens();
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
@@ -98,7 +98,7 @@ export default function RapportPage() {
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
             setKanLageRapport(['admin', 'tenantadmin'].includes(meg.rolle ?? '') || meg.rolle === 'redaktør');
-            if (meg.chatAktivert === false) setBrukerChatAktivert(false);
+            setBrukerChatAktivert(meg.chatAktivert !== false);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -156,7 +156,7 @@ export default function RapportPage() {
         onAktivSideChange={setAktivSide}
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
-      {lisens.chatAktivert && brukerChatAktivert && (
+      {lisens.chatAktivert && brukerChatAktivert === true && (
         <AIChat
           entraObjectId={entraObjectId}
           grupper={grupper}

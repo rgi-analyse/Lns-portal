@@ -54,7 +54,7 @@ export default function WorkspacePage() {
   const lisens = useLisens();
 
   const [workspace,        setWorkspace]        = useState<WorkspaceDetail | null>(null);
-  const [brukerChatAktivert, setBrukerChatAktivert] = useState(true);
+  const [brukerChatAktivert, setBrukerChatAktivert] = useState<boolean | null>(null);
   const [rapporter,        setRapporter]        = useState<Rapport[]>([]);
   const [error,            setError]            = useState<string | null>(null);
   const [kanLageRapport,   setKanLageRapport]   = useState(false);
@@ -96,7 +96,7 @@ export default function WorkspacePage() {
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
             setKanLageRapport(['admin', 'tenantadmin', 'redaktør'].includes(meg.rolle ?? ''));
-            if (meg.chatAktivert === false) setBrukerChatAktivert(false);
+            setBrukerChatAktivert(meg.chatAktivert !== false);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -459,7 +459,7 @@ export default function WorkspacePage() {
           </>
         )}
       </div>
-      {lisens.chatAktivert && brukerChatAktivert && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
+      {lisens.chatAktivert && brukerChatAktivert === true && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
 
       {visNyRapportModal && workspace && (
         <NyRapportModal
