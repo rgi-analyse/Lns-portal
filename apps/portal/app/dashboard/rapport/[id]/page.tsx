@@ -39,7 +39,7 @@ export default function RapportPage() {
   const { id }                                       = useParams<{ id: string }>();
   const router                                       = useRouter();
   const { isAuthenticated, authHeaders, grupper,
-          entraObjectId }                            = usePortalAuth();
+          entraObjectId, rolle }                     = usePortalAuth();
 
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
@@ -143,6 +143,7 @@ export default function RapportPage() {
       <PowerBIReport
         rapportId={rapport.id}
         portalWorkspaceId={rapport.workspaces[0]?.workspace.id}
+        brukerRolle={rolle}
         pbiReportId={rapport.pbiReportId}
         pbiDatasetId={rapport.pbiDatasetId}
         pbiWorkspaceId={rapport.pbiWorkspaceId}

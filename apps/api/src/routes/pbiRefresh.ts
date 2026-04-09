@@ -22,6 +22,45 @@ interface RefreshScheduleResponse {
 }
 
 export async function pbiRefreshRoutes(fastify: FastifyInstance) {
+  fastify.post<{ Body: { pbiDatasetId?: string; pbiWorkspaceId?: string } }>(
+    '/api/pbi/refresh',
+    async (request, reply) => {
+      const { pbiDatasetId, pbiWorkspaceId } = request.body ?? {};
+      if (!pbiDatasetId || !pbiWorkspaceId) {
+        return reply.status(400).send({ error: 'Mangler pbiDatasetId eller pbiWorkspaceId.' });
+      }
+
+      const tenantId     = process.env.PBI_TENANT_ID;
+      const clientId     = process.env.PBI_CLIENT_ID;
+      const clientSecret = process.env.PBI_CLIENT_SECRET;
+      if (!tenantId || !clientId || !clientSecret) {
+        return reply.status(500).send({ error: 'Mangler Power BI-konfigurasjon på serveren.' });
+      }
+
+      try {
+        const token = await getAzureToken(tenantId, clientId, clientSecret);
+        const res = await fetch(
+          `https://api.powerbi.com/v1.0/myorg/groups/${pbiWorkspaceId}/datasets/${pbiDatasetId}/refreshes`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notifyOption: 'NoNotification' }),
+          },
+        );
+
+        if (res.status === 202) {
+          return reply.status(202).send({ ok: true });
+        }
+        const body = await res.text().catch(() => '');
+        fastify.log.error(`[pbiRefresh] PBI svarte ${res.status}: ${body}`);
+        return reply.status(res.status).send({ error: `PBI svarte ${res.status}`, detail: body });
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
+      }
+    },
+  );
+
   fastify.get<{ Querystring: { datasetId?: string; workspaceId?: string } }>(
     '/api/pbi/refresh-info',
     async (request, reply) => {

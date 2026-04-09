@@ -42,11 +42,12 @@ interface PowerBIReportProps {
   onRegisterGetVisualData?: (fn: () => Promise<Record<string, string>>) => void;
   onAktivSideChange?: (side: string) => void;
   clearSlicerTitle?: string;
+  brukerRolle?: string;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerConfig, clearSlicerTitle, onSlicersLoaded, onSlicerValuesLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange }: PowerBIReportProps = {}) {
+export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerConfig, clearSlicerTitle, onSlicersLoaded, onSlicerValuesLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
   const { entraObjectId } = usePortalAuth();
 
   // Workspace-spesifikk nøkkel for bookmark-lagring
@@ -64,7 +65,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const [excelKandidater, setExcelKandidater] = useState<{ pageKey: string; pageLabel: string; visualKey: string; visualLabel: string; type: string }[]>([]);
   const [excelValgte, setExcelValgte] = useState<Set<string>>(new Set());
   const [excelLaster, setExcelLaster] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
 
@@ -842,12 +843,28 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   };
 
   const handleRefresh = async () => {
-    if (!report) return;
-    setRefreshing(true);
+    if (refreshStatus === 'loading') return;
+    setRefreshStatus('loading');
     try {
-      await report.refresh();
-    } finally {
-      setRefreshing(false);
+      const res = await apiFetch('/api/pbi/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pbiDatasetId, pbiWorkspaceId }),
+      });
+      if (res.ok) {
+        setRefreshStatus('success');
+        if (report) await report.refresh();
+        setTimeout(() => setRefreshStatus('idle'), 3000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('[Refresh] feil:', err);
+        setRefreshStatus('error');
+        setTimeout(() => setRefreshStatus('idle'), 4000);
+      }
+    } catch (e) {
+      console.error('[Refresh] nettverksfeil:', e);
+      setRefreshStatus('error');
+      setTimeout(() => setRefreshStatus('idle'), 4000);
     }
   };
 
@@ -1128,12 +1145,19 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               Nullstill
             </ToolBtn>
             <Divider />
-            <ToolBtn onClick={handleRefresh} disabled={!report || refreshing}>
-              {refreshing
-                ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                : <RefreshCw className="w-3.5 h-3.5" />}
-              {refreshing ? 'Oppdaterer...' : 'Refresh'}
-            </ToolBtn>
+            {brukerRolle && brukerRolle !== 'bruker' && (
+              <ToolBtn
+                onClick={handleRefresh}
+                disabled={!pbiDatasetId || refreshStatus === 'loading'}
+                title="Oppdater datasett fra kilde"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshStatus === 'loading' ? 'animate-spin' : ''}`} />
+                {refreshStatus === 'loading' ? 'Oppdaterer...'
+                  : refreshStatus === 'success' ? '✓ Oppdatert'
+                  : refreshStatus === 'error'   ? '✗ Feil'
+                  : 'Refresh'}
+              </ToolBtn>
+            )}
             {/* Fullskjerm — gold accent */}
             <button
               onClick={() => report?.fullscreen()}
