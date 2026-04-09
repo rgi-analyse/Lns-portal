@@ -560,8 +560,9 @@ export async function chatRoutes(fastify: FastifyInstance) {
               rapportListeSection = '\n\n## Tilgjengelige rapporter\n' +
                 'Du kan hjelpe brukeren med å finne og navigere til disse:\n\n' +
                 rapporter.map((r, i) => {
-                  const besk = r.beskrivelse ? ` — ${r.beskrivelse}` : '';
-                  return `${i + 1}. **${r.navn}** (${r.område ?? r.workspace_navn}) [rapport_id:${r.id}]${besk}`;
+                  const kontekst = [r.område, r.workspace_navn].filter(Boolean).join(' · ');
+                  return `${i + 1}. **${r.navn}** — ${kontekst} [rapport_id:${r.id}]` +
+                    (r.beskrivelse ? `\n   ${r.beskrivelse}` : '');
                 }).join('\n');
               console.log(`[Chat] rapport-liste: ${rapporter.length} rapporter for bruker`);
             } else {
