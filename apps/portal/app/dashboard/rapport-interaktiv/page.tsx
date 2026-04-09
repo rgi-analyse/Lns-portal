@@ -2121,7 +2121,16 @@ export default function RapportInteraktivPage() {
                 <label style={labelStyle}>Visual-type</label>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                   {VIS_TYPE_OPTIONS.map(v => (
-                    <button key={v.type} type="button" onClick={()=>setConfig(p=>p?{...p,visualType:v.type}:p)}
+                    <button key={v.type} type="button" onClick={()=>{
+                      setConfig(p => {
+                        if (!p) return p;
+                        const forrige = p.visualType;
+                        const ny = v.type;
+                        if (forrige === ny) return p;
+                        if (forrige === 'table' && ny !== 'table') setValgteKolonner([]);
+                        return { ...p, visualType: ny, sorterPaa: null, sorterRetning: 'DESC' };
+                      });
+                    }}
                       style={{ padding:8, borderRadius:7, cursor:'pointer', border:config.visualType===v.type?'1px solid var(--gold-dim)':'1px solid var(--glass-bg-hover)', background:config.visualType===v.type?'var(--glass-gold-bg)':'var(--glass-bg)', color:config.visualType===v.type?'var(--gold)':'var(--text-secondary)', fontSize:12, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <span style={{ fontSize:18 }}>{v.ikon}</span><span>{v.navn}</span>
                     </button>
