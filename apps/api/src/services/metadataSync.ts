@@ -89,6 +89,25 @@ export async function syncViewColumns(
     }
   }
 
+  // Slett kolonner som ikke lenger finnes i viewet
+  const kolonnerFraView = new Set(kolonner.map(k => k['COLUMN_NAME'] as string));
+  const eksisterende = await queryAzureSQL(`
+    SELECT kolonne_navn FROM ai_metadata_kolonner
+    WHERE view_id = '${esc(viewId)}'
+  `, 500);
+  const utgåtte = eksisterende
+    .map(k => k['kolonne_navn'] as string)
+    .filter(navn => !kolonnerFraView.has(navn));
+
+  if (utgåtte.length > 0) {
+    console.log(`[MetadataSync] sletter ${utgåtte.length} utgåtte kolonner:`, utgåtte);
+    const inClause = utgåtte.map(n => `'${esc(n)}'`).join(', ');
+    await executeAzureSQL(`
+      DELETE FROM ai_metadata_kolonner
+      WHERE view_id = '${esc(viewId)}' AND kolonne_navn IN (${inClause})
+    `);
+  }
+
   await executeAzureSQL(`
     UPDATE ai_metadata_views
     SET sist_synkronisert = GETDATE()

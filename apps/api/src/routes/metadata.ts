@@ -208,6 +208,24 @@ export async function metadataRoutes(fastify: FastifyInstance) {
     },
   );
 
+  // DELETE /api/admin/metadata/views/:id/kolonner/:kolId — slett enkeltkolonne
+  fastify.delete<{ Params: { id: string; kolId: string } }>(
+    '/api/admin/metadata/views/:id/kolonner/:kolId',
+    { preHandler: [requireBruker, requireAdmin] },
+    async (request, reply) => {
+      const { id, kolId } = request.params;
+      const rows = await queryAzureSQL(`
+        SELECT id FROM ai_metadata_kolonner
+        WHERE id = '${esc(kolId)}' AND view_id = '${esc(id)}'
+      `, 1);
+      if (rows.length === 0) return reply.status(404).send({ error: 'Kolonne ikke funnet.' });
+      await executeAzureSQL(`
+        DELETE FROM ai_metadata_kolonner WHERE id = '${esc(kolId)}' AND view_id = '${esc(id)}'
+      `);
+      return reply.status(204).send();
+    },
+  );
+
   // PUT /api/admin/metadata/views/:id/kolonner/:kolId — oppdater kolonne manuelt
   fastify.put<{ Params: { id: string; kolId: string }; Body: { beskrivelse?: string; eksempel_verdier?: string; kolonne_type?: string; lenketekst?: string } }>(
     '/api/admin/metadata/views/:id/kolonner/:kolId',
