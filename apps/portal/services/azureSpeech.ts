@@ -54,6 +54,19 @@ export async function startAzureSTT(
   const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(token, region);
   speechConfig.speechRecognitionLanguage = 'nb-NO';
 
+  // Vent 1200ms stillhet før setning avsluttes (standard: 500ms)
+  speechConfig.setProperty(
+    SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+    '1200',
+  );
+  // Vent 8000ms på første ord før timeout (standard: 5000ms)
+  speechConfig.setProperty(
+    SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs,
+    '8000',
+  );
+  // Dikteringsmodus — optimalisert for lengre setninger med tegnsetting
+  speechConfig.enableDictationMode();
+
   const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
   const recognizer  = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
 
