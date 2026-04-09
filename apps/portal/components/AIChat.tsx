@@ -66,6 +66,7 @@ interface AIChatProps {
   availableTables?: string[];
   aktivSide?: string;
   kanLageRapport?: boolean;
+  grupper?: string[];
   getVisualsData?: () => Promise<Record<string, string>>;
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
@@ -99,8 +100,8 @@ function exportToCsv(data: Record<string, unknown>[], filename: string) {
 
 export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
-  activeSlicerState, availableTables, aktivSide, kanLageRapport, getVisualsData,
-  onSetFilter, onSetSlicer, onClearSlicer,
+  activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
+  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
   const { organisasjonNavn } = useTema();
@@ -383,6 +384,7 @@ export default function AIChat({
       slicers, slicerValues: slicerValues ?? {},
       activeSlicerState: activeSlicerState ?? {},
       aktivSide, visualData,
+      grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
     };
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));

@@ -392,6 +392,7 @@ interface ChatBody {
   aktivSide?: string;
   visualData?: Record<string, string>;
   kanLageRapport?: boolean;
+  grupper?: string[];
 }
 
 /**
@@ -456,6 +457,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             aktivSide:         { type: 'string' },
             visualData:        { type: 'object', additionalProperties: { type: 'string' } },
             kanLageRapport:    { type: 'boolean' },
+            grupper:           { type: 'array', items: { type: 'string' } },
           },
           additionalProperties: false,
         },
@@ -521,6 +523,43 @@ export async function chatRoutes(fastify: FastifyInstance) {
         // FIX 4: token-estimat (ingen-rapport branch)
         console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
         console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
+
+        // Bygg rapport-liste basert på brukerens workspace-tilgang
+        let rapportListeSection = '';
+        if (entraObjectId) {
+          try {
+            const db = (request as TenantRequest).tenantPrisma;
+            const grupper: string[] = request.body.grupper ?? [];
+            const identities = [entraObjectId, ...grupper].filter(Boolean);
+            const tilgjengeligeWorkspaces = await db.workspace.findMany({
+              where: { tilgang: { some: { entraId: { in: identities } } } },
+              select: {
+                navn: true,
+                rapporter: {
+                  where: { rapport: { erAktiv: true } },
+                  select: {
+                    rapport: { select: { id: true, navn: true, område: true, beskrivelse: true } },
+                  },
+                },
+              },
+              take: 30,
+            });
+            const rapporter = tilgjengeligeWorkspaces.flatMap(ws =>
+              ws.rapporter.map(wr => ({ ...wr.rapport, workspace_navn: ws.navn }))
+            );
+            if (rapporter.length > 0) {
+              rapportListeSection = '\n\n## Tilgjengelige rapporter\n' +
+                'Du kan hjelpe brukeren med å finne og navigere til disse:\n\n' +
+                rapporter.map((r, i) => {
+                  const besk = r.beskrivelse ? ` — ${r.beskrivelse}` : '';
+                  return `${i + 1}. **${r.navn}** (${r.område ?? r.workspace_navn}) [rapport_id:${r.id}]${besk}`;
+                }).join('\n');
+              console.log(`[Chat] rapport-liste: ${rapporter.length} rapporter for bruker`);
+            }
+          } catch (err) {
+            console.warn('[Chat] rapport-liste feil:', err);
+          }
+        }
         let ingenRapportPrompt = `Du er en dataassistent for LNS Dataportal.
 Ingen rapport er valgt.
 
@@ -566,7 +605,7 @@ Eksempel:
   → IKKE kall search_portal_reports på nytt — IDene finnes allerede i forrige svar
   → id er ALLTID en UUID på formen xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
   → ALDRI bruk rapportnavnet, en slug eller konstruert ID som rapportId
-${basisPrompt}
+${basisPrompt}${rapportListeSection}
 
 Svar alltid på norsk.`;
 

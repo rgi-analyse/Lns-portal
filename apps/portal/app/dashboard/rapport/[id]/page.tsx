@@ -157,6 +157,7 @@ export default function RapportPage() {
       {lisens.chatAktivert && (
         <AIChat
           entraObjectId={entraObjectId}
+          grupper={grupper}
           rapportId={rapport.id}
           pbiReportId={rapport.pbiReportId}
           rapportNavn={rapport.navn}

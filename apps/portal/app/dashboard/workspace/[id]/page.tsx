@@ -455,7 +455,7 @@ export default function WorkspacePage() {
           </>
         )}
       </div>
-      <AIChat entraObjectId={entraObjectId} />
+      <AIChat entraObjectId={entraObjectId} grupper={grupper} />
 
       {visNyRapportModal && workspace && (
         <NyRapportModal

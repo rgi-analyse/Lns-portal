@@ -462,7 +462,7 @@ export default function DashboardPage() {
           );
         })()}
       </div>
-      {lisens.chatAktivert && <AIChat entraObjectId={entraObjectId} />}
+      {lisens.chatAktivert && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
     </>
   );
 }
