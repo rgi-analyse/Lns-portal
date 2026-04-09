@@ -968,13 +968,14 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   };
 
   const ToolBtn = ({
-    onClick, disabled, children,
-  }: { onClick?: () => void; disabled?: boolean; children: React.ReactNode }) => (
+    onClick, disabled, children, title,
+  }: { onClick?: () => void; disabled?: boolean; children: React.ReactNode; title?: string }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       className={btnTool}
       style={btnStyle}
+      title={title}
       onMouseEnter={(e) => { if (!disabled) Object.assign((e.currentTarget as HTMLButtonElement).style, btnHover); }}
       onMouseLeave={(e) => { Object.assign((e.currentTarget as HTMLButtonElement).style, btnStyle); }}
     >
