@@ -44,7 +44,7 @@ function formaterDato(iso: string | null | undefined): string {
   if (diffMin < 60)  return `${diffMin} min siden`;
   if (diffTimer < 24) return `${diffTimer}t siden`;
   if (diffDager < 7) return `${diffDager} dager siden`;
-  return dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
+  return dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', timeZone: 'Europe/Oslo' });
 }
 
 export default function DashboardPage() {
