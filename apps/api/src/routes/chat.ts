@@ -6,6 +6,20 @@ import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { erAdmin } from '../middleware/auth';
 
 // ── Statisk tillegg som alltid er med (analyse-instruksjoner og generelle regler) ──
+const PROSJEKT_INSTRUKSJON = `
+PROSJEKTIDENTIFISERING:
+Prosjekter kan refereres til på flere måter av brukeren:
+- Som tall alene: "1000", "6050", "4200"
+- Som navn: "Hemsil", "Hovedkontor", "Nussir"
+- Som kombinasjon: "P1000" = prosjektnr 1000, "P6050" = 6050 — fjern alltid prefiks "P"
+
+Når bruker nevner et prosjekt:
+→ Søk på prosjektnummer ELLER prosjektnavn i WHERE-klausulen
+→ Aldri anta at prosjektet ikke finnes uten å ha søkt
+→ Bruk LIKE-søk på navn: WHERE Prosjekt LIKE '%Hemsil%'
+→ Bruk eksakt match på nummer: WHERE Prosjektnr = 1000 (heltall, ikke streng)
+`;
+
 const STATIC_APPENDIX = `
 RUH-ANALYSE — VURDERING AV ALVORLIGHETSGRAD:
 Når bruker spør om å analysere RUH-hendelser eller vurdere alvorlighetsgrad, hent data fra
@@ -314,6 +328,7 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
       for (const k of viewKolonner) {
         const type = k['kolonne_type'] ? ` [${k['kolonne_type']}]` : '';
         viewsPrompt += `  - ${k['kolonne_navn']} (${k['datatype'] ?? 'ukjent'}${type})`;
+        if (k['beskrivelse']) viewsPrompt += ` — ${k['beskrivelse']}`;
         if (k['eksempel_verdier']) viewsPrompt += ` [verdier: ${k['eksempel_verdier']}]`;
         viewsPrompt += '\n';
       }
@@ -387,7 +402,7 @@ async function buildSystemPrompt(rapportId?: string | null, område?: string | n
 
   try {
     const dynamicSection = await buildDynamicViewsSection(kobletViewIds, kobletViewIds ? null : område);
-    const prompt = dynamicSection + STATIC_APPENDIX;
+    const prompt = PROSJEKT_INSTRUKSJON + dynamicSection + STATIC_APPENDIX;
     promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
     return prompt;
   } catch (err) {
