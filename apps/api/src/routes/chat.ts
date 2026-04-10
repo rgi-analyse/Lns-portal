@@ -267,6 +267,7 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
   ]);
 
   console.log(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
+  console.log('[buildSystemPrompt] views funnet:', views.length);
   const kolonnerMedBeskrivelse = kolonner.filter(k => k['beskrivelse']);
   console.log(`[Chat] kolonner med beskrivelse: ${kolonnerMedBeskrivelse.length}`,
     kolonnerMedBeskrivelse.map(k => `${k['kolonne_navn']} (view_id=${k['view_id']})`));
@@ -332,6 +333,12 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
     viewsPrompt += '\n';
   }
 
+  // Oppklarende spørsmål ved mange views
+  const viewInstruks = views.length > 3
+    ? `\nNår bruker spør om data som kan ligge i flere views, still ett oppklarende spørsmål:\n"Dette kan jeg finne i [view A] (beskrivelse) eller [view B] (beskrivelse). Hvilken vil du sjekke?"\nSøk deretter i riktig view basert på svaret.\n`
+    : '';
+  viewsPrompt += viewInstruks;
+
   // Legg til instruksjoner for URL-kolonner
   const urlKolonner = kolonner.filter(k => k['kolonne_type'] === 'url');
   if (urlKolonner.length > 0) {
@@ -365,6 +372,8 @@ async function buildSystemPrompt(rapportId?: string | null, område?: string | n
       // Tabell finnes ikke ennå — fallback til område-filter
     }
   }
+
+  console.log('[buildSystemPrompt] kobletViewIds:', kobletViewIds);
 
   const cacheKey = kobletViewIds ? `rapport:${rapportId}` : (område ?? 'all');
   const cached = promptCacheMap.get(cacheKey);
