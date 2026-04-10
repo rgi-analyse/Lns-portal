@@ -143,11 +143,10 @@ async function buildDynamicViewsSection(
       ORDER BY k.view_id, k.sort_order
     `),
     queryAzureSQL(`
-      SELECT r.view_id, r.regel_type, r.regel AS innhold
+      SELECT r.view_id, r.regel
       FROM ai_metadata_regler r
       JOIN ai_metadata_views v ON r.view_id = v.id
       ${viewsFilter}
-      ORDER BY r.view_id
     `),
     queryAzureSQL(`
       SELECT e.view_id, e.spørsmål, e.sql_eksempel
@@ -213,9 +212,11 @@ async function buildDynamicViewsSection(
       console.log('[prompt] Regnskaps kolonner i prompt:', kolonnerTekst.slice(0, 500));
     }
 
-    const viewRegler = regler.filter(r => r['view_id'] === view['id']);
+    const viewRegler = regler
+      .filter(r => r['view_id'] === view['id'])
+      .map(r => String(r['regel'] ?? ''));
     const reglerTekst = viewRegler.length > 0
-      ? `   Regler for dette viewet:\n${viewRegler.map(r => `   • ${r['innhold'] ?? r['regel'] ?? ''}`).join('\n')}`
+      ? `\n   Regler:\n${viewRegler.map(r => `   • ${r}`).join('\n')}`
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
