@@ -13,7 +13,8 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       queryAzureSQL(`
         SELECT id, schema_name, view_name, visningsnavn, beskrivelse, område, prosjekter,
                er_aktiv, sist_synkronisert, opprettet,
-               prosjekt_kolonne, COALESCE(prosjekt_kolonne_type, 'number') as prosjekt_kolonne_type
+               prosjekt_kolonne, COALESCE(prosjekt_kolonne_type, 'number') as prosjekt_kolonne_type,
+               nøkkelord
         FROM ai_metadata_views
         ORDER BY område, view_name
       `),
@@ -108,12 +109,12 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   );
 
   // PUT /api/admin/metadata/views/:id — oppdater view-metadata
-  fastify.put<{ Params: { id: string }; Body: { visningsnavn?: string; beskrivelse?: string; område?: string; prosjekter?: string; prosjekt_kolonne?: string | null; prosjekt_kolonne_type?: string; er_aktiv?: boolean } }>(
+  fastify.put<{ Params: { id: string }; Body: { visningsnavn?: string; beskrivelse?: string; område?: string; prosjekter?: string; prosjekt_kolonne?: string | null; prosjekt_kolonne_type?: string; nøkkelord?: string | null; er_aktiv?: boolean } }>(
     '/api/admin/metadata/views/:id',
     { preHandler: [requireBruker, requireAdmin] },
     async (request, reply) => {
       const { id } = request.params;
-      const { visningsnavn, beskrivelse, område, prosjekter, prosjekt_kolonne, prosjekt_kolonne_type, er_aktiv } = request.body;
+      const { visningsnavn, beskrivelse, område, prosjekter, prosjekt_kolonne, prosjekt_kolonne_type, nøkkelord, er_aktiv } = request.body;
 
       const validProjektTyper = ['number', 'string', 'name'];
       const setParts: string[] = [];
@@ -125,6 +126,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       if (prosjekt_kolonne_type !== undefined && validProjektTyper.includes(prosjekt_kolonne_type)) {
         setParts.push(`prosjekt_kolonne_type = '${esc(prosjekt_kolonne_type)}'`);
       }
+      if (nøkkelord !== undefined) setParts.push(`nøkkelord = ${nøkkelord ? `'${esc(nøkkelord)}'` : 'NULL'}`);
       if (er_aktiv !== undefined) setParts.push(`er_aktiv = ${er_aktiv ? 1 : 0}`);
 
       if (setParts.length === 0) return reply.status(400).send({ error: 'Ingen felter å oppdatere' });
@@ -138,7 +140,8 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       const rows = await queryAzureSQL(`
         SELECT id, schema_name, view_name, visningsnavn, beskrivelse, område, prosjekter,
                er_aktiv, sist_synkronisert, opprettet,
-               prosjekt_kolonne, COALESCE(prosjekt_kolonne_type, 'number') as prosjekt_kolonne_type
+               prosjekt_kolonne, COALESCE(prosjekt_kolonne_type, 'number') as prosjekt_kolonne_type,
+               nøkkelord
         FROM ai_metadata_views WHERE id = '${esc(id)}'
       `, 1);
 

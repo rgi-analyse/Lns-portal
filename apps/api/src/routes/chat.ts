@@ -67,24 +67,16 @@ const promptCacheMap = new Map<string, { prompt: string; expires: number }>();
 
 const escStr = (val: string): string => val.replace(/'/g, "''");
 
-const REGNSKAP_ORD = [
-  'regning', 'faktura', 'bilag', 'kostnad', 'konto', 'kontonr', 'kontogruppe',
-  'betaling', 'betalt', 'mottatt', 'utgift', 'utgifter',
-  'strøm', 'forsikring', 'leie', 'husleie', 'telefon', 'diesel',
-  'energi', 'vedlikehold', 'innkjøp', 'leverandør',
-];
-
 function rankViews(
   views: Record<string, unknown>[],
   kolonner: Record<string, unknown>[],
+  regler: Record<string, unknown>[],
   spørsmål: string,
 ): Record<string, unknown>[] {
   if (!spørsmål) return views;
   const s = spørsmål.toLowerCase();
   const ord = s.split(/\s+/).filter(o => o.length > 2);
   if (ord.length === 0) return views;
-
-  const erRegnskapsSpørsmål = REGNSKAP_ORD.some(o => s.includes(o));
 
   const rangeringer = [...views].map(v => {
     const viewTekst = [v['visningsnavn'], v['beskrivelse'], v['område']]
@@ -93,13 +85,20 @@ function rankViews(
     const kolonneTekst = viewKolonner
       .map(k => [k['kolonne_navn'], k['beskrivelse']].filter(Boolean).join(' '))
       .join(' ').toLowerCase();
-    const allTekst = viewTekst + ' ' + kolonneTekst;
+    const regelTekst = regler
+      .filter(r => r['view_id'] === v['id'])
+      .map(r => r['regel'] ?? '').join(' ').toLowerCase();
+    const allTekst = [viewTekst, kolonneTekst, regelTekst].join(' ');
 
     let score = ord.reduce((sum, o) => sum + (allTekst.includes(o) ? 1 : 0), 0);
 
-    const viewName = String(v['view_name'] ?? '').toLowerCase();
-    if (erRegnskapsSpørsmål && viewName.includes('regnskaps')) score += 5;
-    if (erRegnskapsSpørsmål && viewName.includes('balanse')) score -= 2;
+    // Nøkkelord-boost fra metadata — ingen hardkoding
+    const nøkkelordStr = String(v['nøkkelord'] ?? '');
+    if (nøkkelordStr) {
+      const nøkkelord = nøkkelordStr.toLowerCase().split(',').map(n => n.trim()).filter(Boolean);
+      const treff = nøkkelord.filter(n => s.includes(n)).length;
+      score += treff * 3;
+    }
 
     return { view: v, score, view_name: v['view_name'] };
   });
@@ -129,7 +128,7 @@ async function buildDynamicViewsSection(
   const [views, kolonner, regler, eksempler] = await Promise.all([
     queryAzureSQL(`
       SELECT v.id, v.schema_name, v.view_name, v.visningsnavn,
-             v.beskrivelse, v.område, v.prosjekter
+             v.beskrivelse, v.område, v.prosjekter, v.nøkkelord
       FROM ai_metadata_views v
       ${viewsFilter}
       ORDER BY v.område, v.view_name
@@ -177,7 +176,7 @@ async function buildDynamicViewsSection(
   let utelatte: string[] = [];
 
   if (brukerSpørsmål && alleViews.length > 4) {
-    const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], brukerSpørsmål);
+    const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], regler as Record<string, unknown>[], brukerSpørsmål);
 
     // Rapport-koblede views prioriteres alltid
     const koblede = kobletViewIds

@@ -56,6 +56,7 @@ interface MetadataView {
   opprettet: string;
   prosjekt_kolonne: string | null;
   prosjekt_kolonne_type: string;
+  nøkkelord: string | null;
   kolonner: Kolonne[];
   eksempler: Eksempel[];
   regler: Regel[];
@@ -94,7 +95,7 @@ export default function MetadataAdminPage() {
 
   // Dialog: edit view
   const [editView, setEditView] = useState<MetadataView | null>(null);
-  const [editForm, setEditForm] = useState({ visningsnavn: '', beskrivelse: '', område: '', prosjekter: '', prosjekt_kolonne: '', prosjekt_kolonne_type: 'number', erAktiv: true });
+  const [editForm, setEditForm] = useState({ visningsnavn: '', beskrivelse: '', område: '', prosjekter: '', prosjekt_kolonne: '', prosjekt_kolonne_type: 'number', nøkkelord: '', erAktiv: true });
 
   // Dialog: edit kolonne
   const [editKolonne, setEditKolonne] = useState<{ viewId: string; kol: Kolonne } | null>(null);
@@ -268,6 +269,7 @@ export default function MetadataAdminPage() {
       prosjekter: view.prosjekter ?? '',
       prosjekt_kolonne: view.prosjekt_kolonne ?? '',
       prosjekt_kolonne_type: view.prosjekt_kolonne_type ?? 'number',
+      nøkkelord: view.nøkkelord ?? '',
       erAktiv: view.er_aktiv !== false,
     });
   };
@@ -726,6 +728,16 @@ export default function MetadataAdminPage() {
               value={editForm.beskrivelse}
               onChange={e => setEditForm(f => ({ ...f, beskrivelse: e.target.value }))}
               rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Nøkkelord (kommaseparert, brukes for AI-søk)</label>
+            <input
+              type="text"
+              value={editForm.nøkkelord ?? ''}
+              onChange={e => setEditForm(f => ({ ...f, nøkkelord: e.target.value }))}
+              placeholder="f.eks. faktura, kunde, salg, utgående"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
