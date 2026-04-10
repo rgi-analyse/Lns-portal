@@ -74,11 +74,12 @@ GENERELLE SQL-REGLER:
 - Ikke avvis spørsmål fordi data ikke finnes i rapporten — søk i databasen først.
 - Svar alltid på norsk.
 
-SØKESTRATEGI:
-- Bruk kolonnebeskrivelsene i systemprompten aktivt — de forteller deg hva kolonnen inneholder og hvordan den skal brukes.
-- Prioriter indekserte kolonner (dimensjoner og ID-kolonner) fremfor fritekst-søk med LIKE på store tekstkolonner.
-- Når et view har en grupperingskolonne (som Kontogruppe, Kategori, Type): bruk den fremfor LIKE-søk på råtekst. Kjør SELECT DISTINCT [grupperingskolonne] for å se tilgjengelige verdier hvis du er usikker.
-- Ved tomt resultat: prøv én alternativ søkestrategi automatisk før du svarer at ingenting finnes.
+SØKESTRATEGI — FØLG DISSE PRINSIPPENE:
+- Les kolonnebeskrivelsene i systemprompten nøye — de forteller hvordan kolonnen skal brukes.
+- Bruk alltid grupperings- og kategoriseringskolonner (som Kontogruppe, Kategori, Type, Status) fremfor fritekst-søk med LIKE på store tekstkolonner.
+- LIKE '%søkeord%' på store tekstkolonner er tregt og upresist — unngå det som første strategi.
+- Når bruker spør etter en kostnadstype uten kontonummer: sjekk først om viewet har en grupperingskolonne, søk på den med LIKE, ikke søk på bilagstekst.
+- Ved tomt resultat: prøv automatisk én alternativ strategi (annen kolonne, bredere LIKE) før du svarer at ingenting finnes.
 - Vis alltid hvilken SQL du brukte slik at brukeren kan korrigere deg.
 
 DATAKILDE-TRANSPARENS:
@@ -88,169 +89,10 @@ DATAKILDE-TRANSPARENS:
   "Dette kan jeg finne i [view A] eller [view B] — hvilket datasett vil du sjekke?"
 - Søk deretter direkte i riktig view uten å spørre igjen.`;
 
-// ── Fallback hardkodet prompt (brukes om metadata-tabeller ikke finnes ennå) ──
+// ── Fallback generisk prompt (brukes om metadata-tabeller ikke er tilgjengelige) ──
 const FALLBACK_BASIS_PROMPT = `
-TILGJENGELIGE VIEWS:
-
-1. ai_gold.vw_Fact_Bolting_BeverBas - Bolting/sikringsdata
-   Kolonner:
-   - Prosjektnr, Prosjektnavn
-   - profil, Profilnavn
-   - Pel, FraPel, tilPel
-   - BoltKode, BoltTypeName
-   - Boltdiameter, Boltlengde
-   - AntallBolter
-   - dato (DATETIME)
-   - år, måned, månedsnavn
-   - ukenr, ukeinfo (f.eks. "10 (02.03.26-08.03.26)")
-   - dag, daginfo (f.eks. "To 5 Mar")
-
-   Eksempelspørringer:
-   SELECT SUM(AntallBolter) FROM ai_gold.vw_Fact_Bolting_BeverBas
-   WHERE år = 2026 AND ukenr = 10
-
-   SELECT Profilnavn, SUM(AntallBolter) AS Antall
-   FROM ai_gold.vw_Fact_Bolting_BeverBas
-   WHERE år = 2026 AND måned = 3
-   GROUP BY Profilnavn ORDER BY Antall DESC
-
-2. ai_gold.vw_Fact_sprut_BeverBas - Sprøytebetong/sikringsdata
-   Kolonner:
-   - Prosjektnr, Prosjektnavn
-   - profil, Profilnavn
-   - Pel, FraPel, tilPel
-   - BetongType: type betong (f.eks. "E1000")
-   - Volum: totalt volum betong (m³)
-   - DumpetVolum: dumpet volum (m³)
-   - ReturnertVolum: returnert volum (m³)
-   - Kommentar: fritekst kommentar
-   - dato (DATETIME)
-   - år, måned, månedsnavn
-   - ukenr, ukeinfo (f.eks. "8 (16.02.26-22.02.26)")
-   - dag, daginfo (f.eks. "Lø 21 Feb")
-
-   Eksempelspørringer:
-   SELECT SUM(Volum) FROM ai_gold.vw_Fact_sprut_BeverBas
-   WHERE år = 2026 AND ukenr = 10
-
-   SELECT Profilnavn, SUM(Volum) AS TotaltVolum
-   FROM ai_gold.vw_Fact_sprut_BeverBas
-   WHERE år = 2026 AND måned = 3
-   GROUP BY Profilnavn ORDER BY TotaltVolum DESC
-
-   SELECT BetongType, SUM(Volum) AS Volum
-   FROM ai_gold.vw_Fact_sprut_BeverBas
-   GROUP BY BetongType ORDER BY Volum DESC
-
-3. ai_gold.vw_Fact_Produksjon_tidslinje_BeverBas - Produksjonstidslinje per operasjon
-   Kolonner:
-   - Prosjektnr, Prosjektnavn
-   - profil, Profilnavn
-   - Pel: pelplassering
-   - Operasjon: type operasjon (f.eks. "Lading og sprenging", "Stopptid")
-   - Timer: varighet i timer (desimaltall, f.eks. 1.167)
-   - Minutter: varighet i minutter (f.eks. 70)
-   - Kommentar: fritekst kommentar
-   - Ansvarlig: navn på ansvarlig person
-   - dato (DATETIME)
-   - år, måned, månedsnavn
-   - ukenr, ukeinfo (f.eks. "8 (16.02.26-22.02.26)")
-   - dag, daginfo (f.eks. "Fr 20 Feb")
-
-   Eksempelspørringer:
-   SELECT Operasjon, SUM(Timer) AS TotaltTimer
-   FROM ai_gold.vw_Fact_Produksjon_tidslinje_BeverBas
-   WHERE år = 2026 AND ukenr = 10
-   GROUP BY Operasjon ORDER BY TotaltTimer DESC
-
-   SELECT SUM(Timer) AS StopptidTimer
-   FROM ai_gold.vw_Fact_Produksjon_tidslinje_BeverBas
-   WHERE år = 2026 AND måned = 3
-   AND Operasjon = 'Stopptid'
-
-   SELECT dato, Operasjon, SUM(Timer) AS Timer
-   FROM ai_gold.vw_Fact_Produksjon_tidslinje_BeverBas
-   WHERE år = 2026 AND ukenr = 10
-   GROUP BY dato, Operasjon ORDER BY dato
-
-4. ai_gold.vw_Fact_RUH - Rapportering av uønskede hendelser (RUH/HMS)
-   Kolonner:
-   - ProsjektId: prosjektnummer (f.eks. 6040)
-   - Prosjekt: prosjektnavn (f.eks. "6040 Fjellhaugen kraftverk")
-   - Ansvarlig: navn på ansvarlig person
-   - Registrerer: hvem som registrerte
-   - Melder: navn på melder (kan være NULL)
-   - Typeavvik: type avvik (f.eks. "HMS", NULL = ikke satt)
-   - Alvorlighetsgrad: "Mindre alvorlig", "Alvorlig", "Svært alvorlig"
-   - Personskade: "Ja" / "Nei" / NULL
-   - Status: "Ny melding", "Lukket", "Under behandling"
-   - Beskrivelse: kort tittel/beskrivelse av hendelsen
-   - BeskrivelseHendelse: utfyllende beskrivelse (kan inneholde HTML-tags som <br />)
-   - dato (DATETIME)
-   - år, måned, månedsnavn
-   - ukenr, ukeinfo (f.eks. "11 (09.03.26-15.03.26)")
-   - dag, daginfo (f.eks. "Ti 10 Mar")
-
-   VIKTIG: BeskrivelseHendelse kan inneholde HTML-tags som <br />.
-   Når du presenterer BeskrivelseHendelse til bruker, fjern HTML-tags og erstatt <br /> med linjeskift.
-
-   Eksempelspørringer:
-   SELECT COUNT(*) AS AntallRUH
-   FROM ai_gold.vw_Fact_RUH
-   WHERE år = 2026 AND måned = 3
-
-   SELECT Alvorlighetsgrad, COUNT(*) AS Antall
-   FROM ai_gold.vw_Fact_RUH
-   WHERE år = 2026
-   GROUP BY Alvorlighetsgrad ORDER BY Antall DESC
-
-   SELECT ProsjektId, Prosjekt, COUNT(*) AS Antall
-   FROM ai_gold.vw_Fact_RUH
-   GROUP BY ProsjektId, Prosjekt ORDER BY Antall DESC
-
-   SELECT COUNT(*) AS Personskader
-   FROM ai_gold.vw_Fact_RUH
-   WHERE Personskade = 'Ja' AND år = 2026
-
-   SELECT dato, Prosjekt, Alvorlighetsgrad, Personskade,
-          Beskrivelse, BeskrivelseHendelse
-   FROM ai_gold.vw_Fact_RUH
-   WHERE Status != 'Lukket'
-   ORDER BY Alvorlighetsgrad DESC, dato DESC
-
-   MERK: Dette viewet inneholder HMS-data på tvers av prosjekter.
-   Bruk dette viewet for alle spørsmål om RUH, avvik, hendelser, personskader og HMS-status.
-
-   KRITISKE REGLER FOR vw_Fact_RUH:
-   1. Viewet heter ALLTID ai_gold.vw_Fact_RUH — IKKE ai_gold.vw_RUH eller andre varianter.
-
-   2. Gyldige verdier for Alvorlighetsgrad: 'Mindre alvorlig', 'Alvorlig', 'Svært alvorlig'
-      IKKE 'Kritisk', 'Høy', 'Lav', 'Medium' eller andre antatte verdier.
-      Når bruker spør om "høy alvorlighetsgrad" eller "alvorlig":
-      Alvorlighetsgrad IN ('Alvorlig', 'Svært alvorlig')
-
-   3. Det finnes INGEN Lokasjon-kolonne. Filtrer på prosjekt via Prosjekt eller ProsjektId:
-      WHERE Prosjekt LIKE '%Hemsil%'   -- søk på prosjektnavn (bruk ALLTID LIKE, aldri eksakt =)
-      WHERE ProsjektId = '6050'        -- søk på prosjektnummer
-
-   4. Når bruker nevner et prosjektnavn (f.eks. "hemsil"), bruk LIKE '%hemsil%' mot Prosjekt-kolonnen.
-      Anta aldri eksakte verdier eller kolonner som ikke er dokumentert over.
-
-   5. Hvis en spørring returnerer 0 rader, gi IKKE opp. Gjør følgende:
-      a) Slå opp faktiske verdier i kolonnen:
-         SELECT DISTINCT Alvorlighetsgrad FROM ai_gold.vw_Fact_RUH
-      b) Juster spørringen basert på faktiske verdier og prøv på nytt.
-
-   6. Hvis du er usikker på verdier, kjør alltid:
-      SELECT DISTINCT [kolonne] FROM ai_gold.vw_Fact_RUH
-      før du bygger hovedspørringen.
-
-   Eksempel — RUH i Hemsil med høy alvorlighetsgrad:
-   SELECT dato, Alvorlighetsgrad, Personskade, Beskrivelse, BeskrivelseHendelse
-   FROM ai_gold.vw_Fact_RUH
-   WHERE Prosjekt LIKE '%Hemsil%'
-   AND Alvorlighetsgrad IN ('Alvorlig', 'Svært alvorlig')
-   ORDER BY dato DESC
+Metadata-tabeller er ikke tilgjengelige for øyeblikket.
+Spør brukeren om hvilken datakilde de vil søke i, og be dem oppgi view-navn eller tabell de vil bruke.
 ${STATIC_APPENDIX}`;
 
 // ── Dynamisk prompt-bygging fra metadata-katalogen ──
