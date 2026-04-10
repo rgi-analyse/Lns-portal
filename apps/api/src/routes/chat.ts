@@ -143,7 +143,7 @@ async function buildDynamicViewsSection(
       ORDER BY k.view_id, k.sort_order
     `),
     queryAzureSQL(`
-      SELECT r.view_id, r.regel_type, r.innhold
+      SELECT r.view_id, r.regel_type, r.regel AS innhold
       FROM ai_metadata_regler r
       JOIN ai_metadata_views v ON r.view_id = v.id
       ${viewsFilter}
