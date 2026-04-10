@@ -7,6 +7,7 @@ import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
+import * as XLSX from 'xlsx';
 
 export interface FilterConfig {
   table: string;
@@ -75,27 +76,16 @@ interface AIChatProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-function exportToCsv(data: Record<string, unknown>[], filename: string) {
+function exportToExcel(data: Record<string, unknown>[], filename: string) {
   if (data.length === 0) return;
-  const headers = Object.keys(data[0]);
-  const rows = data.map((row) =>
-    headers.map((h) => {
-      const val = row[h];
-      if (val === null || val === undefined) return '';
-      const str = String(val);
-      return str.includes(',') || str.includes('"') || str.includes('\n')
-        ? `"${str.replace(/"/g, '""')}"`
-        : str;
-    }).join(',')
-  );
-  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${filename}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(data);
+  const kolBredder = Object.keys(data[0]).map(key => ({
+    wch: Math.max(key.length, ...data.map(rad => String(rad[key] ?? '').length), 8),
+  }));
+  ws['!cols'] = kolBredder;
+  XLSX.utils.book_append_sheet(wb, ws, 'Data');
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
 export default function AIChat({
@@ -325,7 +315,7 @@ export default function AIChat({
 
   function eksporterRapport(forslag: RapportForslag) {
     if (!forslag.data?.length) return;
-    exportToCsv(forslag.data, forslag.tittel || 'rapport');
+    exportToExcel(forslag.data, forslag.tittel || 'rapport');
   }
 
   const LAG_RAPPORT_TRIGGERS = [
@@ -924,7 +914,7 @@ export default function AIChat({
                 return (
                   <div key={i} className="flex gap-2 flex-wrap pl-1">
                     <button
-                      onClick={() => exportToCsv(msg.queryData!, `eksport-${new Date().toISOString().slice(0, 10)}`)}
+                      onClick={() => exportToExcel(msg.queryData!, `eksport-${new Date().toISOString().slice(0, 10)}`)}
                       className="flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors font-semibold"
                       style={{
                         background: 'var(--glass-gold-border)',
@@ -935,7 +925,7 @@ export default function AIChat({
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                     >
                       <Download className="w-3 h-3" />
-                      Last ned Excel (CSV)
+                      Last ned Excel
                     </button>
                   </div>
                 );
