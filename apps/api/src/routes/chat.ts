@@ -16,7 +16,19 @@ const SQL_REGLER = `## SQL-regler (Azure T-SQL)
 - Datoformat: CONVERT(VARCHAR, dato, 103) for DD/MM/YYYY
 - Paginering: SELECT * FROM tabell ORDER BY kolonne OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
 - Kall query_database umiddelbart når bruker spør om data — ikke spør om du skal gjøre det
-- Svar alltid på norsk`;
+- Svar alltid på norsk
+
+DATO-RANGE REGLER:
+Når bruker spør om data "frem til [måned år]", "t.o.m.", "opp til", "akkumulert til":
+FEIL — henter kun én periode: WHERE År = 2026 AND Måned = 4
+RIKTIG — henter alle perioder frem til og med: WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)
+Eksempel "sum alle år frem til april 2026":
+  SELECT År, SUM(Beløp) AS Total FROM [view]
+  WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)
+  GROUP BY År ORDER BY År
+Eksempel "akkumulert sum t.o.m. april 2026":
+  SELECT SUM(Beløp) AS TotalTomApril2026 FROM [view]
+  WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)`;
 
 const SØKESTRATEGI_REGLER = `## Søkestrategi
 - Les kolonnebeskrivelsene nøye — de forteller deg hva kolonnen inneholder og hvordan den brukes
