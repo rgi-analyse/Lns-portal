@@ -3,7 +3,7 @@ import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
 import { syncViewColumns, syncAllViews, discoverNewViews } from '../services/metadataSync';
 import { requireBruker, requireAdmin } from '../middleware/auth';
 
-const esc = (val: string): string => val.replace(/'/g, "''");
+const esc = (val: string): string => val.replace(/'/g, "''").replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
 export async function metadataRoutes(fastify: FastifyInstance) {
 
