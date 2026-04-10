@@ -1146,7 +1146,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               Nullstill
             </ToolBtn>
             <Divider />
-            {(brukerRolle === 'admin' || brukerRolle === 'tenantadmin' || brukerRolle === 'redaktor') && (
+            {(brukerRolle === 'admin' || brukerRolle === 'tenantadmin' || brukerRolle === 'redaktør') && (
               <ToolBtn
                 onClick={handleRefresh}
                 disabled={!pbiDatasetId || refreshStatus === 'loading'}
