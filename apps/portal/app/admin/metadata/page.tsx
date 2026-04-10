@@ -353,6 +353,11 @@ export default function MetadataAdminPage() {
       headers: jsonHeaders,
       body: JSON.stringify(regelForm),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      alert(err.error ?? `Feil ved lagring av regel (HTTP ${res.status})`);
+      return;
+    }
     const ny = await res.json();
     setViews(prev => prev.map(v => v.id === addRegelViewId ? { ...v, regler: [...v.regler, ny] } : v));
     setAddRegelViewId(null);
