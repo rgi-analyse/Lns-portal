@@ -29,6 +29,19 @@ KOLONNE-TYPE REGLER:
 - GROUP BY på varchar fungerer direkte — ingen casting nødvendig:
   ✅ SELECT Prosjekt, SUM(Beløp) FROM view GROUP BY Prosjekt
 - Ved konverteringsfeil i SQL: ikke prøv CAST-varianter — bytt til LIKE-søk i stedet
+- Prosjekt-kolonnen er varchar og inneholder f.eks. "1000 - Hovedkontor" — GROUP BY Prosjekt gir én rad per prosjekt uten konvertering
+
+KORREKT spørring for "sum pr prosjekt":
+  SELECT Prosjekt, SUM(Beløp) AS Total
+  FROM ai_gold.vw_Fact_Regnskapstransaksjoner
+  WHERE Kontonr = 6630
+  AND (år < 2026 OR (år = 2026 AND måned <= 4))
+  GROUP BY Prosjekt
+  ORDER BY Total DESC
+ALDRI skriv dette:
+  SELECT TRY_CAST(LEFT(Prosjekt, CHARINDEX(' ', Prosjekt)-1) AS INT)...
+  SELECT CAST(Prosjekt AS INT)...
+  WHERE ISNUMERIC(Prosjekt) = 1...
 
 DATO-RANGE REGLER:
 Når bruker spør om data "frem til [måned år]", "t.o.m.", "opp til", "akkumulert til":
