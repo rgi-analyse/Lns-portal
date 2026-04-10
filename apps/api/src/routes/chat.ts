@@ -22,26 +22,13 @@ KOLONNE-TYPE REGLER:
 - Sjekk alltid datatype fra kolonneinfo i systemprompten før du skriver SQL
 - varchar/nvarchar-kolonner skal ALDRI castes til tall
 - Bruk alltid LIKE for søk på varchar-kolonner:
-  ✅ WHERE Prosjekt LIKE '%1000%'
-  ❌ WHERE CAST(Prosjekt AS INT) = 1000
-  ❌ WHERE ISNUMERIC(Prosjekt) = 1
-  ❌ WHERE TRY_CAST(Prosjekt AS INT) = 1000
+  ✅ WHERE kolonne LIKE '%søkeverdi%'
+  ❌ WHERE CAST(kolonne AS INT) = verdi
+  ❌ WHERE ISNUMERIC(kolonne) = 1
+  ❌ WHERE TRY_CAST(kolonne AS INT) = verdi
 - GROUP BY på varchar fungerer direkte — ingen casting nødvendig:
-  ✅ SELECT Prosjekt, SUM(Beløp) FROM view GROUP BY Prosjekt
+  ✅ SELECT kolonne, SUM(Beløp) FROM view GROUP BY kolonne
 - Ved konverteringsfeil i SQL: ikke prøv CAST-varianter — bytt til LIKE-søk i stedet
-- Prosjekt-kolonnen er varchar og inneholder f.eks. "1000 - Hovedkontor" — GROUP BY Prosjekt gir én rad per prosjekt uten konvertering
-
-KORREKT spørring for "sum pr prosjekt":
-  SELECT Prosjekt, SUM(Beløp) AS Total
-  FROM ai_gold.vw_Fact_Regnskapstransaksjoner
-  WHERE Kontonr = 6630
-  AND (år < 2026 OR (år = 2026 AND måned <= 4))
-  GROUP BY Prosjekt
-  ORDER BY Total DESC
-ALDRI skriv dette:
-  SELECT TRY_CAST(LEFT(Prosjekt, CHARINDEX(' ', Prosjekt)-1) AS INT)...
-  SELECT CAST(Prosjekt AS INT)...
-  WHERE ISNUMERIC(Prosjekt) = 1...
 
 DATO-RANGE REGLER:
 Når bruker spør om data "frem til [måned år]", "t.o.m.", "opp til", "akkumulert til":
@@ -156,10 +143,11 @@ async function buildDynamicViewsSection(
       ORDER BY k.view_id, k.sort_order
     `),
     queryAzureSQL(`
-      SELECT r.view_id, r.regel
+      SELECT r.view_id, r.regel_type, r.innhold
       FROM ai_metadata_regler r
       JOIN ai_metadata_views v ON r.view_id = v.id
       ${viewsFilter}
+      ORDER BY r.view_id, r.sort_order
     `),
     queryAzureSQL(`
       SELECT e.view_id, e.spørsmål, e.sql_eksempel
@@ -225,7 +213,7 @@ async function buildDynamicViewsSection(
 
     const viewRegler = regler.filter(r => r['view_id'] === view['id']);
     const reglerTekst = viewRegler.length > 0
-      ? `   Regler:\n${viewRegler.map(r => `   - ${r['regel']}`).join('\n')}`
+      ? `   Regler for dette viewet:\n${viewRegler.map(r => `   • ${r['innhold']}`).join('\n')}`
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
