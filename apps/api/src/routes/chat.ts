@@ -5,95 +5,37 @@ import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { erAdmin } from '../middleware/auth';
 
-// ── Statisk tillegg som alltid er med (analyse-instruksjoner og generelle regler) ──
-const PROSJEKT_INSTRUKSJON = `
-PROSJEKTIDENTIFISERING:
-Prosjekter kan refereres til på flere måter av brukeren:
-- Som tall alene: "1000", "6050", "4200"
-- Som navn: "Hemsil", "Hovedkontor", "Nussir"
-- Som kombinasjon: "P1000" = prosjektnr 1000, "P6050" = 6050 — fjern alltid prefiks "P"
+// ── Statisk del av system-prompten ──
+const SYSTEM_INTRO = `Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.`;
 
-Når bruker nevner et prosjekt:
-→ Søk på prosjektnummer ELLER prosjektnavn i WHERE-klausulen
-→ Aldri anta at prosjektet ikke finnes uten å ha søkt
-→ Bruk LIKE-søk på navn: WHERE Prosjekt LIKE '%Hemsil%'
-→ Bruk eksakt match på nummer: WHERE Prosjektnr = 1000 (heltall, ikke streng)
-`;
-
-const STATIC_APPENDIX = `
-RUH-ANALYSE — VURDERING AV ALVORLIGHETSGRAD:
-Når bruker spør om å analysere RUH-hendelser eller vurdere alvorlighetsgrad, hent data fra
-ai_gold.vw_Fact_RUH og analyser følgende felter:
-- Alvorlighetsgrad: registrert alvorlighetsgrad
-- Personskade: om det er registrert personskade
-- Beskrivelse: kort tittel/beskrivelse av hendelsen
-- BeskrivelseHendelse: utfyllende beskrivelse av hendelsen
-
-Analyser BEGGE beskrivelsestekstene og vurder om hendelsen fremstår mer alvorlig enn registrert.
-
-Spørring for analyse:
-SELECT dato, Alvorlighetsgrad, Personskade, Beskrivelse, BeskrivelseHendelse
-FROM ai_gold.vw_Fact_RUH
-WHERE år = 2026
-ORDER BY Alvorlighetsgrad DESC, dato DESC
-
-Presenter resultatet per hendelse i denne rekkefølgen:
-- Dato
-- Registrert alvorlighetsgrad (fra Alvorlighetsgrad-feltet)
-- Personskade (Ja/Nei/NULL)
-- Beskrivelse (kort)
-- BeskrivelseHendelse (utfyllende)
-- Din vurdering (AI-ens egen analyse av faktisk alvorlighet basert på innholdet i begge beskrivelsene)
-
-Flagg spesielt hendelser der:
-- Din vurdering er høyere enn registrert Alvorlighetsgrad
-- Personskade er Ja eller uklar
-- Beskrivelsene inneholder: brann, eksplosjon, fall, kjemikalier, strøm, kollaps,
-  manglende samband i tunnel, farlige stoffer, rømningsvei blokkert
-
-VALG AV DATAKILDE:
-Når bruker spør om økonomi/regnskap/bilag/faktura/kostnader: Bruk alltid Regnskapstransaksjoner (vw_Fact_Regnskapstransaksjoner) som primærkilde — den inneholder bilag med kontonummer og tekst.
-Når bruker spør om leverandør/leverandørnavn: Bruk Leverandørtransaksjoner som primærkilde.
-Når bruker spør om balanse/saldo: Bruk Balansetransaksjoner som primærkilde.
-Informer brukeren om hvilken datakilde du bruker når det er åpenbart fra spørsmålet. Søk direkte i riktig view uten å spørre.
-
-AZURE SQL (T-SQL) SYNTAKSREGLER — FØLG ALLTID:
-- Bruk ALDRI LIMIT — det støttes IKKE i Azure SQL (T-SQL)
-- Begrens rader med: SELECT TOP 20 kolonne FROM tabell (for rådata-lister)
-- ALDRI bruk TOP på spørringer med GROUP BY — GROUP BY returnerer allerede aggregerte data
-- Paginering: SELECT * FROM (SELECT ROW_NUMBER() OVER (ORDER BY kolonne) AS rn, * FROM tabell) t WHERE rn BETWEEN 1 AND 10
-- Alternativt for paginering: SELECT * FROM tabell ORDER BY kolonne OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY
+const SQL_REGLER = `## SQL-regler (Azure T-SQL)
+- Bruk TOP 20 for å begrense rader i rådata-lister — ALDRI LIMIT
+- Aldri bruk TOP på spørringer med GROUP BY
 - Bruk GETDATE() ikke NOW()
-- Bruk ISNULL(kolonne, 0) ikke IFNULL() — COALESCE() fungerer også
+- Bruk ISNULL() eller COALESCE() — ikke IFNULL()
 - Datoformat: CONVERT(VARCHAR, dato, 103) for DD/MM/YYYY
-- String-konkatenering: kolonne1 + ' ' + kolonne2 eller CONCAT(kolonne1, ' ', kolonne2)
+- Paginering: SELECT * FROM tabell ORDER BY kolonne OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
+- Kall query_database umiddelbart når bruker spør om data — ikke spør om du skal gjøre det
+- Svar alltid på norsk`;
 
-GENERELLE SQL-REGLER:
-- Når brukeren spør om data: ALLTID kall query_database umiddelbart. Ikke spør om du skal gjøre det.
-- Ikke si at du ikke har tilgang til data. Du har ALLTID tilgang via query_database.
-- Ikke avvis spørsmål fordi data ikke finnes i rapporten — søk i databasen først.
-- Svar alltid på norsk.
-
-SØKESTRATEGI — FØLG DISSE PRINSIPPENE:
-- Les kolonnebeskrivelsene i systemprompten nøye — de forteller hvordan kolonnen skal brukes.
-- Bruk alltid grupperings- og kategoriseringskolonner (som Kontogruppe, Kategori, Type, Status) fremfor fritekst-søk med LIKE på store tekstkolonner.
-- LIKE '%søkeord%' på store tekstkolonner er tregt og upresist — unngå det som første strategi.
-- Når bruker spør etter en kostnadstype uten kontonummer: sjekk først om viewet har en grupperingskolonne, søk på den med LIKE, ikke søk på bilagstekst.
-- Ved tomt resultat: prøv automatisk én alternativ strategi (annen kolonne, bredere LIKE) før du svarer at ingenting finnes.
-- Vis alltid hvilken SQL du brukte slik at brukeren kan korrigere deg.
-
-DATAKILDE-TRANSPARENS:
-- Informer alltid hvilken datakilde (view-navn) du bruker når du svarer på dataspørsmål.
-- Bruk formuleringen: "Jeg henter dette fra [visningsnavn] ([view_name])..."
-- Hvis spørsmålet kan besvares fra flere views, still ett kort oppklarende spørsmål:
-  "Dette kan jeg finne i [view A] eller [view B] — hvilket datasett vil du sjekke?"
-- Søk deretter direkte i riktig view uten å spørre igjen.`;
+const SØKESTRATEGI_REGLER = `## Søkestrategi
+- Les kolonnebeskrivelsene nøye — de forteller deg hva kolonnen inneholder og hvordan den brukes
+- Foretrekk kategoriseringskolonner (Type, Gruppe, Kategori, Status) fremfor LIKE-søk på store tekstkolonner
+- Informer alltid hvilken datakilde du bruker: "Jeg søker i **[Visningsnavn]** fordi..."
+- Spør bruker ved tvil om hvilken datakilde som er riktig
+- Ved tomt resultat: prøv én alternativ søkestrategi automatisk før du svarer at ingenting finnes
+- Prosjekter kan refereres som tall ("1000"), navn ("Hemsil"), eller kombinasjon ("P1000" = 1000 — fjern prefiks "P")`;
 
 // ── Fallback generisk prompt (brukes om metadata-tabeller ikke er tilgjengelige) ──
-const FALLBACK_BASIS_PROMPT = `
+const FALLBACK_BASIS_PROMPT = `${SYSTEM_INTRO}
+
+${SQL_REGLER}
+
+${SØKESTRATEGI_REGLER}
+
+## Tilgjengelige datakilder
 Metadata-tabeller er ikke tilgjengelige for øyeblikket.
-Spør brukeren om hvilken datakilde de vil søke i, og be dem oppgi view-navn eller tabell de vil bruke.
-${STATIC_APPENDIX}`;
+Spør brukeren om hvilken datakilde de vil søke i, og be dem oppgi view-navn eller tabell de vil bruke.`;
 
 // ── Dynamisk prompt-bygging fra metadata-katalogen ──
 // Cache per område-nøkkel ('all' = alle views, 'HMS' = kun HMS-views, osv.)
@@ -212,96 +154,52 @@ async function buildDynamicViewsSection(
     viewsForPrompt = alleViews;
   }
 
-  // Bygg den fremtredende instruksjonsblokken FØRST — plassert øverst i prompten
-  // slik at GPT-4o gir den høyest vekt
-  const alleKolonnerMedBeskrivelse = kolonner.filter(k => k['beskrivelse']);
-  let instruksjonsseksjon = '';
-  if (alleKolonnerMedBeskrivelse.length > 0) {
-    instruksjonsseksjon += 'VIKTIGE KOLONNE-INSTRUKSJONER (MÅ FØLGES):\n';
-    instruksjonsseksjon += 'Disse instruksjonene er definert av dataeierne og er bindende.\n\n';
-    for (const k of alleKolonnerMedBeskrivelse) {
-      instruksjonsseksjon += `KOLONNE: ${k['kolonne_navn']}\n`;
-      if (k['kolonne_type']) instruksjonsseksjon += `TYPE: ${k['kolonne_type']}\n`;
-      instruksjonsseksjon += `INSTRUKSJON: ${k['beskrivelse']}\n`;
-      instruksjonsseksjon += '---\n';
-    }
-    instruksjonsseksjon += '\n';
-    console.log(`[Chat] kolonne-instruksjoner inkludert: ${alleKolonnerMedBeskrivelse.length} kolonner`);
-    console.log('[Chat] kolonne-instruksjons-tekst (første 600 tegn):', instruksjonsseksjon.slice(0, 600));
-  } else {
-    console.log('[Chat] ingen kolonne-instruksjoner funnet');
-  }
-
-  let viewsPrompt = instruksjonsseksjon + 'TILGJENGELIGE VIEWS:\n\n';
-
-  for (const view of viewsForPrompt) {
-    viewsPrompt += `### ${view['schema_name']}.${view['view_name']}\n`;
-    viewsPrompt += `Navn: ${view['visningsnavn']}\n`;
-    if (view['område']) viewsPrompt += `Område: ${view['område']}\n`;
-    if (view['beskrivelse']) viewsPrompt += `Beskrivelse: ${view['beskrivelse']}\n`;
-
+  // Bygg views-seksjon
+  const viewsPrompt = viewsForPrompt.map(view => {
     const viewKolonner = kolonner.filter(k => k['view_id'] === view['id']);
-    if (viewKolonner.length > 0) {
-      viewsPrompt += `Kolonner:\n`;
-      const kolonneTekstLinjer: string[] = [];
-      for (const k of viewKolonner) {
-        const type = k['kolonne_type'] ? ` [${k['kolonne_type']}]` : '';
-        let linje = `  - ${k['kolonne_navn']} (${k['datatype'] ?? 'ukjent'}${type})`;
-        if (k['beskrivelse']) linje += ` — ${k['beskrivelse']}`;
-        if (k['eksempel_verdier']) linje += ` (eks: ${k['eksempel_verdier']})`;
-        kolonneTekstLinjer.push(linje);
-      }
-      const kolonneTekst = kolonneTekstLinjer.join('\n');
-      viewsPrompt += kolonneTekst + '\n';
-      if (String(view['view_name'] ?? '').includes('Regnskaps')) {
-        console.log('[prompt] Regnskaps kolonner i prompt:', kolonneTekst.slice(0, 500));
-      }
+    const kolonnerTekst = viewKolonner.map(k => {
+      let linje = `   - ${k['kolonne_navn']}`;
+      if (k['beskrivelse']) linje += ` — ${k['beskrivelse']}`;
+      if (k['eksempel_verdier']) linje += ` (eks: ${k['eksempel_verdier']})`;
+      return linje;
+    }).join('\n');
+
+    if (String(view['view_name'] ?? '').includes('Regnskaps')) {
+      console.log('[prompt] Regnskaps kolonner i prompt:', kolonnerTekst.slice(0, 500));
     }
 
     const viewRegler = regler.filter(r => r['view_id'] === view['id']);
-    if (viewRegler.length > 0) {
-      viewsPrompt += `Regler:\n`;
-      for (const r of viewRegler) {
-        viewsPrompt += `  - ${r['regel']}\n`;
-      }
-    }
+    const reglerTekst = viewRegler.length > 0
+      ? `   Regler:\n${viewRegler.map(r => `   - ${r['regel']}`).join('\n')}`
+      : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
-    if (viewEksempler.length > 0) {
-      viewsPrompt += `Eksempelspørringer:\n`;
-      for (const e of viewEksempler) {
-        if (e['spørsmål']) viewsPrompt += `  -- ${e['spørsmål']}\n`;
-        if (e['sql_eksempel']) viewsPrompt += `  ${e['sql_eksempel']}\n`;
-      }
-    }
+    const eksempelTekst = viewEksempler.length > 0
+      ? `   Eksempelspørringer:\n${viewEksempler.map(e => [e['spørsmål'] ? `   -- ${e['spørsmål']}` : '', e['sql_eksempel'] ? `   ${e['sql_eksempel']}` : ''].filter(Boolean).join('\n')).join('\n')}`
+      : '';
 
-    viewsPrompt += '\n';
-  }
+    return [
+      `### ${view['visningsnavn']}`,
+      `   View: ${view['schema_name']}.${view['view_name']}`,
+      view['beskrivelse'] ? `   ${view['beskrivelse']}` : '',
+      kolonnerTekst ? `   Kolonner:\n${kolonnerTekst}` : '',
+      reglerTekst,
+      eksempelTekst,
+    ].filter(Boolean).join('\n');
+  }).join('\n\n');
 
-  // Andre tilgjengelige views (ikke inkludert i prompt)
-  if (utelatte.length > 0) {
-    viewsPrompt += `\nAndre tilgjengelige datakilder (spør meg hvis relevant): ${utelatte.join(', ')}\n`;
-  }
-
-  // Oppklarende spørsmål ved mange views
-  const viewInstruks = viewsForPrompt.length > 3
-    ? `\nNår bruker spør om data som kan ligge i flere views, still ett oppklarende spørsmål:\n"Dette kan jeg finne i [view A] (beskrivelse) eller [view B] (beskrivelse). Hvilken vil du sjekke?"\nSøk deretter i riktig view basert på svaret.\n`
-    : '';
-  viewsPrompt += viewInstruks;
-
-  // Legg til instruksjoner for URL-kolonner
+  // URL-kolonner: vis alltid som lenker
   const urlKolonner = kolonner.filter(k => k['kolonne_type'] === 'url');
-  if (urlKolonner.length > 0) {
-    viewsPrompt += 'URL-KOLONNER (VIKTIG):\n';
-    viewsPrompt += 'Følgende kolonner inneholder URL-er. Vis dem ALLTID som klikkbare markdown-lenker, aldri som rå URL-streng.\n';
-    for (const k of urlKolonner) {
-      const lenketekst = k['lenketekst'] || k['kolonne_navn'];
-      viewsPrompt += `  - ${k['kolonne_navn']}: vis som [${lenketekst}](url-verdien)\n`;
-    }
-    viewsPrompt += '\n';
-  }
+  const urlTekst = urlKolonner.length > 0
+    ? `\n**URL-kolonner** — vis alltid som klikkbare markdown-lenker:\n${urlKolonner.map(k => `- ${k['kolonne_navn']}: vis som [${k['lenketekst'] || k['kolonne_navn']}](url-verdien)`).join('\n')}`
+    : '';
 
-  return viewsPrompt;
+  // Andre views ikke inkludert i prompt
+  const utelatteTekst = utelatte.length > 0
+    ? `\n*Andre tilgjengelige datakilder (spør meg hvis relevant): ${utelatte.join(', ')}*`
+    : '';
+
+  return viewsPrompt + urlTekst + utelatteTekst;
 }
 
 async function buildSystemPrompt(
@@ -337,13 +235,21 @@ async function buildSystemPrompt(
   }
 
   try {
-    const dynamicSection = await buildDynamicViewsSection(
+    const viewsSection = await buildDynamicViewsSection(
       kobletViewIds,
       kobletViewIds ? null : område,
       brukerSpørsmål,
       kobletViewIds,
     );
-    const prompt = PROSJEKT_INSTRUKSJON + dynamicSection + STATIC_APPENDIX;
+    const prompt = `${SYSTEM_INTRO}
+
+${SQL_REGLER}
+
+${SØKESTRATEGI_REGLER}
+
+## Tilgjengelige datakilder
+${viewsSection}`;
+    console.log('[buildSystemPrompt] prompt lengde:', prompt.length);
     if (cacheKey) {
       promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
     }
