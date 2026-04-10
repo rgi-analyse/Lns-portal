@@ -293,7 +293,12 @@ async function buildSystemPrompt(
       kobletViewIds,
       kobletViewIds ? null : tillatteViewIds,  // workspace-tilgang gjelder kun når ingen rapport-kobling
     );
-    const prompt = `${SYSTEM_INTRO}
+    const iDag = new Date().toLocaleDateString('nb-NO', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const prompt = `Dagens dato er ${iDag}.
+
+${SYSTEM_INTRO}
 
 ${SQL_REGLER}
 
