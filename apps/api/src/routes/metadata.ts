@@ -294,6 +294,22 @@ export async function metadataRoutes(fastify: FastifyInstance) {
     },
   );
 
+  // GET /api/admin/metadata/views/:id/regler — hent regler for et view
+  fastify.get<{ Params: { id: string } }>(
+    '/api/admin/metadata/views/:id/regler',
+    { preHandler: [requireBruker, requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const rows = await queryAzureSQL(`
+        SELECT id, view_id, regel, opprettet
+        FROM ai_metadata_regler
+        WHERE view_id = '${esc(id)}'
+        ORDER BY opprettet
+      `);
+      return reply.send(rows);
+    },
+  );
+
   // POST /api/admin/metadata/views/:id/regler — legg til regel
   fastify.post<{ Params: { id: string }; Body: { regel: string } }>(
     '/api/admin/metadata/views/:id/regler',
