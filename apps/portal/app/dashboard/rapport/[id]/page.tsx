@@ -39,7 +39,8 @@ export default function RapportPage() {
   const { id }                                       = useParams<{ id: string }>();
   const router                                       = useRouter();
   const { isAuthenticated, authHeaders, grupper,
-          entraObjectId, rolle }                     = usePortalAuth();
+          entraObjectId }                            = usePortalAuth();
+  const [brukerRolleState, setBrukerRolleState]      = useState<string>('');
 
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
@@ -97,7 +98,10 @@ export default function RapportPage() {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
-            setKanLageRapport(['admin', 'tenantadmin'].includes(meg.rolle ?? '') || meg.rolle === 'redaktør');
+            console.log('[RapportPage] meg.rolle:', meg?.rolle);
+            const r = meg.rolle ?? '';
+            setBrukerRolleState(r);
+            setKanLageRapport(['admin', 'tenantadmin'].includes(r) || r === 'redaktør');
             setBrukerChatAktivert(meg.chatAktivert !== false);
           }
         } catch { /* ikke kritisk */ }
@@ -143,7 +147,7 @@ export default function RapportPage() {
       <PowerBIReport
         rapportId={rapport.id}
         portalWorkspaceId={rapport.workspaces[0]?.workspace.id}
-        brukerRolle={rolle}
+        brukerRolle={brukerRolleState}
         pbiReportId={rapport.pbiReportId}
         pbiDatasetId={rapport.pbiDatasetId}
         pbiWorkspaceId={rapport.pbiWorkspaceId}
