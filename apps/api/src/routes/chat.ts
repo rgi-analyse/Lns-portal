@@ -147,7 +147,7 @@ async function buildDynamicViewsSection(
       FROM ai_metadata_regler r
       JOIN ai_metadata_views v ON r.view_id = v.id
       ${viewsFilter}
-      ORDER BY r.view_id, r.sort_order
+      ORDER BY r.view_id
     `),
     queryAzureSQL(`
       SELECT e.view_id, e.spørsmål, e.sql_eksempel
@@ -158,6 +158,8 @@ async function buildDynamicViewsSection(
   ]);
 
   console.log(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
+  console.log('[buildSystemPrompt] regler fra SQL (første 3):', JSON.stringify(regler.slice(0, 3)));
+  console.log('[buildSystemPrompt] antall regler totalt:', regler.length);
   console.log('[buildSystemPrompt] views funnet:', views.length);
   const regnskapsView = views.find(v => String(v['view_name'] ?? '').includes('Regnskaps'));
   if (regnskapsView) {
@@ -213,7 +215,7 @@ async function buildDynamicViewsSection(
 
     const viewRegler = regler.filter(r => r['view_id'] === view['id']);
     const reglerTekst = viewRegler.length > 0
-      ? `   Regler for dette viewet:\n${viewRegler.map(r => `   • ${r['innhold']}`).join('\n')}`
+      ? `   Regler for dette viewet:\n${viewRegler.map(r => `   • ${r['innhold'] ?? r['regel'] ?? ''}`).join('\n')}`
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
