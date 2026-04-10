@@ -1146,7 +1146,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               Nullstill
             </ToolBtn>
             <Divider />
-            {brukerRolle && brukerRolle !== 'bruker' && (
+            {(brukerRolle === 'admin' || brukerRolle === 'tenantadmin') && (
               <ToolBtn
                 onClick={handleRefresh}
                 disabled={!pbiDatasetId || refreshStatus === 'loading'}
