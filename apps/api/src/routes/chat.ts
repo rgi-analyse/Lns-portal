@@ -43,28 +43,46 @@ const promptCacheMap = new Map<string, { prompt: string; expires: number }>();
 
 const escStr = (val: string): string => val.replace(/'/g, "''");
 
+const REGNSKAP_ORD = [
+  'regning', 'faktura', 'bilag', 'kostnad', 'konto', 'kontonr', 'kontogruppe',
+  'betaling', 'betalt', 'mottatt', 'utgift', 'utgifter',
+  'strøm', 'forsikring', 'leie', 'husleie', 'telefon', 'diesel',
+  'energi', 'vedlikehold', 'innkjøp', 'leverandør',
+];
+
 function rankViews(
   views: Record<string, unknown>[],
   kolonner: Record<string, unknown>[],
   spørsmål: string,
 ): Record<string, unknown>[] {
   if (!spørsmål) return views;
-  const ord = spørsmål.toLowerCase().split(/\s+/).filter(o => o.length > 2);
+  const s = spørsmål.toLowerCase();
+  const ord = s.split(/\s+/).filter(o => o.length > 2);
   if (ord.length === 0) return views;
 
-  return [...views]
-    .map(v => {
-      const viewTekst = [v['visningsnavn'], v['beskrivelse'], v['område']]
-        .filter(Boolean).join(' ').toLowerCase();
-      const viewKolonner = kolonner.filter(k => k['view_id'] === v['id']);
-      const kolonneTekst = viewKolonner
-        .map(k => [k['kolonne_navn'], k['beskrivelse']].filter(Boolean).join(' '))
-        .join(' ').toLowerCase();
-      const score = ord.reduce((sum, o) => sum + ((viewTekst + ' ' + kolonneTekst).includes(o) ? 1 : 0), 0);
-      return { view: v, score };
-    })
-    .sort((a, b) => b.score - a.score)
-    .map(x => x.view);
+  const erRegnskapsSpørsmål = REGNSKAP_ORD.some(o => s.includes(o));
+
+  const rangeringer = [...views].map(v => {
+    const viewTekst = [v['visningsnavn'], v['beskrivelse'], v['område']]
+      .filter(Boolean).join(' ').toLowerCase();
+    const viewKolonner = kolonner.filter(k => k['view_id'] === v['id']);
+    const kolonneTekst = viewKolonner
+      .map(k => [k['kolonne_navn'], k['beskrivelse']].filter(Boolean).join(' '))
+      .join(' ').toLowerCase();
+    const allTekst = viewTekst + ' ' + kolonneTekst;
+
+    let score = ord.reduce((sum, o) => sum + (allTekst.includes(o) ? 1 : 0), 0);
+
+    const viewName = String(v['view_name'] ?? '').toLowerCase();
+    if (erRegnskapsSpørsmål && viewName.includes('regnskaps')) score += 5;
+    if (erRegnskapsSpørsmål && viewName.includes('balanse')) score -= 2;
+
+    return { view: v, score, view_name: v['view_name'] };
+  });
+
+  console.log('[rankViews] scores:', rangeringer.map(r => `${r.score} — ${r.view_name}`).join(', '));
+
+  return rangeringer.sort((a, b) => b.score - a.score).map(x => x.view);
 }
 
 async function buildDynamicViewsSection(
@@ -148,8 +166,8 @@ async function buildDynamicViewsSection(
       .filter(v => !viewsForPrompt.includes(v))
       .map(v => v['visningsnavn'] as string);
 
-    console.log('[buildSystemPrompt] views sendt til AI:', viewsForPrompt.map(v => v['view_name']));
-    console.log('[buildSystemPrompt] utelatte views:', utelatte);
+    console.log('[buildSystemPrompt] sender til AI:', viewsForPrompt.map(v => v['view_name']).join(', '));
+    console.log('[buildSystemPrompt] utelatte views:', utelatte.join(', '));
   } else {
     viewsForPrompt = alleViews;
   }
