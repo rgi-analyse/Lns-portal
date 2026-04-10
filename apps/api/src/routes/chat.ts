@@ -57,18 +57,6 @@ Når bruker spør om leverandør/leverandørnavn: Bruk Leverandørtransaksjoner 
 Når bruker spør om balanse/saldo: Bruk Balansetransaksjoner som primærkilde.
 Informer brukeren om hvilken datakilde du bruker når det er åpenbart fra spørsmålet. Søk direkte i riktig view uten å spørre.
 
-SØKESTRATEGI FOR KOSTNADER (Regnskapstransaksjoner):
-Regnskapstransaksjoner-viewet har en kolonne kalt Kontogruppe som grupperer kontoer semantisk (f.eks. "Energi, brensel og vann", "Telefon og bredbånd", "Leie av lokaler").
-Søk ALLTID på Kontogruppe eller Kontonr — ALDRI på bilagstekst med LIKE:
-  WHERE Kontogruppe LIKE '%Energi%'    -- for strøm/el-kostnader
-  WHERE Kontogruppe LIKE '%Telefon%'   -- for telefonregninger
-  WHERE Kontogruppe LIKE '%Leie%'      -- for husleie/lokaler
-ALDRI: WHERE Bilagstekst LIKE '%strøm%' — dette er tregt og gir feil resultater.
-Når bruker spør etter en kostnadstype uten kontonummer:
-  1. Kjør SELECT DISTINCT Kontogruppe FROM [view] ORDER BY Kontogruppe for å se tilgjengelige grupper
-  2. Match automatisk eller la bruker velge
-  3. Søk deretter med WHERE Kontogruppe = '[valgt gruppe]'
-
 AZURE SQL (T-SQL) SYNTAKSREGLER — FØLG ALLTID:
 - Bruk ALDRI LIMIT — det støttes IKKE i Azure SQL (T-SQL)
 - Begrens rader med: SELECT TOP 20 kolonne FROM tabell (for rådata-lister)
@@ -85,6 +73,13 @@ GENERELLE SQL-REGLER:
 - Ikke si at du ikke har tilgang til data. Du har ALLTID tilgang via query_database.
 - Ikke avvis spørsmål fordi data ikke finnes i rapporten — søk i databasen først.
 - Svar alltid på norsk.
+
+SØKESTRATEGI:
+- Bruk kolonnebeskrivelsene i systemprompten aktivt — de forteller deg hva kolonnen inneholder og hvordan den skal brukes.
+- Prioriter indekserte kolonner (dimensjoner og ID-kolonner) fremfor fritekst-søk med LIKE på store tekstkolonner.
+- Når et view har en grupperingskolonne (som Kontogruppe, Kategori, Type): bruk den fremfor LIKE-søk på råtekst. Kjør SELECT DISTINCT [grupperingskolonne] for å se tilgjengelige verdier hvis du er usikker.
+- Ved tomt resultat: prøv én alternativ søkestrategi automatisk før du svarer at ingenting finnes.
+- Vis alltid hvilken SQL du brukte slik at brukeren kan korrigere deg.
 
 DATAKILDE-TRANSPARENS:
 - Informer alltid hvilken datakilde (view-navn) du bruker når du svarer på dataspørsmål.
@@ -406,12 +401,18 @@ async function buildDynamicViewsSection(
     const viewKolonner = kolonner.filter(k => k['view_id'] === view['id']);
     if (viewKolonner.length > 0) {
       viewsPrompt += `Kolonner:\n`;
+      const kolonneTekstLinjer: string[] = [];
       for (const k of viewKolonner) {
         const type = k['kolonne_type'] ? ` [${k['kolonne_type']}]` : '';
-        viewsPrompt += `  - ${k['kolonne_navn']} (${k['datatype'] ?? 'ukjent'}${type})`;
-        if (k['beskrivelse']) viewsPrompt += ` — ${k['beskrivelse']}`;
-        if (k['eksempel_verdier']) viewsPrompt += ` [verdier: ${k['eksempel_verdier']}]`;
-        viewsPrompt += '\n';
+        let linje = `  - ${k['kolonne_navn']} (${k['datatype'] ?? 'ukjent'}${type})`;
+        if (k['beskrivelse']) linje += ` — ${k['beskrivelse']}`;
+        if (k['eksempel_verdier']) linje += ` (eks: ${k['eksempel_verdier']})`;
+        kolonneTekstLinjer.push(linje);
+      }
+      const kolonneTekst = kolonneTekstLinjer.join('\n');
+      viewsPrompt += kolonneTekst + '\n';
+      if (String(view['view_name'] ?? '').includes('Regnskaps')) {
+        console.log('[prompt] Regnskaps kolonner i prompt:', kolonneTekst.slice(0, 500));
       }
     }
 
