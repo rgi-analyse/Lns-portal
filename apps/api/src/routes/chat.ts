@@ -18,6 +18,18 @@ const SQL_REGLER = `## SQL-regler (Azure T-SQL)
 - Kall query_database umiddelbart når bruker spør om data — ikke spør om du skal gjøre det
 - Svar alltid på norsk
 
+KOLONNE-TYPE REGLER:
+- Sjekk alltid datatype fra kolonneinfo i systemprompten før du skriver SQL
+- varchar/nvarchar-kolonner skal ALDRI castes til tall
+- Bruk alltid LIKE for søk på varchar-kolonner:
+  ✅ WHERE Prosjekt LIKE '%1000%'
+  ❌ WHERE CAST(Prosjekt AS INT) = 1000
+  ❌ WHERE ISNUMERIC(Prosjekt) = 1
+  ❌ WHERE TRY_CAST(Prosjekt AS INT) = 1000
+- GROUP BY på varchar fungerer direkte — ingen casting nødvendig:
+  ✅ SELECT Prosjekt, SUM(Beløp) FROM view GROUP BY Prosjekt
+- Ved konverteringsfeil i SQL: ikke prøv CAST-varianter — bytt til LIKE-søk i stedet
+
 DATO-RANGE REGLER:
 Når bruker spør om data "frem til [måned år]", "t.o.m.", "opp til", "akkumulert til":
 FEIL — henter kun én periode: WHERE År = 2026 AND Måned = 4
