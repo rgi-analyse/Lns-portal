@@ -57,9 +57,22 @@ Når bruker spør om leverandør/leverandørnavn: Bruk Leverandørtransaksjoner 
 Når bruker spør om balanse/saldo: Bruk Balansetransaksjoner som primærkilde.
 Informer brukeren om hvilken datakilde du bruker når det er åpenbart fra spørsmålet. Søk direkte i riktig view uten å spørre.
 
+SØKESTRATEGI FOR KOSTNADER (Regnskapstransaksjoner):
+Regnskapstransaksjoner-viewet har en kolonne kalt Kontogruppe som grupperer kontoer semantisk (f.eks. "Energi, brensel og vann", "Telefon og bredbånd", "Leie av lokaler").
+Søk ALLTID på Kontogruppe eller Kontonr — ALDRI på bilagstekst med LIKE:
+  WHERE Kontogruppe LIKE '%Energi%'    -- for strøm/el-kostnader
+  WHERE Kontogruppe LIKE '%Telefon%'   -- for telefonregninger
+  WHERE Kontogruppe LIKE '%Leie%'      -- for husleie/lokaler
+ALDRI: WHERE Bilagstekst LIKE '%strøm%' — dette er tregt og gir feil resultater.
+Når bruker spør etter en kostnadstype uten kontonummer:
+  1. Kjør SELECT DISTINCT Kontogruppe FROM [view] ORDER BY Kontogruppe for å se tilgjengelige grupper
+  2. Match automatisk eller la bruker velge
+  3. Søk deretter med WHERE Kontogruppe = '[valgt gruppe]'
+
 AZURE SQL (T-SQL) SYNTAKSREGLER — FØLG ALLTID:
 - Bruk ALDRI LIMIT — det støttes IKKE i Azure SQL (T-SQL)
-- Begrens rader med: SELECT TOP 10 kolonne FROM tabell
+- Begrens rader med: SELECT TOP 20 kolonne FROM tabell (for rådata-lister)
+- ALDRI bruk TOP på spørringer med GROUP BY — GROUP BY returnerer allerede aggregerte data
 - Paginering: SELECT * FROM (SELECT ROW_NUMBER() OVER (ORDER BY kolonne) AS rn, * FROM tabell) t WHERE rn BETWEEN 1 AND 10
 - Alternativt for paginering: SELECT * FROM tabell ORDER BY kolonne OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY
 - Bruk GETDATE() ikke NOW()
@@ -324,6 +337,11 @@ async function buildDynamicViewsSection(
 
   console.log(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
   console.log('[buildSystemPrompt] views funnet:', views.length);
+  const regnskapsView = views.find(v => String(v['view_name'] ?? '').includes('Regnskaps'));
+  if (regnskapsView) {
+    const regnskapsKolonner = kolonner.filter(k => k['view_id'] === regnskapsView['id']);
+    console.log('[buildSystemPrompt] Regnskaps kolonner:', regnskapsKolonner.map(k => k['kolonne_navn']));
+  }
   const kolonnerMedBeskrivelse = kolonner.filter(k => k['beskrivelse']);
   console.log(`[Chat] kolonner med beskrivelse: ${kolonnerMedBeskrivelse.length}`,
     kolonnerMedBeskrivelse.map(k => `${k['kolonne_navn']} (view_id=${k['view_id']})`));
