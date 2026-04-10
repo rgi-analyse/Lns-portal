@@ -250,6 +250,7 @@ ${SØKESTRATEGI_REGLER}
 ## Tilgjengelige datakilder
 ${viewsSection}`;
     console.log('[buildSystemPrompt] prompt lengde:', prompt.length);
+    console.log('[buildSystemPrompt] PROMPT PREVIEW:\n', prompt.slice(0, 2000));
     if (cacheKey) {
       promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
     }
