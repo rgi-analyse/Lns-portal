@@ -71,7 +71,14 @@ GENERELLE SQL-REGLER:
 - Når brukeren spør om data: ALLTID kall query_database umiddelbart. Ikke spør om du skal gjøre det.
 - Ikke si at du ikke har tilgang til data. Du har ALLTID tilgang via query_database.
 - Ikke avvis spørsmål fordi data ikke finnes i rapporten — søk i databasen først.
-- Svar alltid på norsk.`;
+- Svar alltid på norsk.
+
+DATAKILDE-TRANSPARENS:
+- Informer alltid hvilken datakilde (view-navn) du bruker når du svarer på dataspørsmål.
+- Bruk formuleringen: "Jeg henter dette fra [visningsnavn] ([view_name])..."
+- Hvis spørsmålet kan besvares fra flere views, still ett kort oppklarende spørsmål:
+  "Dette kan jeg finne i [view A] eller [view B] — hvilket datasett vil du sjekke?"
+- Søk deretter direkte i riktig view uten å spørre igjen.`;
 
 // ── Fallback hardkodet prompt (brukes om metadata-tabeller ikke finnes ennå) ──
 const FALLBACK_BASIS_PROMPT = `
@@ -244,7 +251,36 @@ const promptCacheMap = new Map<string, { prompt: string; expires: number }>();
 
 const escStr = (val: string): string => val.replace(/'/g, "''");
 
-async function buildDynamicViewsSection(viewIds?: string[] | null, område?: string | null): Promise<string> {
+function rankViews(
+  views: Record<string, unknown>[],
+  kolonner: Record<string, unknown>[],
+  spørsmål: string,
+): Record<string, unknown>[] {
+  if (!spørsmål) return views;
+  const ord = spørsmål.toLowerCase().split(/\s+/).filter(o => o.length > 2);
+  if (ord.length === 0) return views;
+
+  return [...views]
+    .map(v => {
+      const viewTekst = [v['visningsnavn'], v['beskrivelse'], v['område']]
+        .filter(Boolean).join(' ').toLowerCase();
+      const viewKolonner = kolonner.filter(k => k['view_id'] === v['id']);
+      const kolonneTekst = viewKolonner
+        .map(k => [k['kolonne_navn'], k['beskrivelse']].filter(Boolean).join(' '))
+        .join(' ').toLowerCase();
+      const score = ord.reduce((sum, o) => sum + ((viewTekst + ' ' + kolonneTekst).includes(o) ? 1 : 0), 0);
+      return { view: v, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(x => x.view);
+}
+
+async function buildDynamicViewsSection(
+  viewIds?: string[] | null,
+  område?: string | null,
+  brukerSpørsmål?: string,
+  kobletViewIds?: string[] | null,
+): Promise<string> {
   // Filtrer views: direkte kobling → område → alle
   let viewsFilter: string;
   if (viewIds && viewIds.length > 0) {
@@ -294,6 +330,33 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
 
   if (views.length === 0) throw new Error('Ingen aktive views funnet for dette området');
 
+  // Ranger og begrens views basert på brukerens spørsmål
+  const alleViews = views as Record<string, unknown>[];
+  let viewsForPrompt: Record<string, unknown>[];
+  let utelatte: string[] = [];
+
+  if (brukerSpørsmål && alleViews.length > 4) {
+    const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], brukerSpørsmål);
+
+    // Rapport-koblede views prioriteres alltid
+    const koblede = kobletViewIds
+      ? rangerteViews.filter(v => kobletViewIds.includes(v['id'] as string))
+      : [];
+    const andreRangerte = rangerteViews
+      .filter(v => !kobletViewIds?.includes(v['id'] as string))
+      .slice(0, 3);
+
+    viewsForPrompt = [...koblede, ...andreRangerte];
+    utelatte = alleViews
+      .filter(v => !viewsForPrompt.includes(v))
+      .map(v => v['visningsnavn'] as string);
+
+    console.log('[buildSystemPrompt] views sendt til AI:', viewsForPrompt.map(v => v['view_name']));
+    console.log('[buildSystemPrompt] utelatte views:', utelatte);
+  } else {
+    viewsForPrompt = alleViews;
+  }
+
   // Bygg den fremtredende instruksjonsblokken FØRST — plassert øverst i prompten
   // slik at GPT-4o gir den høyest vekt
   const alleKolonnerMedBeskrivelse = kolonner.filter(k => k['beskrivelse']);
@@ -316,7 +379,7 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
 
   let viewsPrompt = instruksjonsseksjon + 'TILGJENGELIGE VIEWS:\n\n';
 
-  for (const view of views) {
+  for (const view of viewsForPrompt) {
     viewsPrompt += `### ${view['schema_name']}.${view['view_name']}\n`;
     viewsPrompt += `Navn: ${view['visningsnavn']}\n`;
     if (view['område']) viewsPrompt += `Område: ${view['område']}\n`;
@@ -354,8 +417,13 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
     viewsPrompt += '\n';
   }
 
+  // Andre tilgjengelige views (ikke inkludert i prompt)
+  if (utelatte.length > 0) {
+    viewsPrompt += `\nAndre tilgjengelige datakilder (spør meg hvis relevant): ${utelatte.join(', ')}\n`;
+  }
+
   // Oppklarende spørsmål ved mange views
-  const viewInstruks = views.length > 3
+  const viewInstruks = viewsForPrompt.length > 3
     ? `\nNår bruker spør om data som kan ligge i flere views, still ett oppklarende spørsmål:\n"Dette kan jeg finne i [view A] (beskrivelse) eller [view B] (beskrivelse). Hvilken vil du sjekke?"\nSøk deretter i riktig view basert på svaret.\n`
     : '';
   viewsPrompt += viewInstruks;
@@ -375,7 +443,11 @@ async function buildDynamicViewsSection(viewIds?: string[] | null, område?: str
   return viewsPrompt;
 }
 
-async function buildSystemPrompt(rapportId?: string | null, område?: string | null): Promise<string> {
+async function buildSystemPrompt(
+  rapportId?: string | null,
+  område?: string | null,
+  brukerSpørsmål?: string,
+): Promise<string> {
   // Prøv rapport-spesifikk kobling først
   let kobletViewIds: string[] | null = null;
   if (rapportId) {
@@ -396,14 +468,24 @@ async function buildSystemPrompt(rapportId?: string | null, område?: string | n
 
   console.log('[buildSystemPrompt] kobletViewIds:', kobletViewIds);
 
-  const cacheKey = kobletViewIds ? `rapport:${rapportId}` : (område ?? 'all');
-  const cached = promptCacheMap.get(cacheKey);
-  if (cached && Date.now() < cached.expires) return cached.prompt;
+  // Når brukerSpørsmål er satt bruker vi dynamisk ranking — hopp over cache
+  const cacheKey = brukerSpørsmål ? null : (kobletViewIds ? `rapport:${rapportId}` : (område ?? 'all'));
+  if (cacheKey) {
+    const cached = promptCacheMap.get(cacheKey);
+    if (cached && Date.now() < cached.expires) return cached.prompt;
+  }
 
   try {
-    const dynamicSection = await buildDynamicViewsSection(kobletViewIds, kobletViewIds ? null : område);
+    const dynamicSection = await buildDynamicViewsSection(
+      kobletViewIds,
+      kobletViewIds ? null : område,
+      brukerSpørsmål,
+      kobletViewIds,
+    );
     const prompt = PROSJEKT_INSTRUKSJON + dynamicSection + STATIC_APPENDIX;
-    promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
+    if (cacheKey) {
+      promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
+    }
     return prompt;
   } catch (err) {
     console.warn('[Chat] Bruker fallback til hardkodet prompt:', err instanceof Error ? err.message : err);
@@ -549,7 +631,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
       if (!pbiReportId) {
         console.log('[Chat] prosjektNr:', 'ingen (forside)');
         console.log('[Chat] kontekst:', 'global');
-        const basisPrompt = await buildSystemPrompt(); // alle views, ingen area-filter
+        const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
+        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string);
         // FIX 4: token-estimat (ingen-rapport branch)
         console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
         console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
@@ -748,7 +831,8 @@ Tilgjengelige visualiseringstyper:
       }
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
-      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde);
+      const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
+      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string);
 
       // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
       const slicerValuesSummary = slicerValues
