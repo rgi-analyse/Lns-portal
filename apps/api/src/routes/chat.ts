@@ -113,17 +113,22 @@ async function buildDynamicViewsSection(
   område?: string | null,
   brukerSpørsmål?: string,
   kobletViewIds?: string[] | null,
+  tillatteViewIds?: string[] | null,
 ): Promise<string> {
-  // Filtrer views: direkte kobling → område → alle
+  // Filtrer views: rapport-kobling → workspace-tilgang → område → alle
   let viewsFilter: string;
   if (viewIds && viewIds.length > 0) {
     const idList = viewIds.map(id => `'${escStr(id)}'`).join(', ');
+    viewsFilter = `WHERE v.er_aktiv = 1 AND v.id IN (${idList})`;
+  } else if (tillatteViewIds && tillatteViewIds.length > 0) {
+    const idList = tillatteViewIds.map(id => `'${escStr(id)}'`).join(', ');
     viewsFilter = `WHERE v.er_aktiv = 1 AND v.id IN (${idList})`;
   } else if (område) {
     viewsFilter = `WHERE v.er_aktiv = 1 AND (v.område = '${escStr(område)}' OR v.område IS NULL)`;
   } else {
     viewsFilter = `WHERE v.er_aktiv = 1`;
   }
+  console.log('[buildSystemPrompt] viewsFilter:', viewsFilter);
 
   const [views, kolonner, regler, eksempler] = await Promise.all([
     queryAzureSQL(`
@@ -251,6 +256,7 @@ async function buildSystemPrompt(
   rapportId?: string | null,
   område?: string | null,
   brukerSpørsmål?: string,
+  tillatteViewIds?: string[] | null,
 ): Promise<string> {
   // Prøv rapport-spesifikk kobling først
   let kobletViewIds: string[] | null = null;
@@ -285,6 +291,7 @@ async function buildSystemPrompt(
       kobletViewIds ? null : område,
       brukerSpørsmål,
       kobletViewIds,
+      kobletViewIds ? null : tillatteViewIds,  // workspace-tilgang gjelder kun når ingen rapport-kobling
     );
     const prompt = `${SYSTEM_INTRO}
 
@@ -430,6 +437,41 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Hent views brukeren har tilgang til via workspace-kjede:
+      // Bruker → Workspace-tilgang → Rapport → ai_rapport_view_kobling → View
+      let tillatteViewIds: string[] | null = null;
+      if (entraObjectId) {
+        try {
+          const db = (request as TenantRequest).tenantPrisma;
+          const grupper: string[] = request.body.grupper ?? [];
+          const identities = [entraObjectId, ...grupper].filter(Boolean);
+          const orFilter: Record<string, unknown>[] = [];
+          if (identities.length > 0) {
+            orFilter.push({ tilgang: { some: { entraId: { in: identities } } } });
+          }
+          orFilter.push({ opprettetAv: entraObjectId });
+          const wsRapporter = await db.workspace.findMany({
+            where: { OR: orFilter },
+            select: { rapporter: { where: { rapport: { erAktiv: true } }, select: { rapportId: true } } },
+          });
+          const rapportIds = wsRapporter.flatMap(w => w.rapporter.map(r => r.rapportId));
+          if (rapportIds.length > 0) {
+            const koblinger = await queryAzureSQL(`
+              SELECT DISTINCT view_id FROM ai_rapport_view_kobling
+              WHERE rapport_id IN (${rapportIds.map(id => `'${escStr(id)}'`).join(',')})
+            `);
+            if (koblinger.length > 0) {
+              tillatteViewIds = koblinger.map(r => r['view_id'] as string);
+              console.log('[Chat] tilgjengelige views via workspace:', tillatteViewIds.length);
+            } else {
+              console.log('[Chat] ingen view-koblinger funnet for brukerens rapporter — viser alle views');
+            }
+          }
+        } catch (err) {
+          console.warn('[Chat] workspace-view tilgang feil — fortsetter uten begrensning:', err instanceof Error ? err.message : err);
+        }
+      }
+
       console.log('[Chat] mottatt:', {
         rapportId:       request.body.rapportId,
         pbiReportId:     request.body.pbiReportId,
@@ -445,7 +487,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         console.log('[Chat] prosjektNr:', 'ingen (forside)');
         console.log('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string);
+        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds);
         // FIX 4: token-estimat (ingen-rapport branch)
         console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
         console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
@@ -645,7 +687,7 @@ Tilgjengelige visualiseringstyper:
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string);
+      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds);
 
       // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
       const slicerValuesSummary = slicerValues
