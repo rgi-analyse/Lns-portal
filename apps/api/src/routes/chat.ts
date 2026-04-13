@@ -594,15 +594,30 @@ export async function chatRoutes(fastify: FastifyInstance) {
               select: { id: true },
             });
             if (brukerForVelkomst) {
-              const sisteHendelseVelkomst = await prisma.userEvent.findFirst({
-                where: { userId: brukerForVelkomst.id, hendelsesType: 'åpnet_rapport' },
-                orderBy: { tidspunkt: 'desc' },
-                select: { referanseNavn: true },
-              });
+              const [sisteHendelseVelkomst, profil] = await Promise.all([
+                prisma.userEvent.findFirst({
+                  where: { userId: brukerForVelkomst.id, hendelsesType: 'åpnet_rapport' },
+                  orderBy: { tidspunkt: 'desc' },
+                  select: { referanseNavn: true },
+                }),
+                prisma.userProfile.findUnique({
+                  where: { userId: brukerForVelkomst.id },
+                  select: { aiKontekst: true },
+                }),
+              ]);
               if (sisteHendelseVelkomst?.referanseNavn) {
                 const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
                 const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
                 velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${sisteHendelseVelkomst.referanseNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
+              }
+              if (profil?.aiKontekst) {
+                try {
+                  const kontekst = JSON.parse(profil.aiKontekst) as { topRapporter?: { navn: string; antall: number }[] };
+                  if (kontekst.topRapporter && kontekst.topRapporter.length > 0) {
+                    velkomstTekst += `Brukerens mest brukte rapporter (siste 30 dager):\n` +
+                      kontekst.topRapporter.map(r => `- ${r.navn} (${r.antall} ganger)`).join('\n') + '\n\n';
+                  }
+                } catch { /* ignorerer ugyldig JSON */ }
               }
             }
           } catch {

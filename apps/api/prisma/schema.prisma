@@ -112,6 +112,7 @@ model UserProfile {
   mostUsedReports       String?   @db.NVarChar(Max)
   typicalFilters        String?   @db.NVarChar(Max)
   lastActivity          DateTime?
+  aiKontekst            String?   @db.NVarChar(Max)
   oppdatert             DateTime  @updatedAt
 }
 

@@ -9,6 +9,32 @@ interface LoggBody {
   verdi?: Record<string, unknown>;
 }
 
+async function oppdaterUserProfile(userId: string): Promise<void> {
+  const tredveDAgerSiden = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const hendelser = await prisma.userEvent.findMany({
+    where: { userId, hendelsesType: 'åpnet_rapport', tidspunkt: { gte: tredveDAgerSiden } },
+    orderBy: { tidspunkt: 'desc' },
+    select: { referanseNavn: true },
+  });
+
+  const telling: Record<string, number> = {};
+  for (const h of hendelser) {
+    if (h.referanseNavn) telling[h.referanseNavn] = (telling[h.referanseNavn] ?? 0) + 1;
+  }
+  const topRapporter = Object.entries(telling)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([navn, antall]) => ({ navn, antall }));
+
+  const aiKontekst = JSON.stringify({ topRapporter, oppdatert: new Date().toISOString() });
+
+  await prisma.userProfile.upsert({
+    where:  { userId },
+    update: { aiKontekst, lastActivity: new Date() },
+    create: { userId, aiKontekst, lastActivity: new Date() },
+  });
+}
+
 export async function userEventRoutes(fastify: FastifyInstance) {
   // POST /api/meg/logg — logg en hendelse (fire-and-forget fra portal)
   fastify.post<{ Body: LoggBody }>(
@@ -48,6 +74,11 @@ export async function userEventRoutes(fastify: FastifyInstance) {
           verdi:         verdi ? JSON.stringify(verdi) : null,
           tenantSlug:    (request.headers['x-tenant-id'] as string) ?? 'lns',
         },
+      }).then(() => {
+        // Oppdater aiKontekst i UserProfile ved rapport-åpning
+        if (hendelsesType === 'åpnet_rapport') {
+          oppdaterUserProfile(bruker.id).catch(() => {});
+        }
       }).catch(err => fastify.log.error(err, '[userEvents] logg feilet'));
 
       // Oppdater UserProfile.lastActivity asynkront
