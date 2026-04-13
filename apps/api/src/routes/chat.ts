@@ -384,22 +384,26 @@ export async function chatRoutes(fastify: FastifyInstance) {
       if (!entraId) return reply.send({ melding: null });
 
       try {
-        const rows = await queryAzureSQL(`
-          SELECT TOP 1 hendelsesType, referanseNavn, referanseId, verdi
-          FROM UserEvent
-          WHERE userId = '${escStr(entraId)}'
-            AND hendelsesType = 'åpnet_rapport'
-          ORDER BY tidspunkt DESC
-        `);
+        // Bruker Prisma (master-DB) — userId er intern Prisma-ID, ikke entraObjectId
+        const bruker = await prisma.bruker.findUnique({
+          where: { entraObjectId: entraId },
+          select: { id: true },
+        });
+        if (!bruker) return reply.send({ melding: null });
+
+        const sisteHendelse = await prisma.userEvent.findFirst({
+          where: { userId: bruker.id, hendelsesType: 'åpnet_rapport' },
+          orderBy: { tidspunkt: 'desc' },
+          select: { referanseNavn: true },
+        });
 
         const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
         const t = parseInt(time);
         const hilsen = t < 12 ? 'God morgen' : t < 17 ? 'God dag' : 'God kveld';
 
         let melding = `${hilsen}! `;
-        if (rows.length > 0) {
-          const rapportNavn = String(rows[0]['referanseNavn'] ?? 'en rapport');
-          melding += `Sist du var inne åpnet du "${rapportNavn}". Vil du fortsette der, eller er det noe annet jeg kan hjelpe med?`;
+        if (sisteHendelse?.referanseNavn) {
+          melding += `Sist du var inne åpnet du "${sisteHendelse.referanseNavn}". Vil du fortsette der, eller er det noe annet jeg kan hjelpe med?`;
         } else {
           melding += 'Hva kan jeg hjelpe deg med i dag?';
         }
@@ -585,18 +589,21 @@ export async function chatRoutes(fastify: FastifyInstance) {
         let velkomstTekst = '';
         if (entraObjectId) {
           try {
-            const aktivitetRows = await queryAzureSQL(`
-              SELECT TOP 1 hendelsesType, referanseNavn, referanseId
-              FROM UserEvent
-              WHERE userId = '${escStr(entraObjectId)}'
-                AND hendelsesType = 'åpnet_rapport'
-              ORDER BY tidspunkt DESC
-            `);
-            if (aktivitetRows.length > 0) {
-              const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
-              const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
-              const rapportNavn = String(aktivitetRows[0]['referanseNavn'] ?? 'en rapport');
-              velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${rapportNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
+            const brukerForVelkomst = await prisma.bruker.findUnique({
+              where: { entraObjectId: entraObjectId },
+              select: { id: true },
+            });
+            if (brukerForVelkomst) {
+              const sisteHendelseVelkomst = await prisma.userEvent.findFirst({
+                where: { userId: brukerForVelkomst.id, hendelsesType: 'åpnet_rapport' },
+                orderBy: { tidspunkt: 'desc' },
+                select: { referanseNavn: true },
+              });
+              if (sisteHendelseVelkomst?.referanseNavn) {
+                const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
+                const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
+                velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${sisteHendelseVelkomst.referanseNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
+              }
             }
           } catch {
             // Ikke kritisk — fortsett uten velkomst
