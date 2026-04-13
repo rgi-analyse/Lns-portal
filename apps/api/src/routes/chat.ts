@@ -583,6 +583,40 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }
       }
 
+      const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+
+      // Rydd historikk eldre enn 7 dager (fire-and-forget)
+      if (entraObjectId) {
+        prisma.chatHistorikk.deleteMany({
+          where: { userId: entraObjectId, tidspunkt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        }).catch(() => {});
+      }
+
+      // Hent siste samtale fra en tidligere dag (kontekst for AI)
+      let historikkTekst = '';
+      if (entraObjectId) {
+        try {
+          const iDagDato = new Date().toISOString().slice(0, 10);
+          const tidligereHistorikk = await prisma.chatHistorikk.findMany({
+            where: {
+              userId: entraObjectId,
+              øktId: { not: `${entraObjectId}-${iDagDato}` },
+              tenantSlug,
+            },
+            orderBy: { tidspunkt: 'desc' },
+            take: 6,
+          });
+          if (tidligereHistorikk.length > 0) {
+            tidligereHistorikk.reverse();
+            historikkTekst = `\nForrige samtale:\n` +
+              tidligereHistorikk.map(h =>
+                `${h.rolle === 'user' ? 'Bruker' : 'AI'}: ${h.innhold.slice(0, 200)}`
+              ).join('\n') + '\n\n';
+            console.log('[Chat] historikk fra forrige økt:', tidligereHistorikk.length, 'meldinger');
+          }
+        } catch { /* ikke kritisk — fortsett uten historikk */ }
+      }
+
       console.log('[Chat] mottatt:', {
         rapportId:       request.body.rapportId,
         pbiReportId:     request.body.pbiReportId,
@@ -673,7 +707,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         console.log('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
         velkomstTekst += profilTekst;
 
-        let ingenRapportPrompt = `${velkomstTekst}Du er en dataassistent for LNS Dataportal.
+        let ingenRapportPrompt = `${historikkTekst}${velkomstTekst}Du er en dataassistent for LNS Dataportal.
 Ingen rapport er valgt.
 
 AKTIV KONTEKST:
@@ -749,13 +783,30 @@ Tilgjengelige visualiseringstyper:
         const write = (chunk: unknown) => {
           reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
         };
+        let fullAiTekst = '';
+        const writeOgCapture = (chunk: unknown) => {
+          write(chunk);
+          const c = chunk as Record<string, unknown>;
+          if (c.type === 'text' && typeof c.content === 'string') fullAiTekst += c.content;
+        };
 
         try {
-          await chat(messages, ingenRapportPrompt, write, chatContext);
+          await chat(messages, ingenRapportPrompt, writeOgCapture, chatContext);
         } catch (err) {
           write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
         } finally {
           reply.raw.end();
+        }
+        // Lagre samtale i historikk (fire-and-forget)
+        if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekst) {
+          const iDagDato = new Date().toISOString().slice(0, 10);
+          const øktId = `${entraObjectId}-${iDagDato}`;
+          prisma.chatHistorikk.createMany({
+            data: [
+              { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
+              { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000),                øktId, tenantSlug },
+            ],
+          }).catch(() => {});
         }
         return;
       }
@@ -846,7 +897,7 @@ RUH: WHERE ProsjektId = '${prosjektNr}' OR WHERE Prosjekt LIKE '%${prosjektNr}%'
 `
         : '';
 
-      let rapportKontekst = `Du er en dataassistent for LNS Dataportal.
+      let rapportKontekst = `${historikkTekst}Du er en dataassistent for LNS Dataportal.
 
 RAPPORT KONTEKST:
 Navn: ${rapportNavn}${rapportOmråde ? `\nFagområde: ${rapportOmråde}` : ''}${rapportBeskrivelse ? `\nBeskrivelse: ${rapportBeskrivelse}` : ''}${rapportNøkkelord ? `\nNøkkelord: ${rapportNøkkelord}` : ''}${aktivSide ? `\nAktiv side: ${aktivSide}` : ''}
@@ -976,14 +1027,31 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         console.log('[Chat] sender SSE event:', chunk);
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       };
+      let fullAiTekstRapport = '';
+      const writeOgCapture = (chunk: unknown) => {
+        write(chunk);
+        const c = chunk as Record<string, unknown>;
+        if (c.type === 'text' && typeof c.content === 'string') fullAiTekstRapport += c.content;
+      };
 
       try {
-        await chat(messages, rapportKontekst, write, chatContext);
+        await chat(messages, rapportKontekst, writeOgCapture, chatContext);
       } catch (err) {
         console.error('[chat] feil:', err);
         write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
       } finally {
         reply.raw.end();
+      }
+      // Lagre samtale i historikk (fire-and-forget)
+      if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekstRapport) {
+        const iDagDato = new Date().toISOString().slice(0, 10);
+        const øktId = `${entraObjectId}-${iDagDato}`;
+        prisma.chatHistorikk.createMany({
+          data: [
+            { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
+            { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000),         øktId, tenantSlug },
+          ],
+        }).catch(() => {});
       }
     },
   );
