@@ -610,15 +610,19 @@ export async function chatRoutes(fastify: FastifyInstance) {
                 const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
                 velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${sisteHendelseVelkomst.referanseNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
               }
+              let profilTekst = '';
               if (profil?.aiKontekst) {
                 try {
                   const kontekst = JSON.parse(profil.aiKontekst) as { topRapporter?: { navn: string; antall: number }[] };
                   if (kontekst.topRapporter && kontekst.topRapporter.length > 0) {
-                    velkomstTekst += `Brukerens mest brukte rapporter (siste 30 dager):\n` +
-                      kontekst.topRapporter.map(r => `- ${r.navn} (${r.antall} ganger)`).join('\n') + '\n\n';
+                    profilTekst = `\nBrukerens mest brukte rapporter siste 30 dager:\n` +
+                      kontekst.topRapporter.map(r => `- ${r.navn} (${r.antall} ganger)`).join('\n') +
+                      '\nBruk denne konteksten til å forstå hvilke data brukeren jobber med til daglig, og tilpass svar deretter.\n';
                   }
                 } catch { /* ignorerer ugyldig JSON */ }
               }
+              console.log('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
+              velkomstTekst += profilTekst;
             }
           } catch {
             // Ikke kritisk — fortsett uten velkomst
