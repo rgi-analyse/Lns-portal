@@ -545,7 +545,38 @@ export async function chatRoutes(fastify: FastifyInstance) {
             console.warn('[Chat] rapport-liste feil:', err);
           }
         }
-        let ingenRapportPrompt = `Du er en dataassistent for LNS Dataportal.
+        // Bygg personlig velkomst basert på brukerens siste aktivitet
+        let velkomstTekst = '';
+        if (entraObjectId) {
+          try {
+            const aktivitetRows = await queryAzureSQL(`
+              SELECT TOP 5 hendelse, data,
+                CONVERT(varchar,
+                  CONVERT(datetime, tidspunkt AT TIME ZONE 'UTC'
+                    AT TIME ZONE 'Central European Standard Time'),
+                  120) AS norskTid
+              FROM UserEvent
+              WHERE brukerId = '${escStr(entraObjectId)}'
+              ORDER BY tidspunkt DESC
+            `);
+            if (aktivitetRows.length > 0) {
+              const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
+              const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
+              const sisteRapport = aktivitetRows.find(e => e['hendelse'] === 'åpnet_rapport');
+              if (sisteRapport) {
+                let rapportNavn = 'en rapport';
+                try { rapportNavn = (JSON.parse(String(sisteRapport['data'] ?? '{}')).navn) ?? 'en rapport'; } catch { /* ignorerer */ }
+                velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${rapportNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
+              } else {
+                velkomstTekst = '';
+              }
+            }
+          } catch {
+            // Ikke kritisk — fortsett uten velkomst
+          }
+        }
+
+        let ingenRapportPrompt = `${velkomstTekst}Du er en dataassistent for LNS Dataportal.
 Ingen rapport er valgt.
 
 AKTIV KONTEKST:
