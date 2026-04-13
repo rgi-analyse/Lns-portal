@@ -375,6 +375,47 @@ function rensConversationHistory(messages: ChatMessage[]): ChatMessage[] {
 }
 
 export async function chatRoutes(fastify: FastifyInstance) {
+  // GET /api/chat/velkomst — personlig velkomstmelding basert på siste aktivitet
+  fastify.get(
+    '/api/chat/velkomst',
+    { preHandler: [resolveTenant] },
+    async (request, reply) => {
+      const entraId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      if (!entraId) return reply.send({ melding: null });
+
+      try {
+        const rows = await queryAzureSQL(`
+          SELECT TOP 1 hendelse, data,
+            CONVERT(varchar,
+              CONVERT(datetime, tidspunkt AT TIME ZONE 'UTC'
+                AT TIME ZONE 'Central European Standard Time'), 120
+            ) AS norskTid
+          FROM UserEvent
+          WHERE brukerId = '${escStr(entraId)}'
+            AND hendelse = 'åpnet_rapport'
+          ORDER BY tidspunkt DESC
+        `);
+
+        const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
+        const t = parseInt(time);
+        const hilsen = t < 12 ? 'God morgen' : t < 17 ? 'God dag' : 'God kveld';
+
+        let melding = `${hilsen}! `;
+        if (rows.length > 0) {
+          let rapportNavn = 'en rapport';
+          try { rapportNavn = (JSON.parse(String(rows[0]['data'] ?? '{}')).navn) ?? 'en rapport'; } catch { /* ignorerer */ }
+          melding += `Sist du var inne åpnet du "${rapportNavn}". Vil du fortsette der, eller er det noe annet jeg kan hjelpe med?`;
+        } else {
+          melding += 'Hva kan jeg hjelpe deg med i dag?';
+        }
+
+        return reply.send({ melding });
+      } catch {
+        return reply.send({ melding: null });
+      }
+    },
+  );
+
   fastify.post<{ Body: ChatBody }>(
     '/api/chat',
     {

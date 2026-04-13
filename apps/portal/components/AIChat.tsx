@@ -144,6 +144,23 @@ export default function AIChat({
     settEntraObjectId(entraObjectId);
   }, [entraObjectId]);
 
+  // Hent velkomstmelding ved første mount — kun på dashboard (ikke i rapport-chat)
+  useEffect(() => {
+    if (rapportId || !entraObjectId) return;
+    apiFetch('/api/chat/velkomst', {
+      headers: { 'X-Entra-Object-Id': entraObjectId },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { melding?: string | null } | null) => {
+        if (d?.melding) {
+          setMessages([{ role: 'assistant', content: d.melding }]);
+          setDisplay([{ role: 'assistant', content: d.melding }]);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Last TTS-innstillinger fra brukerprofil ved oppstart
   useEffect(() => {
     if (!entraObjectId) return;
