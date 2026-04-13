@@ -524,6 +524,21 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Hent view-navn for tilgangskontroll i query_database (brukes i openaiService)
+      if (tillatteViewIds && tillatteViewIds.length > 0) {
+        try {
+          const viewNavnRows = await queryAzureSQL(`
+            SELECT view_name FROM ai_metadata_views
+            WHERE id IN (${tillatteViewIds.map(id => `'${escStr(id)}'`).join(',')}) AND er_aktiv = 1
+          `);
+          const tillatteViewNavn = viewNavnRows.map(r => String(r['view_name'] ?? '').toLowerCase()).filter(Boolean);
+          chatContext = { ...chatContext, tillatteViewNavn };
+          console.log('[tilgang] workspace-views:', tillatteViewNavn);
+        } catch (err) {
+          console.warn('[Chat] view-navn fetch feil:', err instanceof Error ? err.message : err);
+        }
+      }
+
       // Hent brukerens profildata tidlig — brukes i rankViews-boost og velkomst
       let profilViews: string[] = [];
       let profilTopRapporter: { navn: string; antall: number }[] = [];

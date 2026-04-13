@@ -103,6 +103,8 @@ export interface ChatContext {
   kildePbiReportId?: string;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
+  /** Tillatte view-navn (lowercase) for denne brukeren — undefined = ingen begrensning */
+  tillatteViewNavn?: string[];
 }
 
 const tools: OpenAI.Chat.ChatCompletionTool[] = [
@@ -543,18 +545,32 @@ export async function chat(
         } else if (tc.name === 'query_database') {
           const rawSQL   = args['sql'] as string;
           const sqlQuery = sanitizeSQL(rawSQL);
-          console.log('[OpenAI] query_database:', sqlQuery);
-          const isAzureSql = /ai_gold\./i.test(sqlQuery);
-          console.log('[OpenAI] ruter til:', isAzureSql ? 'Azure SQL' : 'Fabric');
-          if (isAzureSql) {
-            const rows = await queryAzureSQL(sqlQuery, 200);
-            onChunk({ type: 'query_result', data: rows, sql: sqlQuery });
-            result = { rows };
-          } else {
-            const fabricResult = await executeQuery(sqlQuery, 200);
-            const rows = (fabricResult as { rows?: Record<string, unknown>[] })?.rows;
-            if (rows) onChunk({ type: 'query_result', data: rows, sql: sqlQuery });
-            result = fabricResult;
+
+          // Tilgangskontroll: avvis SQL som refererer views utenfor brukerens workspace-tilgang
+          if (context?.tillatteViewNavn && context.tillatteViewNavn.length > 0) {
+            const sqlLower = sqlQuery.toLowerCase();
+            const referertViews = [...sqlLower.matchAll(/\b(vw_\w+)\b/g)].map(m => m[1]);
+            const ikketillatt = referertViews.filter(v => !context.tillatteViewNavn!.includes(v));
+            if (ikketillatt.length > 0) {
+              console.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
+              result = { error: 'Du har ikke tilgang til denne datakilden.' };
+            }
+          }
+
+          if (!result) {
+            console.log('[OpenAI] query_database:', sqlQuery);
+            const isAzureSql = /ai_gold\./i.test(sqlQuery);
+            console.log('[OpenAI] ruter til:', isAzureSql ? 'Azure SQL' : 'Fabric');
+            if (isAzureSql) {
+              const rows = await queryAzureSQL(sqlQuery, 200);
+              onChunk({ type: 'query_result', data: rows, sql: sqlQuery });
+              result = { rows };
+            } else {
+              const fabricResult = await executeQuery(sqlQuery, 200);
+              const rows = (fabricResult as { rows?: Record<string, unknown>[] })?.rows;
+              if (rows) onChunk({ type: 'query_result', data: rows, sql: sqlQuery });
+              result = fabricResult;
+            }
           }
         } else if (tc.name === 'set_report_filter') {
           const filterConfig: FilterConfig = {
