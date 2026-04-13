@@ -72,6 +72,7 @@ function rankViews(
   kolonner: Record<string, unknown>[],
   regler: Record<string, unknown>[],
   spørsmål: string,
+  profilViews?: string[],
 ): Record<string, unknown>[] {
   if (!spørsmål) return views;
   const s = spørsmål.toLowerCase();
@@ -100,6 +101,9 @@ function rankViews(
       score += treff * 3;
     }
 
+    // Profil-boost: views koblet til brukerens mest brukte rapporter
+    if (profilViews?.includes(String(v['view_name'] ?? ''))) score += 2;
+
     return { view: v, score, view_name: v['view_name'] };
   });
 
@@ -114,6 +118,7 @@ async function buildDynamicViewsSection(
   brukerSpørsmål?: string,
   kobletViewIds?: string[] | null,
   tillatteViewIds?: string[] | null,
+  profilViews?: string[],
 ): Promise<string> {
   // Filtrer views: rapport-kobling → workspace-tilgang → område → alle
   let viewsFilter: string;
@@ -181,7 +186,7 @@ async function buildDynamicViewsSection(
   let utelatte: string[] = [];
 
   if (brukerSpørsmål && alleViews.length > 4) {
-    const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], regler as Record<string, unknown>[], brukerSpørsmål);
+    const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], regler as Record<string, unknown>[], brukerSpørsmål, profilViews);
 
     // Rapport-koblede views prioriteres alltid
     const koblede = kobletViewIds
@@ -257,6 +262,7 @@ async function buildSystemPrompt(
   område?: string | null,
   brukerSpørsmål?: string,
   tillatteViewIds?: string[] | null,
+  profilViews?: string[],
 ): Promise<string> {
   // Prøv rapport-spesifikk kobling først
   let kobletViewIds: string[] | null = null;
@@ -291,7 +297,8 @@ async function buildSystemPrompt(
       kobletViewIds ? null : område,
       brukerSpørsmål,
       kobletViewIds,
-      kobletViewIds ? null : tillatteViewIds,  // workspace-tilgang gjelder kun når ingen rapport-kobling
+      kobletViewIds ? null : tillatteViewIds,
+      profilViews,
     );
     const iDag = new Date().toLocaleDateString('nb-NO', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -517,6 +524,50 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // Hent brukerens profildata tidlig — brukes i rankViews-boost og velkomst
+      let profilViews: string[] = [];
+      let profilTopRapporter: { navn: string; antall: number }[] = [];
+      let profilSisteRapportNavn: string | null = null;
+      if (entraObjectId) {
+        try {
+          const brukerP = await prisma.bruker.findUnique({
+            where: { entraObjectId },
+            select: { id: true },
+          });
+          if (brukerP) {
+            const [profil, sisteHendelse] = await Promise.all([
+              prisma.userProfile.findUnique({ where: { userId: brukerP.id }, select: { aiKontekst: true } }),
+              prisma.userEvent.findFirst({
+                where: { userId: brukerP.id, hendelsesType: 'åpnet_rapport' },
+                orderBy: { tidspunkt: 'desc' },
+                select: { referanseNavn: true },
+              }),
+            ]);
+            profilSisteRapportNavn = sisteHendelse?.referanseNavn ?? null;
+            if (profil?.aiKontekst) {
+              try {
+                const k = JSON.parse(profil.aiKontekst) as { topRapporter?: { navn: string; antall: number }[] };
+                profilTopRapporter = k.topRapporter ?? [];
+                if (profilTopRapporter.length > 0) {
+                  const navnListe = profilTopRapporter.slice(0, 3).map(r => `'${escStr(r.navn)}'`).join(', ');
+                  const koblingRows = await queryAzureSQL(`
+                    SELECT DISTINCT v.view_name
+                    FROM ai_rapport_view_kobling k
+                    JOIN ai_metadata_views v ON k.view_id = v.id
+                    JOIN Rapport r ON k.rapport_id = r.id
+                    WHERE r.navn IN (${navnListe})
+                  `);
+                  profilViews = koblingRows.map(r => String(r['view_name'] ?? '')).filter(Boolean);
+                  console.log('[Chat] profilViews fra topRapporter:', profilViews);
+                }
+              } catch { /* ignorerer ugyldig JSON */ }
+            }
+          }
+        } catch (err) {
+          console.warn('[Chat] profil-fetch feil:', err instanceof Error ? err.message : err);
+        }
+      }
+
       console.log('[Chat] mottatt:', {
         rapportId:       request.body.rapportId,
         pbiReportId:     request.body.pbiReportId,
@@ -532,7 +583,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         console.log('[Chat] prosjektNr:', 'ingen (forside)');
         console.log('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds);
+        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews);
         // FIX 4: token-estimat (ingen-rapport branch)
         console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
         console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
@@ -585,49 +636,27 @@ export async function chatRoutes(fastify: FastifyInstance) {
             console.warn('[Chat] rapport-liste feil:', err);
           }
         }
-        // Bygg personlig velkomst basert på brukerens siste aktivitet
+        // Bygg personlig velkomst fra pre-fetched profildata
         let velkomstTekst = '';
-        if (entraObjectId) {
-          try {
-            const brukerForVelkomst = await prisma.bruker.findUnique({
-              where: { entraObjectId: entraObjectId },
-              select: { id: true },
-            });
-            if (brukerForVelkomst) {
-              const [sisteHendelseVelkomst, profil] = await Promise.all([
-                prisma.userEvent.findFirst({
-                  where: { userId: brukerForVelkomst.id, hendelsesType: 'åpnet_rapport' },
-                  orderBy: { tidspunkt: 'desc' },
-                  select: { referanseNavn: true },
-                }),
-                prisma.userProfile.findUnique({
-                  where: { userId: brukerForVelkomst.id },
-                  select: { aiKontekst: true },
-                }),
-              ]);
-              if (sisteHendelseVelkomst?.referanseNavn) {
-                const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
-                const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
-                velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${sisteHendelseVelkomst.referanseNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
-              }
-              let profilTekst = '';
-              if (profil?.aiKontekst) {
-                try {
-                  const kontekst = JSON.parse(profil.aiKontekst) as { topRapporter?: { navn: string; antall: number }[] };
-                  if (kontekst.topRapporter && kontekst.topRapporter.length > 0) {
-                    profilTekst = `\nBrukerens mest brukte rapporter siste 30 dager:\n` +
-                      kontekst.topRapporter.map(r => `- ${r.navn} (${r.antall} ganger)`).join('\n') +
-                      '\nBruk denne konteksten til å forstå hvilke data brukeren jobber med til daglig, og tilpass svar deretter.\n';
-                  }
-                } catch { /* ignorerer ugyldig JSON */ }
-              }
-              console.log('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
-              velkomstTekst += profilTekst;
-            }
-          } catch {
-            // Ikke kritisk — fortsett uten velkomst
+        if (profilSisteRapportNavn) {
+          const time = new Date().toLocaleString('nb-NO', { timeZone: 'Europe/Oslo', hour: '2-digit' });
+          const hilsen = parseInt(time) < 12 ? 'God morgen' : parseInt(time) < 17 ? 'God dag' : 'God kveld';
+          velkomstTekst = `${hilsen}! Sist du var inne åpnet du "${profilSisteRapportNavn}". Si ifra om du vil fortsette der eller trenger hjelp med noe annet.\n\n`;
+        }
+        let profilTekst = '';
+        if (profilTopRapporter.length > 0) {
+          profilTekst = `\nVIKTIG — Automatisk datakilde-valg:\n` +
+            `Brukeren jobber mest med disse rapportene: ${profilTopRapporter.slice(0, 3).map(r => r.navn).join(', ')}.\n` +
+            `Når brukeren stiller spørsmål uten å spesifisere datakilde, velg automatisk den dataskilden (view) som er koblet til disse rapportene.\n` +
+            `Fortell alltid hvilken datakilde du valgte og hvorfor.\n\n` +
+            `Brukerens mest brukte rapporter siste 30 dager:\n` +
+            profilTopRapporter.map(r => `- ${r.navn} (${r.antall} ganger)`).join('\n') + '\n';
+          if (profilViews.length > 0) {
+            profilTekst += `Foretrukkede datakilder basert på brukerprofil: ${profilViews.join(', ')}\n`;
           }
         }
+        console.log('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
+        velkomstTekst += profilTekst;
 
         let ingenRapportPrompt = `${velkomstTekst}Du er en dataassistent for LNS Dataportal.
 Ingen rapport er valgt.
@@ -776,7 +805,7 @@ Tilgjengelige visualiseringstyper:
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds);
+      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews);
 
       // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
       const slicerValuesSummary = slicerValues
