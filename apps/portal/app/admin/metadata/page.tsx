@@ -770,7 +770,11 @@ export default function MetadataAdminPage() {
                                         {k.visningsnavn}
                                       </span>
                                       {k.format && <span className="ml-2 text-gray-400">({k.format})</span>}
-                                      <p className="font-mono text-[10px] text-gray-500 mt-1 truncate">{k.sql_uttrykk}</p>
+                                      <p
+                                        className="font-mono text-[10px] text-gray-500 mt-1 break-all cursor-pointer hover:text-blue-600 hover:bg-blue-50 rounded px-1 -mx-1 transition-colors"
+                                        onClick={() => { setRedigerKpiId(k.id); setRedigerKpiForm({ navn: k.navn, visningsnavn: k.visningsnavn, sql_uttrykk: k.sql_uttrykk, format: k.format ?? 'antall', beskrivelse: k.beskrivelse ?? '' }); }}
+                                        title="Klikk for å redigere SQL"
+                                      >{k.sql_uttrykk}</p>
                                     </div>
                                     <button
                                       onClick={() => { setRedigerKpiId(k.id); setRedigerKpiForm({ navn: k.navn, visningsnavn: k.visningsnavn, sql_uttrykk: k.sql_uttrykk, format: k.format ?? 'antall', beskrivelse: k.beskrivelse ?? '' }); }}

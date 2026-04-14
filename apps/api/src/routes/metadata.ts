@@ -492,17 +492,19 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       const { kpiId } = request.params;
       const { navn, visningsnavn, sql_uttrykk, format, beskrivelse } = request.body;
 
-      if (!navn?.trim() || !visningsnavn?.trim() || !sql_uttrykk?.trim()) {
-        return reply.status(400).send({ error: 'navn, visningsnavn og sql_uttrykk er påkrevd' });
+      const oppdateringer: string[] = [];
+      if (navn        !== undefined) oppdateringer.push(`navn         = '${esc(navn)}'`);
+      if (visningsnavn !== undefined) oppdateringer.push(`visningsnavn = '${esc(visningsnavn)}'`);
+      if (sql_uttrykk !== undefined) oppdateringer.push(`sql_uttrykk  = '${esc(sql_uttrykk)}'`);
+      if (format      !== undefined) oppdateringer.push(`format       = ${format ? `'${esc(format)}'` : 'NULL'}`);
+      if (beskrivelse !== undefined) oppdateringer.push(`beskrivelse  = ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}`);
+
+      if (oppdateringer.length === 0) {
+        return reply.status(400).send({ error: 'Ingen felt å oppdatere' });
       }
 
       const rows = await queryAzureSQL(`
-        UPDATE ai_metadata_kpi SET
-          navn         = '${esc(navn)}',
-          visningsnavn = '${esc(visningsnavn)}',
-          sql_uttrykk  = '${esc(sql_uttrykk)}',
-          format       = ${format ? `'${esc(format)}'` : 'NULL'},
-          beskrivelse  = ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}
+        UPDATE ai_metadata_kpi SET ${oppdateringer.join(', ')}
         OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
                INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
         WHERE id = '${esc(kpiId)}'
