@@ -300,8 +300,8 @@ const createReportTool: OpenAI.Chat.ChatCompletionTool = {
           enum: ['bar', 'line', 'pie', 'table', 'card'],
           description: 'Primær visualiseringstype: bar=søylediagram, line=linjediagram, pie=kakediagram, table=tabell, card=KPI-nøkkeltall',
         },
-        xAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes på X-aksen / kategorier' },
-        yAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes for verdier / Y-akse' },
+        xAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes på X-aksen / kategorier. Må matche et eksakt alias fra SELECT-setningen.' },
+        yAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes for verdier / Y-akse. VIKTIG: Må matche et eksakt alias fra SELECT-setningen — bruk originalnavnet fra viewet (f.eks. "Antall"), IKKE et nytt beskrivende navn (f.eks. "AntallPersonskader").' },
         grupperPaa:  { type: 'string', description: 'Kolonnenavn å farge/gruppere dataserier på (valgfritt)' },
         foreslåSlicere: { type: 'array', items: { type: 'string' }, description: 'Filtre/dimensjoner brukeren kan interagere med' },
       },
@@ -779,12 +779,32 @@ export async function chat(
             }
             console.log('[OpenAI] create_report prosjektfilter:', prosjektFilter ?? 'ingen');
 
+            // Valider yAkse mot faktiske kolonner i SQL-resultatet
+            const yAkseArg = args['yAkse'] as string | undefined;
+            if (yAkseArg && data.length > 0) {
+              const faktiskeKolonner = Object.keys(data[0]);
+              const yAkseFinnes = faktiskeKolonner.some(
+                k => k.toLowerCase() === yAkseArg.toLowerCase(),
+              );
+              if (!yAkseFinnes) {
+                console.warn(`[OpenAI] create_report yAkse "${yAkseArg}" finnes ikke i SQL-resultatet. Faktiske kolonner: ${faktiskeKolonner.join(', ')}`);
+                result = {
+                  error: `Kolonnen "${yAkseArg}" finnes ikke i SQL-resultatet. ` +
+                    `Faktiske kolonner er: ${faktiskeKolonner.join(', ')}. ` +
+                    `Bruk et av disse eksakte navnene som yAkse — husk at alias i SQL MÅ matche originalnavnet fra viewet.`,
+                };
+                onChunk({ type: 'tool_call', tool: tc.name, result });
+                history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+                continue;
+              }
+            }
+
             const forslag: RapportForslag = {
               tittel:            args['tittel'] as string,
               beskrivelse:       args['beskrivelse'] as string | undefined,
               visualType:        args['visualType'] as string,
               xAkse:             args['xAkse'] as string | undefined,
-              yAkse:             args['yAkse'] as string | undefined,
+              yAkse:             yAkseArg,
               grupperPaa:        args['grupperPaa'] as string | undefined,
               sql:               sqlQuery,
               data,
