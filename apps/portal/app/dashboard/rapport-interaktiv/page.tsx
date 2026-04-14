@@ -210,6 +210,12 @@ function byggWhereKlausul(
   return betingelser.length > 0 ? `WHERE ${betingelser.join(' AND ')}` : '';
 }
 
+// ── Smart default sorteringsretning ──────────────────────────────────────────
+function defaultSorterRetning(xAkse: string): 'ASC' | 'DESC' {
+  const tidskolonner = ['månedsnavn', 'månednavn', 'år', 'måned', 'årmåned'];
+  return tidskolonner.includes(xAkse?.toLowerCase()) ? 'ASC' : 'DESC';
+}
+
 // ── SQL builder ───────────────────────────────────────────────────────────────
 function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kolonnTyper: Record<string, string> = {}, kpiUttrykk: Record<string, string> = {}): string {
   const esc   = (s: string) => `[${s.replace(/[\[\]]/g, '')}]`;
@@ -281,16 +287,19 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
     ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
   }
 
-  const selKols = grp
-    ? `${x}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
-    : `${x}, ${yUttrykk} AS ${alias}${ekstraSelect}`;
   const grpKols = grp ? `${x}, ${grp}` : x;
 
   const where = prosjektFilter ? ` ${prosjektFilter}` : '';
 
   // Kronologisk sortering: månedsnavn sorteres via [måned]-kolonnen (tall), ikke alfabetisk
   const erMånedsnavn = ['månedsnavn', 'månednavn'].includes(cfg.xAkse.toLowerCase());
-  const ekstraGroupBy = erMånedsnavn ? ', [måned]' : '';
+  // [måned] must be in both SELECT and GROUP BY for ORDER BY [måned] to work in SQL Server
+  const ekstraMånedSel = erMånedsnavn ? ', [måned]' : '';
+  const ekstraGroupBy  = erMånedsnavn ? ', [måned]' : '';
+
+  const selKols = grp
+    ? `${x}${ekstraMånedSel}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
+    : `${x}${ekstraMånedSel}, ${yUttrykk} AS ${alias}${ekstraSelect}`;
 
   if (isMed) {
     // Window function: wrap in subquery with DISTINCT to deduplicate rows
@@ -1035,7 +1044,7 @@ export default function RapportInteraktivPage() {
         visualType: f.visualType, xAkse, yAkse,
         aggregering: 'SUM',
         grupperPaa: f.grupperPaa ?? null,
-        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
       });
 
       setAktiveFiltre(parseFiltreTilObjekter(f.sql ?? '', f.prosjektFilter ?? '', f.prosjektKolonne));
@@ -1117,7 +1126,7 @@ export default function RapportInteraktivPage() {
 
       // Nullstill alltid config ved ny sesjon — forhindrer at forrige rapport sine kolonner lever videre
       sessionStorage.removeItem('rapport_forslag');
-      setConfig({ visualType: 'bar', xAkse: '', yAkse: '', aggregering: 'SUM', grupperPaa: null, ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50 });
+      setConfig({ visualType: 'bar', xAkse: '', yAkse: '', aggregering: 'SUM', grupperPaa: null, ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(''), maksRader: 50 });
       setAktivData([]);
       setAktiveFiltre([]);
 
@@ -1220,7 +1229,7 @@ export default function RapportInteraktivPage() {
       const nyConfig: RedigertConfig = {
         visualType: 'bar', xAkse, yAkse,
         aggregering: 'SUM', grupperPaa: null,
-        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: 'DESC', maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
       };
 
       nyRapportAutoFetch.current = true; // Bloker debounced effect under init
@@ -1558,6 +1567,14 @@ export default function RapportInteraktivPage() {
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre, autoRefresh]);
+
+  // ── Auto-oppdater sorteringsretning når xAkse endres ────────────────────────
+  useEffect(() => {
+    if (!config?.xAkse) return;
+    const smartRetning = defaultSorterRetning(config.xAkse);
+    setConfig(prev => prev ? { ...prev, sorterRetning: smartRetning } : prev);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.xAkse]);
 
   // ── Initialiser valgteKolonner ved skifte til tabell-visning ──
   useEffect(() => {
@@ -2596,7 +2613,7 @@ export default function RapportInteraktivPage() {
                   isFirstFetch.current = true;
                   setAktivData(forslag.data ?? []);
                   setAktiveFiltre(parseFiltreTilObjekter(forslag.sql ?? '', forslag.prosjektFilter ?? '', forslag.prosjektKolonne));
-                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:null, sorterRetning:'DESC', maksRader:50 });
+                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:null, sorterRetning:defaultSorterRetning(x), maksRader:50 });
                 }}
                 style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-muted)' }}>
                 Tilbakestill til AI-forslag
