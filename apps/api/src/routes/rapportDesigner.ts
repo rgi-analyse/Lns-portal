@@ -367,6 +367,8 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
                 datatype:     'kpi',
                 sort_order:   9999,
                 sql_uttrykk:  String(k['sql_uttrykk'] ?? ''),
+                visningsnavn: String(k['visningsnavn'] ?? ''),
+                format:       k['format'] ? String(k['format']) : undefined,
               }));
               console.log('[view-kolonner] KPI-er lastet:', kpiKolonner.length);
             }

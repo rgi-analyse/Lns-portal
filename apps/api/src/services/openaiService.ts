@@ -70,7 +70,7 @@ export interface RapportForslag {
   sql: string;
   data: Record<string, unknown>[];
   foreslåSlicere?: string[];
-  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string }[];
+  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; visningsnavn?: string; format?: string }[];
   viewNavn?: string | null;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
@@ -674,7 +674,7 @@ export async function chat(
                 // KPI-er finnes ikke i INFORMATION_SCHEMA — de er forhåndsdefinerte beregninger
                 try {
                   const kpiRader = await queryAzureSQL(`
-                    SELECT k.navn, k.sql_uttrykk
+                    SELECT k.navn, k.visningsnavn, k.sql_uttrykk, k.format
                     FROM ai_metadata_kpi k
                     JOIN ai_metadata_views v ON k.view_id = v.id
                     WHERE v.schema_name = '${safeSchema}' AND v.view_name = '${safeName}'
@@ -687,6 +687,8 @@ export async function chat(
                         kolonne_navn: String(k['navn']),
                         kolonne_type: 'kpi' as string,
                         sql_uttrykk:  String(k['sql_uttrykk']),
+                        visningsnavn: String(k['visningsnavn'] ?? k['navn']),
+                        format:       k['format'] ? String(k['format']) : undefined,
                       }));
                     alleViewKolonner = [...alleViewKolonner, ...kpiKolonner];
                     console.log('[OpenAI] create_report KPI-er lastet:', kpiKolonner.length);

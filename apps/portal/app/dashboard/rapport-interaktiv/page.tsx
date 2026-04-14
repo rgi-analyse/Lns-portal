@@ -24,7 +24,7 @@ interface RapportForslag {
   sql: string;
   data: Record<string, unknown>[];
   foreslåSlicere?: string[];
-  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[];
+  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[];
   viewNavn?: string | null;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
@@ -355,7 +355,8 @@ function exportToCsv(data: Record<string, unknown>[], filename: string) {
 }
 
 // ── Bar chart ─────────────────────────────────────────────────────────────────
-function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string }) {
+function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
+  const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
   const W = 800, H = 400, padL = 80, padR = 20, padT = 20, padB = 90;
   const groups     = grupperPaa ? [...new Set(data.map(r => String(r[grupperPaa] ?? '')))] : [''];
   const categories = [...new Set(data.map(r => String(r[xCol] ?? '')))];
@@ -382,7 +383,7 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<strin
           <g key={t}>
             <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
             <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
-              {(t*maxVal).toLocaleString('nb-NO',{maximumFractionDigits:0})}
+              {fmt(t*maxVal)}
             </text>
           </g>
         );
@@ -399,7 +400,7 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<strin
               return (
                 <g key={grp}>
                   <rect x={bx} y={by} width={barW} height={bh} fill={COLORS[gi%COLORS.length]} rx={2} opacity={0.85}/>
-                  {bh>20 && <text x={bx+barW/2} y={by+12} fontSize={9} textAnchor="middle" fill="var(--text-secondary)">{val.toLocaleString('nb-NO',{maximumFractionDigits:0})}</text>}
+                  {bh>20 && <text x={bx+barW/2} y={by+12} fontSize={9} textAnchor="middle" fill="var(--text-secondary)">{fmt(val)}</text>}
                 </g>
               );
             })}
@@ -423,7 +424,8 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel }: { data: Record<strin
 }
 
 // ── Line / Area chart ─────────────────────────────────────────────────────────
-function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string }) {
+function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
+  const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
   const W = 800, H = 400, padL = 80, padR = 20, padT = 20, padB = 60;
   const vals   = data.map(r => Number(r[yCol]) || 0);
   const maxVal = Math.max(...vals, 1);
@@ -448,7 +450,7 @@ function LineChart({ data, xCol, yCol, area, yLabel }: { data: Record<string,unk
           <g key={t}>
             <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
             <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
-              {(t*maxVal).toLocaleString('nb-NO',{maximumFractionDigits:0})}
+              {fmt(t*maxVal)}
             </text>
           </g>
         );
@@ -954,8 +956,9 @@ export default function RapportInteraktivPage() {
   const [lasterData, setLasterData] = useState(false);
   const [tilgjengeligeKolonner, setTilgjengeligeKolonner] = useState<string[]>([]);
   const [kolonnTyper, setKolonnTyper] = useState<Record<string, string>>({});
-  const [kpiUttrykk, setKpiUttrykk] = useState<Record<string, string>>({});
-  const [kpiFormat,  setKpiFormat]  = useState<Record<string, string>>({});
+  const [kpiUttrykk,      setKpiUttrykk]      = useState<Record<string, string>>({});
+  const [kpiFormat,       setKpiFormat]       = useState<Record<string, string>>({});
+  const [kpiVisningsnavn, setKpiVisningsnavn] = useState<Record<string, string>>({});
   const [visTabell,          setVisTabell]          = useState(false);
   const [visRediger,         setVisRediger]         = useState(false);
   const [eksporterer,        setEksporterer]        = useState(false);
@@ -1049,16 +1052,19 @@ export default function RapportInteraktivPage() {
         const typemap: Record<string, string> = {};
         const kpiMap: Record<string, string> = {};
         const fmtMap: Record<string, string> = {};
+        const vnsMap: Record<string, string> = {};
         for (const k of f.alleViewKolonner) {
           typemap[k.kolonne_navn] = k.kolonne_type;
           if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
-            kpiMap[k.kolonne_navn] = k.sql_uttrykk!;
-            if (k.format) fmtMap[k.kolonne_navn] = k.format!;
+            kpiMap[k.kolonne_navn] = k.sql_uttrykk;
+            if (k.format)       fmtMap[k.kolonne_navn] = k.format;
+            if (k.visningsnavn) vnsMap[k.kolonne_navn] = k.visningsnavn;
           }
         }
         setKolonnTyper(typemap);
         setKpiUttrykk(kpiMap);
         setKpiFormat(fmtMap);
+        setKpiVisningsnavn(vnsMap);
       } else {
         setTilgjengeligeKolonner(dataCols);
         if (f.viewNavn) {
@@ -1139,7 +1145,7 @@ export default function RapportInteraktivPage() {
       }
 
       // Steg 2: Hent kolonner FØR state settes — lokale variabler kun
-      let alleKolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[] = [];
+      let alleKolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[] = [];
       console.log('[Designer] henter kolonner for viewNavn:', viewNavn);
       try {
         const r = await apiFetch(
@@ -1148,7 +1154,7 @@ export default function RapportInteraktivPage() {
         );
         console.log('[Designer] kolonner API status:', r.status);
         if (r.ok) {
-          const d = await r.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]; kilde: string };
+          const d = await r.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[]; kilde: string };
           alleKolonner = d.kolonner ?? [];
           console.log('[Designer] kolonner kilde:', d.kilde, '| antall:', alleKolonner.length);
           console.log('[Designer] measures:', alleKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
@@ -1178,11 +1184,13 @@ export default function RapportInteraktivPage() {
       const typemap: Record<string, string> = {};
       const kpiMap: Record<string, string> = {};
       const fmtMap: Record<string, string> = {};
+      const vnsMap: Record<string, string> = {};
       for (const k of alleKolonner) {
         typemap[k.kolonne_navn] = k.kolonne_type;
         if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
-          kpiMap[k.kolonne_navn] = k.sql_uttrykk!;
-          if (k.format) fmtMap[k.kolonne_navn] = k.format!;
+          kpiMap[k.kolonne_navn] = k.sql_uttrykk;
+          if (k.format)       fmtMap[k.kolonne_navn] = k.format;
+          if (k.visningsnavn) vnsMap[k.kolonne_navn] = k.visningsnavn;
         }
       }
 
@@ -1217,6 +1225,7 @@ export default function RapportInteraktivPage() {
       setKolonnTyper(typemap);
       setKpiUttrykk(kpiMap);
       setKpiFormat(fmtMap);
+      setKpiVisningsnavn(vnsMap);
 
       // Deaktiver auto-refresh automatisk for sannsynlig store views
       const erSannsynligStortView = viewNavn?.toLowerCase().includes('fact') ||
@@ -1428,7 +1437,7 @@ export default function RapportInteraktivPage() {
       };
 
       // Hent ferske kolonnetyper fra API — ikke bruk lagret config (kan være utdatert/feil)
-      let alleViewKolonner = (cfg.alleViewKolonner as { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]) ?? [];
+      let alleViewKolonner = (cfg.alleViewKolonner as { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[]) ?? [];
       if (vn) {
         try {
           const kolRes = await apiFetch(
@@ -1436,7 +1445,7 @@ export default function RapportInteraktivPage() {
             { credentials: 'include' },
           );
           if (kolRes.ok) {
-            const kolData = await kolRes.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]; kilde: string };
+            const kolData = await kolRes.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[]; kilde: string };
             alleViewKolonner = kolData.kolonner ?? alleViewKolonner;
             console.log('[Designer] ferske kolonnetyper lastet | kilde:', kolData.kilde,
               '| measures:', alleViewKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
@@ -1470,14 +1479,17 @@ export default function RapportInteraktivPage() {
       setKolonnTyper(typemap);
       const kpiMapLagret: Record<string, string> = {};
       const fmtMapLagret: Record<string, string> = {};
+      const vnsMapLagret: Record<string, string> = {};
       for (const k of alleViewKolonner) {
         if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
-          kpiMapLagret[k.kolonne_navn] = k.sql_uttrykk!;
-          if (k.format) fmtMapLagret[k.kolonne_navn] = k.format!;
+          kpiMapLagret[k.kolonne_navn] = k.sql_uttrykk;
+          if (k.format)       fmtMapLagret[k.kolonne_navn] = k.format;
+          if (k.visningsnavn) vnsMapLagret[k.kolonne_navn] = k.visningsnavn;
         }
       }
       setKpiUttrykk(kpiMapLagret);
       setKpiFormat(fmtMapLagret);
+      setKpiVisningsnavn(vnsMapLagret);
 
       // Gjenoppbygg valgteKolonner — verifiser mot ferske kolonner slik at utgåtte ikke tas med
       const gyldigeNavn = new Set(alleViewKolonner.map(k => k.kolonne_navn));
@@ -1672,10 +1684,20 @@ export default function RapportInteraktivPage() {
     .filter(f => f.kolonne && f.verdi && f.kolonne !== (forslag.prosjektKolonne ?? ''))
     .map(f => `${f.kolonne} ${f.operator} ${f.verdi}`);
 
-  // Y-akse label med aggregeringsnavn
-  const yAkseLabel = config.aggregering === 'NONE'
-    ? config.yAkse
-    : `${config.aggregering}(${config.yAkse})`;
+  // Y-akse label: KPI-er viser visningsnavn, andre viser aggregering(kolonnenavn)
+  const yAkseLabel = kpiUttrykk[config.yAkse]
+    ? (kpiVisningsnavn[config.yAkse] || config.yAkse)
+    : config.aggregering === 'NONE'
+      ? config.yAkse
+      : `${config.aggregering}(${config.yAkse})`;
+
+  // Format-bevisst tallformatering for KPI-er
+  const yFormat = kpiFormat[config.yAkse];
+  function formaterVerdi(val: number, fmt?: string): string {
+    if (fmt === 'prosent') return `${val.toFixed(2)} %`;
+    if (fmt === 'nok') return val.toLocaleString('nb-NO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' kr';
+    return val.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
+  }
 
   const visTypeLabel: Record<string,string> = {
     bar:'Søylediagram', line:'Linjediagram', area:'Områdediagram',
@@ -1883,9 +1905,9 @@ export default function RapportInteraktivPage() {
       <div style={{ color:'var(--text-muted)', padding:40, textAlign:'center' }}>Ingen data å vise.</div>
     );
     switch (config.visualType) {
-      case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel}/>;
-      case 'line':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel}/>;
-      case 'area':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} area yLabel={yAkseLabel}/>;
+      case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
+      case 'line':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
+      case 'area':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} area yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
       case 'pie':       return <PieChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse}/>;
       case 'card':      return <CardChart      data={behandletData} yCol={config.yAkse} yLabel={yAkseLabel}/>;
       case 'table':     return null;
