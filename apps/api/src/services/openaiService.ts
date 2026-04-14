@@ -239,6 +239,48 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
   },
 ];
 
+const opprettKpiTool: OpenAI.Chat.ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'opprett_kpi',
+    description:
+      'Oppretter en ny KPI i systemet basert på brukerens beskrivelse av beregningslogikk. ' +
+      'Kall dette BARE etter at brukeren har bekreftet hvordan KPI-en beregnes og du har oversatt det til SQL. ' +
+      'Ikke kall dette uten eksplisitt bekreftelse fra bruker.',
+    parameters: {
+      type: 'object',
+      properties: {
+        view_navn: {
+          type: 'string',
+          description: 'Fullt view-navn inkl. schema, f.eks. ai_gold.vw_Fact_Regnskapstransksjoner',
+        },
+        navn: {
+          type: 'string',
+          description: 'Teknisk navn uten mellomrom, f.eks. Dekningsbidrag',
+        },
+        visningsnavn: {
+          type: 'string',
+          description: 'Lesbart navn for brukere, f.eks. "Dekningsbidrag %"',
+        },
+        sql_uttrykk: {
+          type: 'string',
+          description: 'Fullstendig SQL-aggregeringsuttrykk, f.eks. CAST(SUM(omsetning - varekostnad) AS FLOAT) / NULLIF(SUM(omsetning), 0)',
+        },
+        format: {
+          type: 'string',
+          enum: ['prosent', 'nok', 'antall', 'desimal'],
+          description: 'Format: prosent (%), nok (kr), antall (heltall), desimal',
+        },
+        beskrivelse: {
+          type: 'string',
+          description: 'Forklaring av hva KPI-en måler (valgfritt)',
+        },
+      },
+      required: ['view_navn', 'navn', 'visningsnavn', 'sql_uttrykk', 'format'],
+    },
+  },
+};
+
 const createReportTool: OpenAI.Chat.ChatCompletionTool = {
   type: 'function',
   function: {
@@ -336,7 +378,7 @@ export async function chat(
   ];
 
   const activeTools = context?.kanLageRapport
-    ? [...tools, createReportTool]
+    ? [...tools, opprettKpiTool, createReportTool]
     : tools;
 
   // Recursive tool-call loop
@@ -758,6 +800,63 @@ export async function chat(
             console.log('[OpenAI] create_report forslag klar, rader:', data.length);
             onChunk({ type: 'rapport_forslag', forslag });
             result = { success: true, message: `Rapportforslag "${forslag.tittel}" er klart med ${data.length} rader.` };
+          }
+        } else if (tc.name === 'opprett_kpi') {
+          if (!context?.kanLageRapport) {
+            result = { error: 'Du har ikke tilgang til å opprette KPI-er.' };
+          } else {
+            const viewNavn_    = String(args['view_navn'] ?? '');
+            const navn_        = String(args['navn'] ?? '');
+            const visningsnavn_ = String(args['visningsnavn'] ?? '');
+            const sql_uttrykk_ = String(args['sql_uttrykk'] ?? '');
+            const format_      = String(args['format'] ?? '');
+            const beskrivelse_ = args['beskrivelse'] ? String(args['beskrivelse']) : '';
+
+            if (!viewNavn_ || !navn_ || !visningsnavn_ || !sql_uttrykk_ || !format_) {
+              result = { error: 'Mangler påkrevde felter: view_navn, navn, visningsnavn, sql_uttrykk, format.' };
+            } else {
+              const parts     = viewNavn_.split('.');
+              const safeSchema = (parts[0] ?? 'ai_gold').replace(/'/g, "''");
+              const safeView   = (parts[1] ?? viewNavn_).replace(/'/g, "''");
+              const safeNavn   = navn_.replace(/'/g, "''");
+              const safeVns    = visningsnavn_.replace(/'/g, "''");
+              const safeSql    = sql_uttrykk_.replace(/'/g, "''");
+              const safeFmt    = format_.replace(/'/g, "''");
+              const safeBesk   = beskrivelse_.replace(/'/g, "''");
+
+              // Slå opp view_id fra view-navn
+              const viewRader = await queryAzureSQL(`
+                SELECT id FROM ai_metadata_views
+                WHERE schema_name = '${safeSchema}' AND view_name = '${safeView}' AND er_aktiv = 1
+              `, 1);
+
+              if (!viewRader.length) {
+                result = { error: `View '${viewNavn_}' er ikke registrert i metadata. Administrator må registrere viewet først.` };
+              } else {
+                const viewId = String(viewRader[0]['id']);
+                const rows = await queryAzureSQL(`
+                  INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
+                  OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+                         INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+                  VALUES (
+                    '${viewId}', '${safeNavn}', '${safeVns}',
+                    '${safeSql}', '${safeFmt}',
+                    ${safeBesk ? `'${safeBesk}'` : 'NULL'}
+                  )
+                `, 1);
+                console.log('[OpenAI] opprett_kpi:', navn_, 'for view', viewNavn_);
+                // Logg for admin-oversikt (ikke kritisk)
+                queryAzureSQL(`
+                  INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
+                  VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
+                `).catch(() => {});
+                result = {
+                  success: true,
+                  kpi: rows[0],
+                  melding: `KPI "${visningsnavn_}" er opprettet for ${viewNavn_}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
+                };
+              }
+            }
           }
         } else {
           result = { error: `Ukjent verktøy: ${tc.name}` };

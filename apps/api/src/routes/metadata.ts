@@ -481,6 +481,38 @@ export async function metadataRoutes(fastify: FastifyInstance) {
     },
   );
 
+  // PATCH /api/admin/metadata/views/:id/kpi/:kpiId — rediger KPI
+  fastify.patch<{
+    Params: { id: string; kpiId: string };
+    Body: { navn?: string; visningsnavn?: string; sql_uttrykk?: string; format?: string; beskrivelse?: string };
+  }>(
+    '/api/admin/metadata/views/:id/kpi/:kpiId',
+    { preHandler: [requireBruker, requireAdmin] },
+    async (request, reply) => {
+      const { kpiId } = request.params;
+      const { navn, visningsnavn, sql_uttrykk, format, beskrivelse } = request.body;
+
+      if (!navn?.trim() || !visningsnavn?.trim() || !sql_uttrykk?.trim()) {
+        return reply.status(400).send({ error: 'navn, visningsnavn og sql_uttrykk er påkrevd' });
+      }
+
+      const rows = await queryAzureSQL(`
+        UPDATE ai_metadata_kpi SET
+          navn         = '${esc(navn)}',
+          visningsnavn = '${esc(visningsnavn)}',
+          sql_uttrykk  = '${esc(sql_uttrykk)}',
+          format       = ${format ? `'${esc(format)}'` : 'NULL'},
+          beskrivelse  = ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}
+        OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+               INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+        WHERE id = '${esc(kpiId)}'
+      `, 1);
+
+      if (!rows.length) return reply.status(404).send({ error: 'KPI ikke funnet' });
+      return reply.send(rows[0]);
+    },
+  );
+
   // DELETE /api/admin/metadata/views/:id/kpi/:kpiId — slett KPI
   fastify.delete<{ Params: { id: string; kpiId: string } }>(
     '/api/admin/metadata/views/:id/kpi/:kpiId',

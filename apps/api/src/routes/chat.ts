@@ -236,23 +236,37 @@ async function buildDynamicViewsSection(
       : '';
 
     const viewKpi = kpi.filter(k => k['view_id'] === view['id']);
-    const kpiTekst = viewKpi.length > 0
-      ? '\n   KPI-beregninger (eksisterer IKKE som fysiske kolonner — bruk SQL-uttrykket direkte):\n' +
-        viewKpi.map(k => {
-          const besk = k['beskrivelse'] ? `\n     Beskrivelse: ${k['beskrivelse']}` : '';
-          return `   - Teknisk navn (bruk dette eksakt som alias i SQL): ${k['navn']}\n     Visningsnavn: ${k['visningsnavn']}\n     Format: ${k['format'] ?? 'tall'}\n     SQL: ${k['sql_uttrykk']}${besk}`;
-        }).join('\n') +
-        '\n\n   REGLER FOR KPI-KOLONNER:\n' +
-        '   • Bruk alltid det tekniske navnet eksakt — IKKE modifiser eller legg til ord som "Prosent", "Andel" osv.\n' +
-        '     Eksempel: teknisk navn "Lønnsandel" → alias skal være [Lønnsandel], IKKE [LønnsandelProsent]\n' +
-        '   • SQL-uttrykket finnes IKKE som fysisk kolonne — aldri referer til teknisk navn i FROM/WHERE, kun i SELECT AS\n' +
-        '   • Legg SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
-        '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
-        '   • For månedsvisning: bruk disse eksakte kolonnene fra viewet: månedsnavn, måned, år, årmåned\n' +
-        '   • ALDRI lag egne dimensjonskolonner som Periode, PeriodeNavn, MånedNavn — bruk viewets egne kolonner\n' +
-        '   • Eksempel riktig: SELECT [år], [månedsnavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [år], [månedsnavn], [måned] ORDER BY [år], [måned]\n' +
-        '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS LønnsandelProsent FROM [view] ...'
-      : '';
+    const fullViewNavn = `${view['schema_name']}.${view['view_name']}`;
+    const kpiListe = viewKpi.length > 0
+      ? viewKpi.map(k => `   - ${k['navn']} (${k['visningsnavn']})`).join('\n')
+      : '   (ingen KPI-er opprettet ennå)';
+    const kpiTekst =
+      `\n   Tilgjengelige KPI-er for ${view['visningsnavn']}:\n${kpiListe}\n` +
+      (viewKpi.length > 0
+        ? '\n   KPI-beregninger (eksisterer IKKE som fysiske kolonner — bruk SQL-uttrykket direkte):\n' +
+          viewKpi.map(k => {
+            const besk = k['beskrivelse'] ? `\n     Beskrivelse: ${k['beskrivelse']}` : '';
+            return `   - Teknisk navn (bruk dette eksakt som alias i SQL): ${k['navn']}\n     Visningsnavn: ${k['visningsnavn']}\n     Format: ${k['format'] ?? 'tall'}\n     SQL: ${k['sql_uttrykk']}${besk}`;
+          }).join('\n') +
+          '\n\n   REGLER FOR KPI-KOLONNER:\n' +
+          '   • Bruk alltid det tekniske navnet eksakt — IKKE modifiser eller legg til ord som "Prosent", "Andel" osv.\n' +
+          '     Eksempel: teknisk navn "Lønnsandel" → alias skal være [Lønnsandel], IKKE [LønnsandelProsent]\n' +
+          '   • SQL-uttrykket finnes IKKE som fysisk kolonne — aldri referer til teknisk navn i FROM/WHERE, kun i SELECT AS\n' +
+          '   • Legg SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
+          '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
+          '   • For månedsvisning: bruk disse eksakte kolonnene fra viewet: månedsnavn, måned, år, årmåned\n' +
+          '   • ALDRI lag egne dimensjonskolonner som Periode, PeriodeNavn, MånedNavn — bruk viewets egne kolonner\n' +
+          '   • Eksempel riktig: SELECT [år], [månedsnavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [år], [månedsnavn], [måned] ORDER BY [år], [måned]\n' +
+          '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS LønnsandelProsent FROM [view] ...'
+        : '') +
+      `\n\n   HVIS BRUKER BER OM KPI SOM IKKE FINNES I LISTEN OVER:\n` +
+      `   1. Ikke lag en fiktiv kolonne eller gjett SQL-uttrykket\n` +
+      `   2. Spør bruker om beregningslogikk i klartekst, f.eks.:\n` +
+      `      "Dekningsbidrag er ikke satt opp ennå. Hvordan beregnes det?\n` +
+      `       Beskriv gjerne med ord, f.eks. 'omsetning minus varekostnad delt på omsetning'"\n` +
+      `   3. Når bruker har bekreftet logikken — oversett til SQL og kall verktøyet opprett_kpi med:\n` +
+      `      view_navn: "${fullViewNavn}"\n` +
+      `   4. Bekreft opprettelsen og lag rapporten`;
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
     const eksempelTekst = viewEksempler.length > 0

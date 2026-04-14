@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
@@ -123,6 +123,10 @@ export default function MetadataAdminPage() {
   // Dialog: legg til KPI
   const [addKpiViewId, setAddKpiViewId] = useState<string | null>(null);
   const [kpiForm, setKpiForm] = useState({ navn: '', visningsnavn: '', sql_uttrykk: '', format: 'antall', beskrivelse: '' });
+
+  // Inline redigering av KPI
+  const [redigerKpiId, setRedigerKpiId] = useState<string | null>(null);
+  const [redigerKpiForm, setRedigerKpiForm] = useState({ navn: '', visningsnavn: '', sql_uttrykk: '', format: 'antall', beskrivelse: '' });
 
   // Alle rapporter for dropdown
   const [alleRapporter, setAlleRapporter] = useState<RapportItem[]>([]);
@@ -410,6 +414,23 @@ export default function MetadataAdminPage() {
     setViews(prev => prev.map(v => v.id === viewId ? { ...v, kpi: v.kpi.filter(k => k.id !== kpiId) } : v));
   };
 
+  const lagreKpi = async (viewId: string, kpiId: string) => {
+    if (!redigerKpiForm.navn.trim() || !redigerKpiForm.visningsnavn.trim() || !redigerKpiForm.sql_uttrykk.trim()) return;
+    const res = await apiFetch(`/api/admin/metadata/views/${viewId}/kpi/${kpiId}`, {
+      method: 'PATCH',
+      headers: jsonHeaders,
+      body: JSON.stringify(redigerKpiForm),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      alert(err.error ?? `Feil ved lagring (HTTP ${res.status})`);
+      return;
+    }
+    const oppdatert = await res.json() as Kpi;
+    setViews(prev => prev.map(v => v.id === viewId ? { ...v, kpi: v.kpi.map(k => k.id === kpiId ? oppdatert : k) } : v));
+    setRedigerKpiId(null);
+  };
+
   // ── Rapport-koblinger ──
   const leggTilKobling = async () => {
     if (!addKoblingViewId || !koblingForm.rapportId.trim()) return;
@@ -673,21 +694,99 @@ export default function MetadataAdminPage() {
                         ) : (
                           <div className="space-y-1">
                             {view.kpi.map(k => (
-                              <div key={k.id} className="flex items-start gap-2 text-xs bg-white rounded border border-gray-100 px-3 py-2">
-                                <div className="flex-1">
-                                  <span className="inline-flex items-center gap-1 font-semibold text-gray-800">
-                                    <span className="bg-amber-100 text-amber-700 px-1 rounded text-[10px] font-bold">KPI</span>
-                                    {k.visningsnavn}
-                                  </span>
-                                  {k.format && <span className="ml-2 text-gray-400">({k.format})</span>}
-                                  <p className="font-mono text-[10px] text-gray-500 mt-1 truncate">{k.sql_uttrykk}</p>
-                                </div>
-                                <button
-                                  onClick={() => slettKpi(view.id, k.id)}
-                                  className="shrink-0 text-gray-300 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                              <div key={k.id} className="text-xs bg-white rounded border border-gray-100 px-3 py-2">
+                                {redigerKpiId === k.id ? (
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="block text-[10px] text-gray-500 mb-0.5">Teknisk navn</label>
+                                        <input
+                                          value={redigerKpiForm.navn}
+                                          onChange={e => setRedigerKpiForm(f => ({ ...f, navn: e.target.value }))}
+                                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] text-gray-500 mb-0.5">Visningsnavn</label>
+                                        <input
+                                          value={redigerKpiForm.visningsnavn}
+                                          onChange={e => setRedigerKpiForm(f => ({ ...f, visningsnavn: e.target.value }))}
+                                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] text-gray-500 mb-0.5">SQL-uttrykk</label>
+                                      <textarea
+                                        value={redigerKpiForm.sql_uttrykk}
+                                        onChange={e => setRedigerKpiForm(f => ({ ...f, sql_uttrykk: e.target.value }))}
+                                        rows={3}
+                                        className="w-full border border-gray-200 rounded px-2 py-1 font-mono text-[10px]"
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className="block text-[10px] text-gray-500 mb-0.5">Format</label>
+                                        <select
+                                          value={redigerKpiForm.format}
+                                          onChange={e => setRedigerKpiForm(f => ({ ...f, format: e.target.value }))}
+                                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                        >
+                                          <option value="prosent">Prosent (%)</option>
+                                          <option value="nok">Kroner (NOK)</option>
+                                          <option value="antall">Antall</option>
+                                          <option value="desimal">Desimal</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] text-gray-500 mb-0.5">Beskrivelse</label>
+                                        <input
+                                          value={redigerKpiForm.beskrivelse}
+                                          onChange={e => setRedigerKpiForm(f => ({ ...f, beskrivelse: e.target.value }))}
+                                          className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                      <button
+                                        onClick={() => lagreKpi(view.id, k.id)}
+                                        className="px-3 py-1 bg-blue-600 text-white rounded text-[11px] font-medium hover:bg-blue-700"
+                                      >
+                                        Lagre
+                                      </button>
+                                      <button
+                                        onClick={() => setRedigerKpiId(null)}
+                                        className="px-3 py-1 border border-gray-200 rounded text-[11px] text-gray-600 hover:bg-gray-50"
+                                      >
+                                        Avbryt
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-start gap-2">
+                                    <div className="flex-1">
+                                      <span className="inline-flex items-center gap-1 font-semibold text-gray-800">
+                                        <span className="bg-amber-100 text-amber-700 px-1 rounded text-[10px] font-bold">KPI</span>
+                                        {k.visningsnavn}
+                                      </span>
+                                      {k.format && <span className="ml-2 text-gray-400">({k.format})</span>}
+                                      <p className="font-mono text-[10px] text-gray-500 mt-1 truncate">{k.sql_uttrykk}</p>
+                                    </div>
+                                    <button
+                                      onClick={() => { setRedigerKpiId(k.id); setRedigerKpiForm({ navn: k.navn, visningsnavn: k.visningsnavn, sql_uttrykk: k.sql_uttrykk, format: k.format ?? 'antall', beskrivelse: k.beskrivelse ?? '' }); }}
+                                      className="shrink-0 text-gray-300 hover:text-blue-500 transition-colors"
+                                      title="Rediger KPI"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => slettKpi(view.id, k.id)}
+                                      className="shrink-0 text-gray-300 hover:text-red-500 transition-colors"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
