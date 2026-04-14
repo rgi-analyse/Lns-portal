@@ -246,8 +246,10 @@ async function buildDynamicViewsSection(
         '\n\n   REGLER FOR KPI-KOLONNER:\n' +
         '   • [kolonne_navn] finnes IKKE i viewet — aldri bruk det direkte i SELECT eller WHERE\n' +
         '   • Legg alltid SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
-        '   • Bruk dimensjonskolonner fra viewet slik de er (År, Måned, MånedNavn osv.) — lag dem IKKE selv med CASE WHEN\n' +
-        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Tittel] FROM [view] GROUP BY [År], [MånedNavn]'
+        '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
+        '   • For månedsvisning: bruk kolonnene som allerede finnes i viewet (f.eks. MånedNavn, Måned, År)\n' +
+        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Tittel] FROM [view] GROUP BY [År], [MånedNavn] ORDER BY [År], [Måned]\n' +
+        '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS KPI FROM [view] ...'
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);

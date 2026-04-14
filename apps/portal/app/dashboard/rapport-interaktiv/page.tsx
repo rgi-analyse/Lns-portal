@@ -1234,7 +1234,12 @@ export default function RapportInteraktivPage() {
         if (prosjektFilter) filterDeler.push(prosjektFilter.replace(/^\s*WHERE\s+/i, '').trim());
         filterDeler.push(`[${xAkse}] IS NOT NULL`);
         const whereKlausul = `WHERE ${filterDeler.join(' AND ')}`;
-        const sql = `SELECT TOP 50 [${xAkse}], SUM([${yAkse}]) AS [${yAkse}] FROM ${viewNavn} ${whereKlausul} GROUP BY [${xAkse}] ORDER BY SUM([${yAkse}]) DESC`;
+        // KPI-kolonner: injiser sql_uttrykk direkte — de finnes ikke som fysiske kolonner
+        const yUttrykk = kpiMap[yAkse]
+          ? `${kpiMap[yAkse]} AS [${yAkse}]`
+          : `SUM([${yAkse}]) AS [${yAkse}]`;
+        const yOrder = kpiMap[yAkse] ? kpiMap[yAkse] : `SUM([${yAkse}])`;
+        const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} GROUP BY [${xAkse}] ORDER BY ${yOrder} DESC`;
         console.log('[Designer] initial SQL:', sql);
         setLasterData(true);
         try {
