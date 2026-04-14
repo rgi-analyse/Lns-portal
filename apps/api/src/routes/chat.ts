@@ -5,61 +5,142 @@ import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { erAdmin } from '../middleware/auth';
 
-// ── Statisk del av system-prompten ──
-const SYSTEM_INTRO = `Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.`;
-
-const SQL_REGLER = `## SQL-regler (Azure T-SQL)
-- Bruk TOP 20 for å begrense rader i rådata-lister — ALDRI LIMIT
+// ── Statiske regler — gjelder alltid, alle klienter ──
+export const BASIS_REGLER = `
+## AZURE SQL T-SQL SYNTAKSREGLER
+- Bruk alltid T-SQL syntaks (SQL Server / Azure SQL)
+- Bruk firkantparenteser rundt kolonnenavn: [Beløp], [månedsnavn]
+- Bruk TOP i stedet for LIMIT: SELECT TOP 100
 - Aldri bruk TOP på spørringer med GROUP BY
 - Bruk GETDATE() ikke NOW()
 - Bruk ISNULL() eller COALESCE() — ikke IFNULL()
-- Datoformat: CONVERT(VARCHAR, dato, 103) for DD/MM/YYYY
-- Paginering: SELECT * FROM tabell ORDER BY kolonne OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY
 - Kall query_database umiddelbart når bruker spør om data — ikke spør om du skal gjøre det
 - Svar alltid på norsk
 
-KOLONNE-TYPE REGLER:
+## KOLONNE-TYPE REGLER
 - Sjekk alltid datatype fra kolonneinfo i systemprompten før du skriver SQL
 - varchar/nvarchar-kolonner skal ALDRI castes til tall
 - Bruk alltid LIKE for søk på varchar-kolonner:
-  ✅ WHERE kolonne LIKE '%søkeverdi%'
-  ❌ WHERE CAST(kolonne AS INT) = verdi
-  ❌ WHERE ISNUMERIC(kolonne) = 1
-  ❌ WHERE TRY_CAST(kolonne AS INT) = verdi
-- GROUP BY på varchar fungerer direkte — ingen casting nødvendig:
-  ✅ SELECT kolonne, SUM(Beløp) FROM view GROUP BY kolonne
-- Ved konverteringsfeil i SQL: ikke prøv CAST-varianter — bytt til LIKE-søk i stedet
+  ✅ WHERE [Prosjekt] LIKE '%1000%'
+  ❌ WHERE CAST([Prosjekt] AS INT) = 1000
+  ❌ WHERE ISNUMERIC([Prosjekt]) = 1
+  ❌ WHERE TRY_CAST([Prosjekt] AS INT) = 1000
+- GROUP BY på varchar fungerer direkte — ingen casting nødvendig
+- Ved konverteringsfeil: bytt til LIKE-søk, prøv aldri CAST-varianter
 
-DATO-RANGE REGLER:
-Når bruker spør om data "frem til [måned år]", "t.o.m.", "opp til", "akkumulert til":
-FEIL — henter kun én periode: WHERE År = 2026 AND Måned = 4
-RIKTIG — henter alle perioder frem til og med: WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)
-Eksempel "sum alle år frem til april 2026":
-  SELECT År, SUM(Beløp) AS Total FROM [view]
-  WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)
-  GROUP BY År ORDER BY År
-Eksempel "akkumulert sum t.o.m. april 2026":
-  SELECT SUM(Beløp) AS TotalTomApril2026 FROM [view]
-  WHERE (År < 2026) OR (År = 2026 AND Måned <= 4)`;
+## DATO-RANGE REGLER
+- "hittil i år" / "akkumulert" / "t.o.m. [måned]":
+  ✅ WHERE (år < 2026) OR (år = 2026 AND måned <= 4)
+  ❌ WHERE år = 2026 AND måned = 4
+- Bruk alltid kolonnene år (int) og måned (int) for datofiltrering
+- ALDRI bruk DATEPART(), YEAR(), MONTH() — viewet har egne dato-kolonner
+- Dimensjonskolonner for tid: år, måned, månedsnavn, årmåned, åruke
 
-const SØKESTRATEGI_REGLER = `## Søkestrategi
-- Les kolonnebeskrivelsene nøye — de forteller deg hva kolonnen inneholder og hvordan den brukes
-- Foretrekk kategoriseringskolonner (Type, Gruppe, Kategori, Status) fremfor LIKE-søk på store tekstkolonner
+## WHERE-KLAUSUL REGLER
+- Skriv alltid enkle betingelser uten sammensatte parenteser:
+  ✅ WHERE [år] = 2026 AND [måned] = 3
+  ❌ WHERE ([år] = 2026 AND [måned] = 3)
+- Rapport-designeren parser filtre fra WHERE — parenteser bryter parsingen
+
+## SØKESTRATEGI
+- Les alltid kolonnebeskrivelsene nøye før du skriver SQL
+- Foretrekk kategoriseringskolonner (Type, Gruppe, Status) fremfor LIKE-søk på store tekstkolonner
 - Informer alltid hvilken datakilde du bruker: "Jeg søker i **[Visningsnavn]** fordi..."
 - Spør bruker ved tvil om hvilken datakilde som er riktig
-- Ved tomt resultat: prøv én alternativ søkestrategi automatisk før du svarer at ingenting finnes
-- Prosjekter kan refereres som tall ("1000"), navn ("Hemsil"), eller kombinasjon ("P1000" = 1000 — fjern prefiks "P")`;
+- Ved tom resultat: prøv bredere søk før du konkluderer med "ingen data"
+- Prosjekter kan refereres som tall ("1000"), navn ("Hemsil"), eller kombinasjon ("P1000" = 1000)
+
+## KONTOPLAN-OPPSLAG
+- Når bruker spør etter kostnadstype med navn (husleie, strøm, forsikring):
+  Gjør ALLTID et kontoplan-oppslag FØR hovedspørringen:
+  SELECT DISTINCT [Kontonr], [Konto], [Kontogruppe]
+  FROM [view]
+  WHERE [Konto] LIKE '%[søkeord]%'
+  GROUP BY [Kontonr], [Konto], [Kontogruppe]
+- Bruk funnet Kontonr i neste spørring: WHERE [Kontonr] IN (...)
+- Søkeord-synonymer håndteres via kontoplan-oppslaget — ikke hardkod
+
+## KOLONNENAVN-REGLER FOR RAPPORT-SPØRRINGER
+
+REGEL 1 — Behold alltid originalt kolonnenavn som alias:
+Selv om du filtrerer dataene (f.eks. WHERE Personskade = 'Ja'),
+skal alias ALLTID være det originale kolonnenavnet fra viewet:
+  ✅ SUM([Antall]) AS [Antall]              ← originalnavn, selv ved filtrering
+  ❌ SUM([Antall]) AS [AntallPersonskader]  ← lag ikke nye navn
+  ✅ SUM([Beløp]) AS [Beløp]               ← originalnavn
+  ❌ SUM([Beløp]) AS [TotalLønnskostnader] ← lag ikke nye navn
+
+REGEL 2 — xAkse og yAkse MÅ matche SQL-aliaset eksakt:
+  SQL: SELECT [månedsnavn], SUM([Antall]) AS [Antall]
+  xAkse: "månedsnavn"  ← eksakt match med SELECT
+  yAkse: "Antall"      ← eksakt match med alias
+
+REGEL 3 — Ny beregning → spør om KPI eller midlertidig:
+Hvis bruker ber om en beregning som IKKE tilsvarer en eksisterende
+kolonne i viewet, spør:
+  "Dette er en ny beregning. Vil du lagre den som KPI for gjenbruk
+   i rapport-designeren, eller bruke den som midlertidig visning?"
+- KPI → kall opprett_kpi-verktøyet med riktig view_navn
+- Midlertidig → bruk beskrivende alias, men informer bruker om at
+  den ikke fungerer videre i rapport-designeren
+
+## DIMENSJONS-KOLONNER
+- For månedsvisning — bruk ALLTID viewets egne kolonner:
+  månedsnavn, måned, år, årmåned, åruke
+- ALDRI lag DATENAME(), MONTH(), YEAR(), DATEPART() selv
+- Sorter alltid tidsserier på tallkolonnen: ORDER BY [måned] ASC
+
+## KPI-REGLER
+
+Bruk av KPI (tilgjengelige KPI-er vises per datakilde nedenfor):
+- Bruk teknisk navn EKSAKT som alias — kopier direkte, ikke modifiser:
+  ✅ <sql_uttrykk> AS [OverheadProsent]  ← eksakt teknisk navn
+  ❌ <sql_uttrykk> AS [OverheadProsent2] ← modifiser aldri
+- SQL-uttrykket finnes IKKE som fysisk kolonne i viewet
+- Legg SQL-uttrykket direkte i SELECT — aldri pakk det inn i SUM() igjen
+- ALDRI referer til teknisk KPI-navn i FROM/WHERE — kun i SELECT AS
+
+NÅR SKAL AI FORESLÅ KPI-LAGRING:
+Foreslå KPI når spørsmålet handler om:
+1. En ratio eller prosent av to størrelser
+   (andel, margin, dekningsbidrag, effektivitet, prosent)
+2. Et nøkkeltall virksomheten trolig følger løpende
+   (trigger-ord: "alltid", "hver måned", "vi måler", "standard")
+3. En beregning som kombinerer flere kolonner til ett måltall
+
+IKKE FORESLÅ KPI når spørsmålet:
+1. Er tidsavgrenset ("i mars", "for 2025", "hittil i år")
+2. Er filtrert på en spesifikk dimensjonsverdi (enkelt kunde,
+   leverandør, ansatt, prosjekt, avdeling, kostsenter osv.)
+   Eksempel: "for HGB Betong" → ikke KPI
+   Eksempel: "per kunde" → KPI-kandidat
+3. Er en enkel aggregering på én kolonne uten ratio-beregning
+
+## RAPPORT-OPPRETTING
+
+Velg visualType basert på spørsmålet:
+- bar    → sammenligning per kategori (per kunde, per prosjekt)
+- line   → tidsserier og trender (per måned, per uke)
+- table  → detaljdata og lister
+- pie    → andeler og prosenter (maks 8 kategorier)
+- card   → enkeltverdi / nøkkeltall (sum, snitt, antall)
+
+## GENERELLE PRINSIPPER
+- Svar alltid på norsk
+- Vær konsis — presenter resultater direkte, ikke som lange forklaringer
+- Ved feil: forklar kort hva som gikk galt og prøv automatisk igjen
+- Vis alltid hvilken datakilde som brukes
+- Spør bruker ved tvil — ikke gjett
+`;
 
 // ── Fallback generisk prompt (brukes om metadata-tabeller ikke er tilgjengelige) ──
-const FALLBACK_BASIS_PROMPT = `${SYSTEM_INTRO}
-
-${SQL_REGLER}
-
-${SØKESTRATEGI_REGLER}
+const FALLBACK_BASIS_PROMPT = `Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.
 
 ## Tilgjengelige datakilder
 Metadata-tabeller er ikke tilgjengelige for øyeblikket.
-Spør brukeren om hvilken datakilde de vil søke i, og be dem oppgi view-navn eller tabell de vil bruke.`;
+Spør brukeren om hvilken datakilde de vil søke i, og be dem oppgi view-navn eller tabell de vil bruke.
+
+${BASIS_REGLER}`;
 
 // ── Dynamisk prompt-bygging fra metadata-katalogen ──
 // Cache per område-nøkkel ('all' = alle views, 'HMS' = kun HMS-views, osv.)
@@ -237,61 +318,17 @@ async function buildDynamicViewsSection(
 
     const viewKpi = kpi.filter(k => k['view_id'] === view['id']);
     const fullViewNavn = `${view['schema_name']}.${view['view_name']}`;
-    const kpiListe = viewKpi.length > 0
-      ? viewKpi.map(k => `   - ${k['navn']} (${k['visningsnavn']})`).join('\n')
-      : '   (ingen KPI-er opprettet ennå)';
-    const kpiTekst =
-      `\n   Tilgjengelige KPI-er for ${view['visningsnavn']}:\n${kpiListe}\n` +
-      (viewKpi.length > 0
-        ? '\n   KPI-beregninger (eksisterer IKKE som fysiske kolonner — bruk SQL-uttrykket direkte):\n' +
-          viewKpi.map(k => {
-            const besk = k['beskrivelse'] ? `\n     Beskrivelse: ${k['beskrivelse']}` : '';
-            return `   - Teknisk navn (bruk dette eksakt som alias i SQL): ${k['navn']}\n     Visningsnavn: ${k['visningsnavn']}\n     Format: ${k['format'] ?? 'tall'}\n     SQL: ${k['sql_uttrykk']}${besk}`;
-          }).join('\n') +
-          '\n\n   REGLER FOR KPI-KOLONNER:\n' +
-          '   • Bruk alltid det tekniske navnet eksakt — IKKE modifiser eller legg til ord som "Prosent", "Andel" osv.\n' +
-          '     Eksempel: teknisk navn "Lønnsandel" → alias skal være [Lønnsandel], IKKE [LønnsandelProsent]\n' +
-          '   • SQL-uttrykket finnes IKKE som fysisk kolonne — aldri referer til teknisk navn i FROM/WHERE, kun i SELECT AS\n' +
-          '   • Legg SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
-          '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
-          '   • For månedsvisning: bruk disse eksakte kolonnene fra viewet: månedsnavn, måned, år, årmåned\n' +
-          '   • ALDRI lag egne dimensjonskolonner som Periode, PeriodeNavn, MånedNavn — bruk viewets egne kolonner\n' +
-          '   • Eksempel riktig: SELECT [år], [månedsnavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [år], [månedsnavn], [måned] ORDER BY [år], [måned]\n' +
-          '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS LønnsandelProsent FROM [view] ...'
-        : '') +
-      `\n\n   HVIS BRUKER BER OM KPI SOM IKKE FINNES I LISTEN OVER:\n` +
-      `   1. Ikke lag en fiktiv kolonne eller gjett SQL-uttrykket\n` +
-      `   2. Spør bruker om beregningslogikk i klartekst, f.eks.:\n` +
-      `      "Dekningsbidrag er ikke satt opp ennå. Hvordan beregnes det?\n` +
-      `       Beskriv gjerne med ord, f.eks. 'omsetning minus varekostnad delt på omsetning'"\n` +
-      `   3. Når bruker har bekreftet logikken — oversett til SQL og kall verktøyet opprett_kpi med:\n` +
-      `      view_navn: "${fullViewNavn}"\n` +
-      `   4. Bekreft opprettelsen og lag rapporten\n` +
-      `\n\n   KOLONNENAVN-REGLER:\n` +
-      `\n` +
-      `   REGEL 1 — Behold alltid originalt kolonnenavn som alias:\n` +
-      `   Selv om du filtrerer dataene (f.eks. WHERE Personskade = 'Ja'), skal alias ALLTID\n` +
-      `   være det originale kolonnenavnet fra viewet — ikke et beskrivende navn:\n` +
-      `   ✅ SUM([Antall]) AS [Antall]              ← originalnavn, selv ved filtrering\n` +
-      `   ❌ SUM([Antall]) AS [AntallPersonskader]  ← lag ikke nye navn\n` +
-      `\n` +
-      `   REGEL 2 — Tittelen beskriver filteret, ikke kolonnen:\n` +
-      `   Bruk rapport-tittelen og beskrivelsen til å forklare hva som er filtrert:\n` +
-      `   Tittel: "Personskader per måned"    ← beskriver innholdet\n` +
-      `   Kolonne: [Antall]                    ← originalnavn\n` +
-      `\n` +
-      `   REGEL 3 — Kun ett unntak: bruker eksplisitt ber om nytt navn:\n` +
-      `   Hvis bruker sier "kall den AntallPersonskader" → spør:\n` +
-      `   "Vil du lagre dette som en KPI for gjenbruk, eller bruke det som midlertidig visning?"\n` +
-      `   KPI → kall opprett_kpi (view_navn: "${fullViewNavn}") med navn avtalt med bruker\n` +
-      `   Midlertidig → bruk nytt navn men informer om at den ikke fungerer i rapport-designeren\n` +
-      `\n` +
-      `   EKSEMPEL KORREKT FLYT:\n` +
-      `   Bruker: "Antall personskader per måned"\n` +
-      `   SQL: SELECT [månedsnavn], [måned], SUM([Antall]) AS [Antall]\n` +
-      `        FROM [view] WHERE [Personskade] = 'Ja'\n` +
-      `        GROUP BY [månedsnavn], [måned] ORDER BY [måned]\n` +
-      `   Tittel: "Personskader per måned"`;
+    const kpiTekst = viewKpi.length > 0
+      ? `\n   KPI-er (virtuelle beregninger — finnes IKKE som fysiske kolonner):\n` +
+        viewKpi.map(k => {
+          const besk = k['beskrivelse'] ? `\n     Beskrivelse: ${k['beskrivelse']}` : '';
+          return `   - Teknisk navn (bruk eksakt som alias): ${k['navn']}\n` +
+            `     Visningsnavn: ${k['visningsnavn']}\n` +
+            `     Format: ${k['format'] ?? 'tall'}\n` +
+            `     SQL: ${k['sql_uttrykk']}${besk}`;
+        }).join('\n') +
+        `\n   For å opprette ny KPI: kall opprett_kpi med view_navn: "${fullViewNavn}"`
+      : `\n   KPI-er: (ingen opprettet ennå — kall opprett_kpi med view_navn: "${fullViewNavn}" for å opprette)`;
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
     const eksempelTekst = viewEksempler.length > 0
@@ -367,18 +404,17 @@ async function buildSystemPrompt(
       profilViews,
     );
     const iDag = new Date().toLocaleDateString('nb-NO', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      timeZone: 'Europe/Oslo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     });
-    const prompt = `Dagens dato er ${iDag}.
+    const prompt = `Dagens dato: ${iDag}.
 
-${SYSTEM_INTRO}
+Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.
 
-${SQL_REGLER}
+## TILGJENGELIGE DATAKILDER
+${viewsSection}
 
-${SØKESTRATEGI_REGLER}
-
-## Tilgjengelige datakilder
-${viewsSection}`;
+---
+${BASIS_REGLER}`;
     console.log('[buildSystemPrompt] prompt lengde:', prompt.length);
     console.log('[buildSystemPrompt] PROMPT PREVIEW:\n', prompt.slice(0, 2000));
     if (cacheKey) {
