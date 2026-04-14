@@ -841,7 +841,24 @@ export async function chat(
                 result = { error: `View '${safeSchema}.${safeView}' er ikke registrert i metadata. Administrator må registrere viewet først.` };
               } else {
                 const viewId = String(viewRader[0]['id']);
-                console.log('[opprett_kpi] view_id:', viewId, '— starter INSERT');
+                console.log('[opprett_kpi] view_id:', viewId, '— sjekker duplikat');
+
+                // Sjekk om KPI med samme navn allerede eksisterer
+                const eksisterende = await queryAzureSQL(`
+                  SELECT id, navn, visningsnavn, sql_uttrykk, format, beskrivelse
+                  FROM ai_metadata_kpi
+                  WHERE view_id = '${viewId}' AND navn = '${safeNavn}'
+                `, 1);
+
+                if (eksisterende.length > 0) {
+                  console.log('[opprett_kpi] KPI finnes allerede:', safeNavn);
+                  result = {
+                    success: true,
+                    kpi: eksisterende[0],
+                    melding: `KPI "${visningsnavn_}" finnes allerede og kan brukes direkte.`,
+                  };
+                } else {
+                console.log('[opprett_kpi] starter INSERT');
                 const rows = await queryAzureSQL(`
                   INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
                   OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
@@ -863,6 +880,7 @@ export async function chat(
                   kpi: rows[0],
                   melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
                 };
+                } // end else (ikke duplikat)
               }
             }
           }
