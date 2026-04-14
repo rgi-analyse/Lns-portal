@@ -301,25 +301,31 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
     ? `${x}${ekstraMånedSel}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
     : `${x}${ekstraMånedSel}, ${yUttrykk} AS ${alias}${ekstraSelect}`;
 
+  // Kolonner som må castes til INT for riktig sortering (ikke alfabetisk)
+  const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
+  const byggOrderBy = (kol: string, retning: string): string =>
+    tallKolonner.has(kol?.toLowerCase())
+      ? `ORDER BY CAST([${kol}] AS INT) ${retning}`
+      : `ORDER BY [${kol}] ${retning}`;
+
   if (isMed) {
     // Window function: wrap in subquery with DISTINCT to deduplicate rows
     const innerPart = grp
       ? `SELECT DISTINCT ${x}, ${grp}, ${yUttrykk} AS ${alias} FROM ${viewNavn}${where}`
       : `SELECT DISTINCT ${x}, ${yUttrykk} AS ${alias} FROM ${viewNavn}${where}`;
     const orderPart = cfg.sorterPaa
-      ? `ORDER BY ${esc(cfg.sorterPaa)} ${cfg.sorterRetning}`
-      : `ORDER BY ${alias} ${cfg.sorterRetning}`;
+      ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning)
+      : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
     return `SELECT TOP 500 * FROM (${innerPart}) _med ${orderPart}`;
   }
 
   const groupBy = erAggregert ? `GROUP BY ${grpKols}${ekstraGroupBy}` : '';
+  // Default: sorter på x-aksen (ikke y-aksen). månedsnavn sorteres via [måned] (INT).
   const orderBy = cfg.sorterPaa
-    ? `ORDER BY ${esc(cfg.sorterPaa)} ${cfg.sorterRetning}`
-    : erAggregert
-      ? erMånedsnavn
-        ? `ORDER BY [måned] ${cfg.sorterRetning}`
-        : `ORDER BY ${yUttrykk} ${cfg.sorterRetning}`
-      : '';
+    ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning)
+    : erMånedsnavn
+      ? `ORDER BY CAST([måned] AS INT) ${cfg.sorterRetning}`
+      : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
 
   return `SELECT TOP 500 ${selKols} FROM ${viewNavn}${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
 }
