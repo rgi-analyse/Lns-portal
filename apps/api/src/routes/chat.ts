@@ -239,17 +239,18 @@ async function buildDynamicViewsSection(
     const kpiTekst = viewKpi.length > 0
       ? '\n   KPI-beregninger (eksisterer IKKE som fysiske kolonner — bruk SQL-uttrykket direkte):\n' +
         viewKpi.map(k => {
-          const format = k['format'] ? ` [${k['format']}]` : '';
-          const besk   = k['beskrivelse'] ? ` — ${k['beskrivelse']}` : '';
-          return `   - Visningsnavn: ${k['visningsnavn']}${format}${besk}\n     Internt navn: ${k['navn']}\n     SQL: ${k['sql_uttrykk']}`;
+          const besk = k['beskrivelse'] ? `\n     Beskrivelse: ${k['beskrivelse']}` : '';
+          return `   - Teknisk navn (bruk dette eksakt som alias i SQL): ${k['navn']}\n     Visningsnavn: ${k['visningsnavn']}\n     Format: ${k['format'] ?? 'tall'}\n     SQL: ${k['sql_uttrykk']}${besk}`;
         }).join('\n') +
         '\n\n   REGLER FOR KPI-KOLONNER:\n' +
-        '   • [kolonne_navn] finnes IKKE i viewet — aldri bruk det direkte i SELECT eller WHERE\n' +
-        '   • Legg alltid SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
+        '   • Bruk alltid det tekniske navnet eksakt — IKKE modifiser eller legg til ord som "Prosent", "Andel" osv.\n' +
+        '     Eksempel: teknisk navn "Lønnsandel" → alias skal være [Lønnsandel], IKKE [LønnsandelProsent]\n' +
+        '   • SQL-uttrykket finnes IKKE som fysisk kolonne — aldri referer til teknisk navn i FROM/WHERE, kun i SELECT AS\n' +
+        '   • Legg SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
         '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
         '   • For månedsvisning: bruk kolonnene som allerede finnes i viewet (f.eks. MånedNavn, Måned, År)\n' +
-        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Tittel] FROM [view] GROUP BY [År], [MånedNavn] ORDER BY [År], [Måned]\n' +
-        '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS KPI FROM [view] ...'
+        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [År], [MånedNavn] ORDER BY [År], [Måned]\n' +
+        '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS LønnsandelProsent FROM [view] ...'
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
