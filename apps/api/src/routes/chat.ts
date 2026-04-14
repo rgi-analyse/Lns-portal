@@ -237,7 +237,17 @@ async function buildDynamicViewsSection(
 
     const viewKpi = kpi.filter(k => k['view_id'] === view['id']);
     const kpiTekst = viewKpi.length > 0
-      ? `\n   KPI-er (bruk sql_uttrykk direkte i SELECT — allerede aggregert):\n${viewKpi.map(k => `   - ${k['visningsnavn']}${k['format'] ? ` (${k['format']})` : ''}: ${k['sql_uttrykk']}`).join('\n')}`
+      ? '\n   KPI-beregninger (eksisterer IKKE som fysiske kolonner — bruk SQL-uttrykket direkte):\n' +
+        viewKpi.map(k => {
+          const format = k['format'] ? ` [${k['format']}]` : '';
+          const besk   = k['beskrivelse'] ? ` — ${k['beskrivelse']}` : '';
+          return `   - Visningsnavn: ${k['visningsnavn']}${format}${besk}\n     Internt navn: ${k['navn']}\n     SQL: ${k['sql_uttrykk']}`;
+        }).join('\n') +
+        '\n\n   REGLER FOR KPI-KOLONNER:\n' +
+        '   • [kolonne_navn] finnes IKKE i viewet — aldri bruk det direkte i SELECT eller WHERE\n' +
+        '   • Legg alltid SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
+        '   • Bruk dimensjonskolonner fra viewet slik de er (År, Måned, MånedNavn osv.) — lag dem IKKE selv med CASE WHEN\n' +
+        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Tittel] FROM [view] GROUP BY [År], [MånedNavn]'
       : '';
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);

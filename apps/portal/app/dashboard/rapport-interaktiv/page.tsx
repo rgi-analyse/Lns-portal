@@ -955,6 +955,7 @@ export default function RapportInteraktivPage() {
   const [tilgjengeligeKolonner, setTilgjengeligeKolonner] = useState<string[]>([]);
   const [kolonnTyper, setKolonnTyper] = useState<Record<string, string>>({});
   const [kpiUttrykk, setKpiUttrykk] = useState<Record<string, string>>({});
+  const [kpiFormat,  setKpiFormat]  = useState<Record<string, string>>({});
   const [visTabell,          setVisTabell]          = useState(false);
   const [visRediger,         setVisRediger]         = useState(false);
   const [eksporterer,        setEksporterer]        = useState(false);
@@ -1047,14 +1048,17 @@ export default function RapportInteraktivPage() {
         setTilgjengeligeKolonner(navnListe);
         const typemap: Record<string, string> = {};
         const kpiMap: Record<string, string> = {};
+        const fmtMap: Record<string, string> = {};
         for (const k of f.alleViewKolonner) {
           typemap[k.kolonne_navn] = k.kolonne_type;
           if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
             kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+            if ((k as { format?: string }).format) fmtMap[k.kolonne_navn] = (k as { format?: string }).format!;
           }
         }
         setKolonnTyper(typemap);
         setKpiUttrykk(kpiMap);
+        setKpiFormat(fmtMap);
       } else {
         setTilgjengeligeKolonner(dataCols);
         if (f.viewNavn) {
@@ -1173,10 +1177,12 @@ export default function RapportInteraktivPage() {
 
       const typemap: Record<string, string> = {};
       const kpiMap: Record<string, string> = {};
+      const fmtMap: Record<string, string> = {};
       for (const k of alleKolonner) {
         typemap[k.kolonne_navn] = k.kolonne_type;
         if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
           kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+          if ((k as { format?: string }).format) fmtMap[k.kolonne_navn] = (k as { format?: string }).format!;
         }
       }
 
@@ -1210,6 +1216,7 @@ export default function RapportInteraktivPage() {
       setTilgjengeligeKolonner(alleKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
       setKpiUttrykk(kpiMap);
+      setKpiFormat(fmtMap);
 
       // Deaktiver auto-refresh automatisk for sannsynlig store views
       const erSannsynligStortView = viewNavn?.toLowerCase().includes('fact') ||
@@ -1457,12 +1464,15 @@ export default function RapportInteraktivPage() {
       setTilgjengeligeKolonner(alleViewKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
       const kpiMapLagret: Record<string, string> = {};
+      const fmtMapLagret: Record<string, string> = {};
       for (const k of alleViewKolonner) {
         if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
           kpiMapLagret[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+          if ((k as { format?: string }).format) fmtMapLagret[k.kolonne_navn] = (k as { format?: string }).format!;
         }
       }
       setKpiUttrykk(kpiMapLagret);
+      setKpiFormat(fmtMapLagret);
 
       // Gjenoppbygg valgteKolonner — verifiser mot ferske kolonner slik at utgåtte ikke tas med
       const gyldigeNavn = new Set(alleViewKolonner.map(k => k.kolonne_navn));
@@ -2443,23 +2453,29 @@ export default function RapportInteraktivPage() {
               {config.visualType!=='table' && (
                 <div>
                   <label style={labelStyle}>Aggregering</label>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
-                    {AGG_OPTIONS.map(a => (
-                      <button key={a.verdi} type="button"
-                        onClick={()=>setConfig(p=>p?{...p,aggregering:a.verdi}:p)}
-                        style={{
-                          padding:'7px 6px', borderRadius:7, cursor:'pointer',
-                          border: config.aggregering===a.verdi ? '1px solid var(--gold-dim)' : '1px solid var(--glass-bg-hover)',
-                          background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
-                          color: config.aggregering===a.verdi ? 'var(--gold)' : 'var(--text-secondary)',
-                          fontSize:11, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-                          fontFamily:'Barlow, sans-serif',
-                        }}>
-                        <span style={{ fontSize:15, fontWeight:700, fontFamily:'monospace' }}>{a.ikon}</span>
-                        <span>{a.navn}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {kpiUttrykk[config.yAkse] ? (
+                    <div style={{ padding:'8px 10px', borderRadius:7, background:'rgba(251,146,60,0.08)', border:'1px solid rgba(251,146,60,0.25)', fontSize:11, color:'rgba(251,146,60,0.9)', lineHeight:1.5 }}>
+                      <span style={{ fontWeight:700 }}>K</span> KPI{kpiFormat[config.yAkse] ? ` (${kpiFormat[config.yAkse]})` : ''} — aggregering håndteres automatisk av SQL-uttrykket
+                    </div>
+                  ) : (
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
+                      {AGG_OPTIONS.map(a => (
+                        <button key={a.verdi} type="button"
+                          onClick={()=>setConfig(p=>p?{...p,aggregering:a.verdi}:p)}
+                          style={{
+                            padding:'7px 6px', borderRadius:7, cursor:'pointer',
+                            border: config.aggregering===a.verdi ? '1px solid var(--gold-dim)' : '1px solid var(--glass-bg-hover)',
+                            background: config.aggregering===a.verdi ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
+                            color: config.aggregering===a.verdi ? 'var(--gold)' : 'var(--text-secondary)',
+                            fontSize:11, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+                            fontFamily:'Barlow, sans-serif',
+                          }}>
+                          <span style={{ fontSize:15, fontWeight:700, fontFamily:'monospace' }}>{a.ikon}</span>
+                          <span>{a.navn}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {/* Aktuelt uttrykk */}
                   <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'monospace', background:'var(--glass-bg)', borderRadius:5, padding:'4px 8px' }}>
                     {yAkseLabel}
