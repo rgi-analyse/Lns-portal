@@ -677,7 +677,7 @@ export async function chat(
             // Pre-validering: sjekk yAkse mot SQL-aliaser FØR DB-kall
             const yAkseInput = args['yAkse'] as string | undefined;
             if (yAkseInput) {
-              const aliasMatches = [...sqlQuery.matchAll(/\bAS\s+\[?(\w+)\]?/gi)];
+              const aliasMatches = [...sqlQuery.matchAll(/\bAS\s+\[?([a-zA-ZæøåÆØÅ0-9_]+)\]?/gi)];
               const sqlAliaser   = aliasMatches.map(m => m[1]);
               console.log('[OpenAI] create_report SQL-aliaser:', sqlAliaser);
               if (sqlAliaser.length > 0 && !sqlAliaser.some(a => a.toLowerCase() === yAkseInput.toLowerCase())) {
