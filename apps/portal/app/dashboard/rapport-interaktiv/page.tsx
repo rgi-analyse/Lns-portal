@@ -132,9 +132,11 @@ function parseFiltreTilObjekter(
     if (proj) where = where.replace(proj, '').replace(/^\s*AND\s+/i, '').replace(/\s+AND\s*$/i, '').trim();
   }
   if (!where) return [];
+  // Fjern ytre parenteser rundt hele WHERE-blokken (AI skriver av og til "(a AND b)")
+  where = where.replace(/^\s*\(/, '').replace(/\)\s*$/, '').trim();
   return where
     .split(/\s+AND\s+/i)
-    .map(b => b.trim())
+    .map(b => b.replace(/^\(|\)$/g, '').trim()) // fjern parenteser rundt enkeltfiltre
     .filter(b => b.length > 0)
     .map(b => {
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
@@ -1053,7 +1055,11 @@ export default function RapportInteraktivPage() {
         ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
       });
 
-      setAktiveFiltre(parseFiltreTilObjekter(f.sql ?? '', f.prosjektFilter ?? '', f.prosjektKolonne));
+      {
+        const parsed = parseFiltreTilObjekter(f.sql ?? '', f.prosjektFilter ?? '', f.prosjektKolonne);
+        const gyldigeKol = new Set((f.alleViewKolonner ?? []).map(k => k.kolonne_navn.toLowerCase()));
+        setAktiveFiltre(gyldigeKol.size > 0 ? parsed.filter(ff => gyldigeKol.has(ff.kolonne.toLowerCase())) : parsed);
+      }
 
       // sessionStorage-path: sett refs og marker initialisering som ferdig
       viewNavnRef.current            = f.viewNavn ?? null;
@@ -2618,7 +2624,11 @@ export default function RapportInteraktivPage() {
                   const y = forslag.yAkse ?? cols[1] ?? cols[0] ?? '';
                   isFirstFetch.current = true;
                   setAktivData(forslag.data ?? []);
-                  setAktiveFiltre(parseFiltreTilObjekter(forslag.sql ?? '', forslag.prosjektFilter ?? '', forslag.prosjektKolonne));
+                  {
+                    const parsed2 = parseFiltreTilObjekter(forslag.sql ?? '', forslag.prosjektFilter ?? '', forslag.prosjektKolonne);
+                    const gyldigeKol2 = new Set((forslag.alleViewKolonner ?? []).map(k => k.kolonne_navn.toLowerCase()));
+                    setAktiveFiltre(gyldigeKol2.size > 0 ? parsed2.filter(ff => gyldigeKol2.has(ff.kolonne.toLowerCase())) : parsed2);
+                  }
                   setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:null, sorterRetning:defaultSorterRetning(x), maksRader:50 });
                 }}
                 style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-muted)' }}>

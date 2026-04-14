@@ -297,7 +297,10 @@ const createReportTool: OpenAI.Chat.ChatCompletionTool = {
             'SQL SELECT-spørring mot ai_gold view for å hente rapport-data. Bruk TOP 200 for begrensning. ' +
             'KRITISK: Alias i SELECT MÅ matche eksakt kolonnenavn fra viewet. ' +
             'Bruk ALDRI beskrivende navn som TotalLønnskostnader eller AntallRUH — ' +
-            'bruk originalnavnet: SUM([Beløp]) AS [Beløp], SUM([Antall]) AS [Antall].',
+            'bruk originalnavnet: SUM([Beløp]) AS [Beløp], SUM([Antall]) AS [Antall]. ' +
+            'VIKTIG for WHERE: Skriv ALLTID enkle betingelser uten ytre parenteser: ' +
+            '✅ WHERE [år] = 2026 AND [måned] = 3  ' +
+            '❌ WHERE ([år] = 2026 AND [måned] = 3)  — parenteser rundt WHERE-blokken bryter filter-parsingen.',
         },
         visualType: {
           type: 'string',
