@@ -812,10 +812,13 @@ export async function chat(
             const format_      = String(args['format'] ?? '');
             const beskrivelse_ = args['beskrivelse'] ? String(args['beskrivelse']) : '';
 
+            console.log('[opprett_kpi] input:', JSON.stringify({ view_navn: viewNavn_, navn: navn_, visningsnavn: visningsnavn_, format: format_ }));
+
             if (!viewNavn_ || !navn_ || !visningsnavn_ || !sql_uttrykk_ || !format_) {
               result = { error: 'Mangler påkrevde felter: view_navn, navn, visningsnavn, sql_uttrykk, format.' };
             } else {
-              const parts     = viewNavn_.split('.');
+              // Støtt både "ai_gold.vw_Foo" og bare "vw_Foo" (default schema ai_gold)
+              const parts      = viewNavn_.includes('.') ? viewNavn_.split('.') : ['ai_gold', viewNavn_];
               const safeSchema = (parts[0] ?? 'ai_gold').replace(/'/g, "''");
               const safeView   = (parts[1] ?? viewNavn_).replace(/'/g, "''");
               const safeNavn   = navn_.replace(/'/g, "''");
@@ -824,16 +827,21 @@ export async function chat(
               const safeFmt    = format_.replace(/'/g, "''");
               const safeBesk   = beskrivelse_.replace(/'/g, "''");
 
+              console.log('[opprett_kpi] slår opp view:', safeSchema, safeView);
+
               // Slå opp view_id fra view-navn
               const viewRader = await queryAzureSQL(`
                 SELECT id FROM ai_metadata_views
                 WHERE schema_name = '${safeSchema}' AND view_name = '${safeView}' AND er_aktiv = 1
               `, 1);
 
+              console.log('[opprett_kpi] view lookup resultat:', viewRader.length, 'rader');
+
               if (!viewRader.length) {
-                result = { error: `View '${viewNavn_}' er ikke registrert i metadata. Administrator må registrere viewet først.` };
+                result = { error: `View '${safeSchema}.${safeView}' er ikke registrert i metadata. Administrator må registrere viewet først.` };
               } else {
                 const viewId = String(viewRader[0]['id']);
+                console.log('[opprett_kpi] view_id:', viewId, '— starter INSERT');
                 const rows = await queryAzureSQL(`
                   INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
                   OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
@@ -844,16 +852,16 @@ export async function chat(
                     ${safeBesk ? `'${safeBesk}'` : 'NULL'}
                   )
                 `, 1);
-                console.log('[OpenAI] opprett_kpi:', navn_, 'for view', viewNavn_);
-                // Logg for admin-oversikt (ikke kritisk)
+                console.log('[opprett_kpi] INSERT OK, kpi:', JSON.stringify(rows[0]));
+                // Logg for admin-oversikt (ikke kritisk — tabellen kan mangle)
                 queryAzureSQL(`
                   INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
                   VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
-                `).catch(() => {});
+                `).catch(logErr => console.warn('[opprett_kpi] logg-insert feilet (tabell mangler?):', (logErr as Error).message));
                 result = {
                   success: true,
                   kpi: rows[0],
-                  melding: `KPI "${visningsnavn_}" er opprettet for ${viewNavn_}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
+                  melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
                 };
               }
             }
