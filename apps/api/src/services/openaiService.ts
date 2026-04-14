@@ -293,15 +293,32 @@ const createReportTool: OpenAI.Chat.ChatCompletionTool = {
         beskrivelse: { type: 'string', description: 'Kort beskrivelse av hva rapporten viser' },
         sql: {
           type: 'string',
-          description: 'SQL SELECT-spørring mot ai_gold view for å hente rapport-data. Bruk TOP 200 for begrensning. Aggreger og grupper data slik at resultatet er klart for visualisering.',
+          description:
+            'SQL SELECT-spørring mot ai_gold view for å hente rapport-data. Bruk TOP 200 for begrensning. ' +
+            'KRITISK: Alias i SELECT MÅ matche eksakt kolonnenavn fra viewet. ' +
+            'Bruk ALDRI beskrivende navn som TotalLønnskostnader eller AntallRUH — ' +
+            'bruk originalnavnet: SUM([Beløp]) AS [Beløp], SUM([Antall]) AS [Antall].',
         },
         visualType: {
           type: 'string',
           enum: ['bar', 'line', 'pie', 'table', 'card'],
           description: 'Primær visualiseringstype: bar=søylediagram, line=linjediagram, pie=kakediagram, table=tabell, card=KPI-nøkkeltall',
         },
-        xAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes på X-aksen / kategorier. Må matche et eksakt alias fra SELECT-setningen.' },
-        yAkse:       { type: 'string', description: 'Kolonnenavn fra SQL-resultatet som brukes for verdier / Y-akse. VIKTIG: Må matche et eksakt alias fra SELECT-setningen — bruk originalnavnet fra viewet (f.eks. "Antall"), IKKE et nytt beskrivende navn (f.eks. "AntallPersonskader").' },
+        xAkse: {
+          type: 'string',
+          description:
+            'Kolonnenavn for X-aksen. MÅ være eksakt lik aliaset i SQL SELECT-setningen ' +
+            'og et gyldig kolonnenavn fra viewet. Eks: "månedsnavn", "Ansvarlig".',
+        },
+        yAkse: {
+          type: 'string',
+          description:
+            'Kolonnenavn for Y-aksen. MÅ være eksakt lik aliaset i SQL SELECT-setningen ' +
+            'og et gyldig kolonnenavn fra viewet. ' +
+            'ALDRI bruk beskrivende navn som TotalLønnskostnader, AntallRUH, SumBeløp — ' +
+            'bruk originalnavnet fra viewet: "Beløp", "Antall", "OverheadProsent". ' +
+            'Konsistens mellom SQL-alias og yAkse er kritisk.',
+        },
         grupperPaa:  { type: 'string', description: 'Kolonnenavn å farge/gruppere dataserier på (valgfritt)' },
         foreslåSlicere: { type: 'array', items: { type: 'string' }, description: 'Filtre/dimensjoner brukeren kan interagere med' },
       },
@@ -653,6 +670,26 @@ export async function chat(
             const rawSQL   = args['sql'] as string;
             const sqlQuery = sanitizeSQL(rawSQL);
             console.log('[OpenAI] create_report SQL:', sqlQuery);
+
+            // Pre-validering: sjekk yAkse mot SQL-aliaser FØR DB-kall
+            const yAkseInput = args['yAkse'] as string | undefined;
+            if (yAkseInput) {
+              const aliasMatches = [...sqlQuery.matchAll(/\bAS\s+\[?(\w+)\]?/gi)];
+              const sqlAliaser   = aliasMatches.map(m => m[1]);
+              console.log('[OpenAI] create_report SQL-aliaser:', sqlAliaser);
+              if (sqlAliaser.length > 0 && !sqlAliaser.some(a => a.toLowerCase() === yAkseInput.toLowerCase())) {
+                console.warn(`[OpenAI] create_report yAkse "${yAkseInput}" matcher ikke SQL-aliaser: ${sqlAliaser.join(', ')}`);
+                result = {
+                  error: `yAkse "${yAkseInput}" finnes ikke i SQL-aliaset. ` +
+                    `Tilgjengelige aliaser: ${sqlAliaser.join(', ')}. ` +
+                    `Alias MÅ matche originalnavnet fra viewet — bruk f.eks. SUM([${sqlAliaser[0] ?? 'Antall'}]) AS [${sqlAliaser[0] ?? 'Antall'}].`,
+                };
+                onChunk({ type: 'tool_call', tool: tc.name, result });
+                history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+                continue;
+              }
+            }
+
             let data: Record<string, unknown>[] = [];
             try {
               data = await queryAzureSQL(sqlQuery, 500);
