@@ -266,7 +266,20 @@ async function buildDynamicViewsSection(
       `       Beskriv gjerne med ord, f.eks. 'omsetning minus varekostnad delt på omsetning'"\n` +
       `   3. Når bruker har bekreftet logikken — oversett til SQL og kall verktøyet opprett_kpi med:\n` +
       `      view_navn: "${fullViewNavn}"\n` +
-      `   4. Bekreft opprettelsen og lag rapporten`;
+      `   4. Bekreft opprettelsen og lag rapporten\n` +
+      `\n\n   KOLONNENAVN-REGLER FOR RAPPORT-SPØRRINGER:\n` +
+      `   REGEL 1 — Behold originalt kolonnenavn som alias:\n` +
+      `   Når du bruker en eksisterende kolonne fra viewet, bruk ALLTID originalnavnet som alias:\n` +
+      `   ✅ SUM([Antall]) AS [Antall]       ← originalnavn — rapport-designeren gjenkjenner dette\n` +
+      `   ❌ SUM([Antall]) AS [AntallRUH]    ← nytt navn — bryter kompatibilitet med designeren\n` +
+      `\n` +
+      `   REGEL 2 — Ny beregning → spør om KPI eller midlertidig:\n` +
+      `   Hvis bruker ber om en beregning som IKKE tilsvarer en eksisterende kolonne i viewet:\n` +
+      `   1. Spør: "Dette er en ny beregning. Vil du lagre den som KPI for gjenbruk i rapport-designeren,\n` +
+      `      eller bruke den som midlertidig spørring?"\n` +
+      `   2. KPI → kall opprett_kpi (view_navn: "${fullViewNavn}") med navn avtalt med bruker\n` +
+      `   3. Midlertidig → bruk et beskrivende alias, men informer bruker om at den ikke er tilgjengelig\n` +
+      `      i rapport-designeren og ikke kan gjenbrukes`;
 
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
     const eksempelTekst = viewEksempler.length > 0
