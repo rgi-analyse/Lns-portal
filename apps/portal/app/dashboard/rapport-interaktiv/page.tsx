@@ -527,6 +527,22 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   const harLinjeAkse = harSerier ? linjeSerier.length > 0 : !!linjeKol;
   const behandletData = harSerier ? beregnKumulativ(data, serier ?? []) : data;
 
+  const beregnDomain = (kolonner: string[]): [number, number] => {
+    const verdier = behandletData.flatMap(d =>
+      kolonner.map(k => Number(d[k])).filter(v => !isNaN(v))
+    );
+    if (verdier.length === 0) return [0, 0];
+    const min = Math.min(...verdier);
+    const max = Math.max(...verdier);
+    const padding = Math.abs(max - min) * 0.1;
+    return [min < 0 ? min - padding : 0, max + padding];
+  };
+
+  const stolpeKolonner = harSerier ? stolpeSerier.map(s => s.navn) : [stolpeKol];
+  const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn)  : [linjeKol];
+  const stolpeDomain   = beregnDomain(stolpeKolonner);
+  const linjeDomain    = beregnDomain(linjeKolonner);
+
   return (
     <ResponsiveContainer width="100%" height={400}>
       <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
@@ -541,6 +557,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
         <YAxis
           yAxisId="stolpe"
           orientation="left"
+          domain={stolpeDomain}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
           tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
         />
@@ -548,6 +565,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
           <YAxis
             yAxisId="linje"
             orientation="right"
+            domain={linjeDomain}
             tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
             tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
           />
