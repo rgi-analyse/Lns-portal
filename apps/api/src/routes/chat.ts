@@ -248,8 +248,9 @@ async function buildDynamicViewsSection(
         '   • SQL-uttrykket finnes IKKE som fysisk kolonne — aldri referer til teknisk navn i FROM/WHERE, kun i SELECT AS\n' +
         '   • Legg SQL-uttrykket direkte i SELECT (ikke pakk det inn i SUM() eller annen aggregering)\n' +
         '   • ALDRI bruk DATENAME(), MONTH(), YEAR(), DATEPART() for å lage dimensjoner — viewet har egne kolonner\n' +
-        '   • For månedsvisning: bruk kolonnene som allerede finnes i viewet (f.eks. MånedNavn, Måned, År)\n' +
-        '   • Eksempel riktig: SELECT [År], [MånedNavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [År], [MånedNavn] ORDER BY [År], [Måned]\n' +
+        '   • For månedsvisning: bruk disse eksakte kolonnene fra viewet: månedsnavn, måned, år, årmåned\n' +
+        '   • ALDRI lag egne dimensjonskolonner som Periode, PeriodeNavn, MånedNavn — bruk viewets egne kolonner\n' +
+        '   • Eksempel riktig: SELECT [år], [månedsnavn], <sql_uttrykk> AS [Lønnsandel] FROM [view] GROUP BY [år], [månedsnavn], [måned] ORDER BY [år], [måned]\n' +
         '   • Eksempel FEIL: SELECT YEAR(dato), DATENAME(month, dato), SUM(verdi)/SUM(total) AS LønnsandelProsent FROM [view] ...'
       : '';
 
