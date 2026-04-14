@@ -288,6 +288,10 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   const where = prosjektFilter ? ` ${prosjektFilter}` : '';
 
+  // Kronologisk sortering: månedsnavn sorteres via [måned]-kolonnen (tall), ikke alfabetisk
+  const erMånedsnavn = ['månedsnavn', 'månednavn'].includes(cfg.xAkse.toLowerCase());
+  const ekstraGroupBy = erMånedsnavn ? ', [måned]' : '';
+
   if (isMed) {
     // Window function: wrap in subquery with DISTINCT to deduplicate rows
     const innerPart = grp
@@ -299,11 +303,13 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
     return `SELECT TOP 500 * FROM (${innerPart}) _med ${orderPart}`;
   }
 
-  const groupBy = erAggregert ? `GROUP BY ${grpKols}` : '';
+  const groupBy = erAggregert ? `GROUP BY ${grpKols}${ekstraGroupBy}` : '';
   const orderBy = cfg.sorterPaa
     ? `ORDER BY ${esc(cfg.sorterPaa)} ${cfg.sorterRetning}`
     : erAggregert
-      ? `ORDER BY ${yUttrykk} ${cfg.sorterRetning}`
+      ? erMånedsnavn
+        ? `ORDER BY [måned] ${cfg.sorterRetning}`
+        : `ORDER BY ${yUttrykk} ${cfg.sorterRetning}`
       : '';
 
   return `SELECT TOP 500 ${selKols} FROM ${viewNavn}${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
@@ -1247,8 +1253,11 @@ export default function RapportInteraktivPage() {
         const yUttrykk = kpiMap[yAkse]
           ? `${kpiMap[yAkse]} AS [${yAkse}]`
           : `SUM([${yAkse}]) AS [${yAkse}]`;
-        const yOrder = kpiMap[yAkse] ? kpiMap[yAkse] : `SUM([${yAkse}])`;
-        const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} GROUP BY [${xAkse}] ORDER BY ${yOrder} DESC`;
+        // Kronologisk sortering for månedsnavn
+        const erMånedInitial = ['månedsnavn', 'månednavn'].includes(xAkse.toLowerCase());
+        const initialGroupBy = erMånedInitial ? `GROUP BY [${xAkse}], [måned]` : `GROUP BY [${xAkse}]`;
+        const initialOrder   = erMånedInitial ? `ORDER BY [måned] ASC` : `ORDER BY ${kpiMap[yAkse] ?? `SUM([${yAkse}])`} DESC`;
+        const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} ${initialGroupBy} ${initialOrder}`;
         console.log('[Designer] initial SQL:', sql);
         setLasterData(true);
         try {
