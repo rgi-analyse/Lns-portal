@@ -24,7 +24,7 @@ interface RapportForslag {
   sql: string;
   data: Record<string, unknown>[];
   foreslåSlicere?: string[];
-  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string }[];
+  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[];
   viewNavn?: string | null;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
@@ -1051,9 +1051,9 @@ export default function RapportInteraktivPage() {
         const fmtMap: Record<string, string> = {};
         for (const k of f.alleViewKolonner) {
           typemap[k.kolonne_navn] = k.kolonne_type;
-          if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
-            kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
-            if ((k as { format?: string }).format) fmtMap[k.kolonne_navn] = (k as { format?: string }).format!;
+          if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
+            kpiMap[k.kolonne_navn] = k.sql_uttrykk!;
+            if (k.format) fmtMap[k.kolonne_navn] = k.format!;
           }
         }
         setKolonnTyper(typemap);
@@ -1139,7 +1139,7 @@ export default function RapportInteraktivPage() {
       }
 
       // Steg 2: Hent kolonner FØR state settes — lokale variabler kun
-      let alleKolonner: { kolonne_navn: string; kolonne_type: string }[] = [];
+      let alleKolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[] = [];
       console.log('[Designer] henter kolonner for viewNavn:', viewNavn);
       try {
         const r = await apiFetch(
@@ -1148,7 +1148,7 @@ export default function RapportInteraktivPage() {
         );
         console.log('[Designer] kolonner API status:', r.status);
         if (r.ok) {
-          const d = await r.json() as { kolonner: { kolonne_navn: string; kolonne_type: string }[]; kilde: string };
+          const d = await r.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]; kilde: string };
           alleKolonner = d.kolonner ?? [];
           console.log('[Designer] kolonner kilde:', d.kilde, '| antall:', alleKolonner.length);
           console.log('[Designer] measures:', alleKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
@@ -1180,9 +1180,9 @@ export default function RapportInteraktivPage() {
       const fmtMap: Record<string, string> = {};
       for (const k of alleKolonner) {
         typemap[k.kolonne_navn] = k.kolonne_type;
-        if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
-          kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
-          if ((k as { format?: string }).format) fmtMap[k.kolonne_navn] = (k as { format?: string }).format!;
+        if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
+          kpiMap[k.kolonne_navn] = k.sql_uttrykk!;
+          if (k.format) fmtMap[k.kolonne_navn] = k.format!;
         }
       }
 
@@ -1428,7 +1428,7 @@ export default function RapportInteraktivPage() {
       };
 
       // Hent ferske kolonnetyper fra API — ikke bruk lagret config (kan være utdatert/feil)
-      let alleViewKolonner = (cfg.alleViewKolonner as { kolonne_navn: string; kolonne_type: string }[]) ?? [];
+      let alleViewKolonner = (cfg.alleViewKolonner as { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]) ?? [];
       if (vn) {
         try {
           const kolRes = await apiFetch(
@@ -1436,7 +1436,7 @@ export default function RapportInteraktivPage() {
             { credentials: 'include' },
           );
           if (kolRes.ok) {
-            const kolData = await kolRes.json() as { kolonner: { kolonne_navn: string; kolonne_type: string }[]; kilde: string };
+            const kolData = await kolRes.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string }[]; kilde: string };
             alleViewKolonner = kolData.kolonner ?? alleViewKolonner;
             console.log('[Designer] ferske kolonnetyper lastet | kilde:', kolData.kilde,
               '| measures:', alleViewKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
@@ -1471,9 +1471,9 @@ export default function RapportInteraktivPage() {
       const kpiMapLagret: Record<string, string> = {};
       const fmtMapLagret: Record<string, string> = {};
       for (const k of alleViewKolonner) {
-        if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
-          kpiMapLagret[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
-          if ((k as { format?: string }).format) fmtMapLagret[k.kolonne_navn] = (k as { format?: string }).format!;
+        if (k.kolonne_type === 'kpi' && k.sql_uttrykk) {
+          kpiMapLagret[k.kolonne_navn] = k.sql_uttrykk!;
+          if (k.format) fmtMapLagret[k.kolonne_navn] = k.format!;
         }
       }
       setKpiUttrykk(kpiMapLagret);

@@ -70,7 +70,7 @@ export interface RapportForslag {
   sql: string;
   data: Record<string, unknown>[];
   foreslåSlicere?: string[];
-  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string }[];
+  alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string }[];
   viewNavn?: string | null;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
@@ -627,7 +627,7 @@ export async function chat(
             const viewNavn  = viewMatch?.[1] ?? null;
 
             // Hent ALLE kolonner fra viewet via INFORMATION_SCHEMA + LEFT JOIN metadata for kolonne_type
-            let alleViewKolonner: { kolonne_navn: string; kolonne_type: string }[] = [];
+            let alleViewKolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string }[] = [];
             if (viewNavn) {
               const schemaName   = viewNavn.split('.')[0] ?? 'ai_gold';
               const viewNameOnly = viewNavn.split('.')[1] ?? viewNavn;
@@ -669,6 +669,31 @@ export async function chat(
                   }))
                   .filter(k => Boolean(k.kolonne_navn));
                 console.log('[OpenAI] create_report alle view-kolonner:', alleViewKolonner.length);
+
+                // Hent KPI-er og legg til som virtuelle kolonner med sql_uttrykk
+                // KPI-er finnes ikke i INFORMATION_SCHEMA — de er forhåndsdefinerte beregninger
+                try {
+                  const kpiRader = await queryAzureSQL(`
+                    SELECT k.navn, k.sql_uttrykk
+                    FROM ai_metadata_kpi k
+                    JOIN ai_metadata_views v ON k.view_id = v.id
+                    WHERE v.schema_name = '${safeSchema}' AND v.view_name = '${safeName}'
+                    AND v.er_aktiv = 1 AND k.er_aktiv = 1
+                  `);
+                  if (kpiRader.length > 0) {
+                    const kpiKolonner = kpiRader
+                      .filter(k => k['navn'] && k['sql_uttrykk'])
+                      .map(k => ({
+                        kolonne_navn: String(k['navn']),
+                        kolonne_type: 'kpi' as string,
+                        sql_uttrykk:  String(k['sql_uttrykk']),
+                      }));
+                    alleViewKolonner = [...alleViewKolonner, ...kpiKolonner];
+                    console.log('[OpenAI] create_report KPI-er lastet:', kpiKolonner.length);
+                  }
+                } catch (kpiErr) {
+                  console.warn('[OpenAI] create_report KPI-henting feilet:', (kpiErr as Error).message);
+                }
               } catch (isErr) {
                 console.warn('[OpenAI] create_report kolonner-feil:', (isErr as Error).message);
               }
