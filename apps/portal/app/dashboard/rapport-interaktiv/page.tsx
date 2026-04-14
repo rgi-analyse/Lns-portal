@@ -137,7 +137,7 @@ function parseFiltreTilObjekter(
   return where
     .split(/\s+AND\s+/i)
     .map(b => b.replace(/^\(|\)$/g, '').trim()) // fjern parenteser rundt enkeltfiltre
-    .filter(b => b.length > 0)
+    .filter(b => b.length > 0 && !/\s+OR\s+/i.test(b)) // ignorer OR-betingelser — for komplekse for filter-UI
     .map(b => {
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
       if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim() };
