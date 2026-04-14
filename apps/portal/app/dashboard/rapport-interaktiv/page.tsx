@@ -211,35 +211,41 @@ function byggWhereKlausul(
 }
 
 // ── SQL builder ───────────────────────────────────────────────────────────────
-function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kolonnTyper: Record<string, string> = {}): string {
+function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kolonnTyper: Record<string, string> = {}, kpiUttrykk: Record<string, string> = {}): string {
   const esc   = (s: string) => `[${s.replace(/[\[\]]/g, '')}]`;
   const x     = esc(cfg.xAkse);
   const y     = esc(cfg.yAkse);
   const alias = esc(cfg.yAkse);
+  // KPI-kolonner bruker pre-definert SQL-uttrykk direkte (allerede aggregert)
+  const kpiExpr = kpiUttrykk[cfg.yAkse];
   // Ikke inkluder grupperPaa hvis den er identisk med xAkse — unngår duplikat i SELECT/GROUP BY
   const grp   = (cfg.grupperPaa && cfg.grupperPaa !== cfg.xAkse) ? esc(cfg.grupperPaa) : null;
 
   let yUttrykk: string;
   let isMed = false;
-  switch (cfg.aggregering) {
-    case 'NONE':           yUttrykk = y; break;
-    case 'COUNT':          yUttrykk = `COUNT(${y})`; break;
-    case 'COUNT_DISTINCT': yUttrykk = `COUNT(DISTINCT ${y})`; break;
-    case 'SUM':            yUttrykk = `SUM(${y})`; break;
-    case 'AVG':            yUttrykk = `AVG(CAST(${y} AS FLOAT))`; break;
-    case 'MAX':            yUttrykk = `MAX(${y})`; break;
-    case 'MIN':            yUttrykk = `MIN(${y})`; break;
-    case 'MEDIAN': {
-      // PERCENTILE_CONT is a window function in T-SQL — use PARTITION BY x (and grp)
-      const partCols = grp ? `${x}, ${grp}` : x;
-      yUttrykk = `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${y}) OVER (PARTITION BY ${partCols})`;
-      isMed = true;
-      break;
+  if (kpiExpr) {
+    yUttrykk = kpiExpr; // KPI bruker sitt SQL-uttrykk direkte
+  } else {
+    switch (cfg.aggregering) {
+      case 'NONE':           yUttrykk = y; break;
+      case 'COUNT':          yUttrykk = `COUNT(${y})`; break;
+      case 'COUNT_DISTINCT': yUttrykk = `COUNT(DISTINCT ${y})`; break;
+      case 'SUM':            yUttrykk = `SUM(${y})`; break;
+      case 'AVG':            yUttrykk = `AVG(CAST(${y} AS FLOAT))`; break;
+      case 'MAX':            yUttrykk = `MAX(${y})`; break;
+      case 'MIN':            yUttrykk = `MIN(${y})`; break;
+      case 'MEDIAN': {
+        // PERCENTILE_CONT is a window function in T-SQL — use PARTITION BY x (and grp)
+        const partCols = grp ? `${x}, ${grp}` : x;
+        yUttrykk = `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${y}) OVER (PARTITION BY ${partCols})`;
+        isMed = true;
+        break;
+      }
+      default:               yUttrykk = y;
     }
-    default:               yUttrykk = y;
   }
 
-  const erAggregert = cfg.aggregering !== 'NONE' && !isMed;
+  const erAggregert = kpiExpr ? true : (cfg.aggregering !== 'NONE' && !isMed);
 
   // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne
   const kombSerier = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
@@ -948,6 +954,7 @@ export default function RapportInteraktivPage() {
   const [lasterData, setLasterData] = useState(false);
   const [tilgjengeligeKolonner, setTilgjengeligeKolonner] = useState<string[]>([]);
   const [kolonnTyper, setKolonnTyper] = useState<Record<string, string>>({});
+  const [kpiUttrykk, setKpiUttrykk] = useState<Record<string, string>>({});
   const [visTabell,          setVisTabell]          = useState(false);
   const [visRediger,         setVisRediger]         = useState(false);
   const [eksporterer,        setEksporterer]        = useState(false);
@@ -986,9 +993,11 @@ export default function RapportInteraktivPage() {
   const configRef              = useRef<RedigertConfig | null>(null);
   const valgteKolonnerRef      = useRef<string[]>([]);
   const kolonnTyperRef         = useRef<Record<string, string>>({});
+  const kpiUtrykkRef           = useRef<Record<string, string>>({});
   configRef.current        = config;        // synkroniser på hver render
   valgteKolonnerRef.current  = valgteKolonner;
   kolonnTyperRef.current     = kolonnTyper;
+  kpiUtrykkRef.current       = kpiUttrykk;
 
   useEffect(() => {
     try {
@@ -1037,8 +1046,15 @@ export default function RapportInteraktivPage() {
         const navnListe = f.alleViewKolonner.map(k => k.kolonne_navn);
         setTilgjengeligeKolonner(navnListe);
         const typemap: Record<string, string> = {};
-        for (const k of f.alleViewKolonner) typemap[k.kolonne_navn] = k.kolonne_type;
+        const kpiMap: Record<string, string> = {};
+        for (const k of f.alleViewKolonner) {
+          typemap[k.kolonne_navn] = k.kolonne_type;
+          if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
+            kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+          }
+        }
         setKolonnTyper(typemap);
+        setKpiUttrykk(kpiMap);
       } else {
         setTilgjengeligeKolonner(dataCols);
         if (f.viewNavn) {
@@ -1156,7 +1172,13 @@ export default function RapportInteraktivPage() {
       }
 
       const typemap: Record<string, string> = {};
-      for (const k of alleKolonner) typemap[k.kolonne_navn] = k.kolonne_type;
+      const kpiMap: Record<string, string> = {};
+      for (const k of alleKolonner) {
+        typemap[k.kolonne_navn] = k.kolonne_type;
+        if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
+          kpiMap[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+        }
+      }
 
       // Steg 4: Sett ALT state på én gang — kolonner, config og forslag er klare
       const nyttForslag: RapportForslag = {
@@ -1187,6 +1209,7 @@ export default function RapportInteraktivPage() {
       setConfig(nyConfig);
       setTilgjengeligeKolonner(alleKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
+      setKpiUttrykk(kpiMap);
 
       // Deaktiver auto-refresh automatisk for sannsynlig store views
       const erSannsynligStortView = viewNavn?.toLowerCase().includes('fact') ||
@@ -1304,23 +1327,29 @@ export default function RapportInteraktivPage() {
 
         // Slå opp type fra metadata, fall tilbake på kolonnTyper-ref (alltid oppdatert)
         const getType = (k: string) => alleKolMeta.find(m => m.kolonne_navn === k)?.kolonne_type ?? kolonnTyperRef.current[k] ?? 'dimensjon';
-        const valgteDimensjoner = valgteKol.filter(k => getType(k) !== 'measure');
+        const valgteKpiKol      = valgteKol.filter(k => getType(k) === 'kpi');
+        const valgteDimensjoner = valgteKol.filter(k => getType(k) !== 'measure' && getType(k) !== 'kpi');
         const valgteMeasures    = valgteKol.filter(k => getType(k) === 'measure');
         console.log('[TabellSQL] dimensjoner i GROUP BY:', valgteDimensjoner);
         console.log('[TabellSQL] measures med SUM:', valgteMeasures);
+        console.log('[TabellSQL] KPI-kolonner:', valgteKpiKol);
 
         const selectListe = [
           ...valgteDimensjoner.map(k => `[${k}]`),
           ...valgteMeasures.map(k => `SUM([${k}]) AS [${k}]`),
+          ...valgteKpiKol.map(k => `${kpiUtrykkRef.current[k] ?? `SUM([${k}])`} AS [${k}]`),
         ].join(',\n  ');
         const groupBy = valgteDimensjoner.length > 0 ? `GROUP BY ${valgteDimensjoner.map(k => `[${k}]`).join(', ')}` : '';
+        const firstMeasure = valgteMeasures[0] ?? valgteKpiKol[0];
         const orderBy = valgteMeasures.length > 0
           ? `ORDER BY SUM([${valgteMeasures[0]}]) DESC`
-          : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
+          : valgteKpiKol.length > 0
+            ? `ORDER BY ${kpiUtrykkRef.current[firstMeasure] ?? `SUM([${firstMeasure}])`} DESC`
+            : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
       } else {
-        sql = byggSQL(cfg, vn, where, kolonnTyperRef.current);
+        sql = byggSQL(cfg, vn, where, kolonnTyperRef.current, kpiUtrykkRef.current);
       }
       console.log('[rapport-interaktiv] hentData SQL:', sql);
       const res = await apiFetch('/api/pbi/query-sql', {
@@ -1427,6 +1456,13 @@ export default function RapportInteraktivPage() {
       setAktiveFiltre(lagretFiltre);
       setTilgjengeligeKolonner(alleViewKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
+      const kpiMapLagret: Record<string, string> = {};
+      for (const k of alleViewKolonner) {
+        if (k.kolonne_type === 'kpi' && (k as { sql_uttrykk?: string }).sql_uttrykk) {
+          kpiMapLagret[k.kolonne_navn] = (k as { sql_uttrykk?: string }).sql_uttrykk!;
+        }
+      }
+      setKpiUttrykk(kpiMapLagret);
 
       // Gjenoppbygg valgteKolonner — verifiser mot ferske kolonner slik at utgåtte ikke tas med
       const gyldigeNavn = new Set(alleViewKolonner.map(k => k.kolonne_navn));
@@ -2450,8 +2486,8 @@ export default function RapportInteraktivPage() {
                     {tilgjengeligeKolonner.map(kol => {
                       const type      = kolonnTyper[kol] ?? 'dimensjon';
                       const checked   = valgteKolonner.includes(kol);
-                      const typeIkon  = type==='measure' ? 'Σ' : type==='dato' ? '⌚' : type==='id' ? '#' : '≡';
-                      const typeColor = type==='measure' ? 'var(--gold)' : type==='dato' ? 'rgba(110,231,183,0.9)' : type==='id' ? 'rgba(200,200,200,0.5)' : 'rgba(147,197,253,0.9)';
+                      const typeIkon  = type==='measure' ? 'Σ' : type==='kpi' ? 'K' : type==='dato' ? '⌚' : type==='id' ? '#' : '≡';
+                      const typeColor = type==='measure' ? 'var(--gold)' : type==='kpi' ? 'rgba(251,146,60,0.9)' : type==='dato' ? 'rgba(110,231,183,0.9)' : type==='id' ? 'rgba(200,200,200,0.5)' : 'rgba(147,197,253,0.9)';
                       return (
                         <label key={kol} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text-secondary)', cursor:'pointer', padding:'2px 0' }}>
                           <input type="checkbox" checked={checked} style={{ accentColor:'var(--gold)', flexShrink:0 }}

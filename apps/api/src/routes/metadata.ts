@@ -7,9 +7,9 @@ const esc = (val: string): string => val.replace(/'/g, "''").replace(/\r\n/g, '\
 
 export async function metadataRoutes(fastify: FastifyInstance) {
 
-  // GET /api/admin/metadata/views — alle views med kolonner, eksempler og regler
+  // GET /api/admin/metadata/views — alle views med kolonner, eksempler, regler og KPI-er
   fastify.get('/api/admin/metadata/views', { preHandler: [requireBruker, requireAdmin] }, async (_request, reply) => {
-    const [views, kolonner, eksempler, regler] = await Promise.all([
+    const [views, kolonner, eksempler, regler, kpi] = await Promise.all([
       queryAzureSQL(`
         SELECT id, schema_name, view_name, visningsnavn, beskrivelse, område, prosjekter,
                er_aktiv, sist_synkronisert, opprettet,
@@ -35,6 +35,12 @@ export async function metadataRoutes(fastify: FastifyInstance) {
         FROM ai_metadata_regler
         ORDER BY view_id
       `),
+      queryAzureSQL(`
+        SELECT id, view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse
+        FROM ai_metadata_kpi
+        WHERE er_aktiv = 1
+        ORDER BY view_id, visningsnavn
+      `),
     ]);
 
     const result = views.map(v => ({
@@ -42,6 +48,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
       kolonner: kolonner.filter(k => k['view_id'] === v['id']),
       eksempler: eksempler.filter(e => e['view_id'] === v['id']),
       regler: regler.filter(r => r['view_id'] === v['id']),
+      kpi: kpi.filter(k => k['view_id'] === v['id']),
     }));
 
     return reply.send(result);
@@ -427,6 +434,62 @@ export async function metadataRoutes(fastify: FastifyInstance) {
         fastify.log.error(`[metadata] DELETE rapport/${rapportId}/views/${viewId} feilet: ${err}`);
         return reply.status(500).send({ error: 'Kunne ikke fjerne kobling', details: String(err) });
       }
+    },
+  );
+
+  // GET /api/admin/metadata/views/:id/kpi — hent KPI-er for et view
+  fastify.get<{ Params: { id: string } }>(
+    '/api/admin/metadata/views/:id/kpi',
+    { preHandler: [requireBruker] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const rows = await queryAzureSQL(`
+        SELECT id, view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse, er_aktiv
+        FROM ai_metadata_kpi
+        WHERE view_id = '${esc(id)}' AND er_aktiv = 1
+        ORDER BY visningsnavn
+      `);
+      return reply.send(rows);
+    },
+  );
+
+  // POST /api/admin/metadata/views/:id/kpi — legg til ny KPI
+  fastify.post<{ Params: { id: string }; Body: { navn: string; visningsnavn: string; sql_uttrykk: string; format?: string; beskrivelse?: string } }>(
+    '/api/admin/metadata/views/:id/kpi',
+    { preHandler: [requireBruker, requireAdmin] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { navn, visningsnavn, sql_uttrykk, format, beskrivelse } = request.body;
+
+      if (!navn?.trim() || !visningsnavn?.trim() || !sql_uttrykk?.trim()) {
+        return reply.status(400).send({ error: 'navn, visningsnavn og sql_uttrykk er påkrevd' });
+      }
+
+      const rows = await queryAzureSQL(`
+        INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
+        OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+               INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+        VALUES (
+          '${esc(id)}', '${esc(navn)}', '${esc(visningsnavn)}',
+          '${esc(sql_uttrykk)}',
+          ${format ? `'${esc(format)}'` : 'NULL'},
+          ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}
+        )
+      `, 1);
+
+      return reply.status(201).send(rows[0]);
+    },
+  );
+
+  // DELETE /api/admin/metadata/views/:id/kpi/:kpiId — slett KPI
+  fastify.delete<{ Params: { id: string; kpiId: string } }>(
+    '/api/admin/metadata/views/:id/kpi/:kpiId',
+    { preHandler: [requireBruker, requireAdmin] },
+    async (request, reply) => {
+      await executeAzureSQL(`
+        DELETE FROM ai_metadata_kpi WHERE id = '${esc(request.params.kpiId)}'
+      `);
+      return reply.status(204).send();
     },
   );
 }

@@ -43,6 +43,16 @@ interface Regel {
   regel: string;
 }
 
+interface Kpi {
+  id: string;
+  view_id: string;
+  navn: string;
+  visningsnavn: string;
+  sql_uttrykk: string;
+  format: string | null;
+  beskrivelse: string | null;
+}
+
 interface MetadataView {
   id: string;
   schema_name: string;
@@ -60,6 +70,7 @@ interface MetadataView {
   kolonner: Kolonne[];
   eksempler: Eksempel[];
   regler: Regel[];
+  kpi: Kpi[];
 }
 
 interface RapportItem {
@@ -109,6 +120,10 @@ export default function MetadataAdminPage() {
   const [addRegelViewId, setAddRegelViewId] = useState<string | null>(null);
   const [regelForm, setRegelForm] = useState({ regel: '' });
 
+  // Dialog: legg til KPI
+  const [addKpiViewId, setAddKpiViewId] = useState<string | null>(null);
+  const [kpiForm, setKpiForm] = useState({ navn: '', visningsnavn: '', sql_uttrykk: '', format: 'antall', beskrivelse: '' });
+
   // Alle rapporter for dropdown
   const [alleRapporter, setAlleRapporter] = useState<RapportItem[]>([]);
 
@@ -124,7 +139,7 @@ export default function MetadataAdminPage() {
       const res = await apiFetch('/api/admin/metadata/views', { headers: authHeaders });
       const data: unknown = await res.json();
       console.log('[Metadata] API respons:', data);
-      setViews(Array.isArray(data) ? data : []);
+      setViews(Array.isArray(data) ? data.map((v: MetadataView) => ({ ...v, kpi: v.kpi ?? [] })) : []);
     } catch {
       setStatusMsg('Feil ved henting av views');
     } finally {
@@ -371,6 +386,30 @@ export default function MetadataAdminPage() {
     setViews(prev => prev.map(v => v.id === viewId ? { ...v, regler: v.regler.filter(r => r.id !== regelId) } : v));
   };
 
+  // ── KPI ──
+  const leggTilKpi = async () => {
+    if (!addKpiViewId || !kpiForm.navn.trim() || !kpiForm.visningsnavn.trim() || !kpiForm.sql_uttrykk.trim()) return;
+    const res = await apiFetch(`/api/admin/metadata/views/${addKpiViewId}/kpi`, {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify(kpiForm),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string };
+      alert(err.error ?? `Feil ved lagring av KPI (HTTP ${res.status})`);
+      return;
+    }
+    const ny = await res.json();
+    setViews(prev => prev.map(v => v.id === addKpiViewId ? { ...v, kpi: [...v.kpi, ny] } : v));
+    setAddKpiViewId(null);
+    setKpiForm({ navn: '', visningsnavn: '', sql_uttrykk: '', format: 'antall', beskrivelse: '' });
+  };
+
+  const slettKpi = async (viewId: string, kpiId: string) => {
+    await apiFetch(`/api/admin/metadata/views/${viewId}/kpi/${kpiId}`, { method: 'DELETE', headers: authHeaders });
+    setViews(prev => prev.map(v => v.id === viewId ? { ...v, kpi: v.kpi.filter(k => k.id !== kpiId) } : v));
+  };
+
   // ── Rapport-koblinger ──
   const leggTilKobling = async () => {
     if (!addKoblingViewId || !koblingForm.rapportId.trim()) return;
@@ -606,6 +645,45 @@ export default function MetadataAdminPage() {
                                 <span className="flex-1 text-gray-700">{r.regel}</span>
                                 <button
                                   onClick={() => slettRegel(view.id, r.id)}
+                                  className="shrink-0 text-gray-300 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* KPI */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            KPI-er ({view.kpi?.length ?? 0})
+                          </h4>
+                          <button
+                            onClick={() => { setAddKpiViewId(view.id); setKpiForm({ navn: '', visningsnavn: '', sql_uttrykk: '', format: 'antall', beskrivelse: '' }); }}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            <Plus className="w-3 h-3" /> Legg til
+                          </button>
+                        </div>
+                        {!view.kpi?.length ? (
+                          <p className="text-xs text-gray-400">Ingen KPI-er definert.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {view.kpi.map(k => (
+                              <div key={k.id} className="flex items-start gap-2 text-xs bg-white rounded border border-gray-100 px-3 py-2">
+                                <div className="flex-1">
+                                  <span className="inline-flex items-center gap-1 font-semibold text-gray-800">
+                                    <span className="bg-amber-100 text-amber-700 px-1 rounded text-[10px] font-bold">KPI</span>
+                                    {k.visningsnavn}
+                                  </span>
+                                  {k.format && <span className="ml-2 text-gray-400">({k.format})</span>}
+                                  <p className="font-mono text-[10px] text-gray-500 mt-1 truncate">{k.sql_uttrykk}</p>
+                                </div>
+                                <button
+                                  onClick={() => slettKpi(view.id, k.id)}
                                   className="shrink-0 text-gray-300 hover:text-red-500 transition-colors"
                                 >
                                   <Trash2 className="w-3 h-3" />
@@ -938,6 +1016,77 @@ export default function MetadataAdminPage() {
         <DialogFooter>
           <button onClick={() => setAddRegelViewId(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">Avbryt</button>
           <button onClick={leggTilRegel} disabled={!regelForm.regel.trim()} className="px-4 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 font-medium transition-colors">Legg til</button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Dialog: Legg til KPI */}
+      <Dialog
+        open={!!addKpiViewId}
+        onClose={() => setAddKpiViewId(null)}
+        title="Legg til KPI"
+        className="max-w-lg"
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Kolonnenavn (intern, ingen mellomrom)</label>
+            <input
+              value={kpiForm.navn}
+              onChange={e => setKpiForm(p => ({ ...p, navn: e.target.value }))}
+              placeholder="f.eks. OverheadProsent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Visningsnavn</label>
+            <input
+              value={kpiForm.visningsnavn}
+              onChange={e => setKpiForm(p => ({ ...p, visningsnavn: e.target.value }))}
+              placeholder="f.eks. Overhead %"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">SQL-uttrykk (aggregert)</label>
+            <textarea
+              value={kpiForm.sql_uttrykk}
+              onChange={e => setKpiForm(p => ({ ...p, sql_uttrykk: e.target.value }))}
+              rows={3}
+              placeholder="f.eks. CAST(SUM(Kostnad) AS FLOAT) / NULLIF(SUM(Budsjett), 0) * 100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Format</label>
+            <select
+              value={kpiForm.format}
+              onChange={e => setKpiForm(p => ({ ...p, format: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="prosent">Prosent (%)</option>
+              <option value="nok">Kroner (NOK)</option>
+              <option value="antall">Antall</option>
+              <option value="desimal">Desimal</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Beskrivelse (valgfri)</label>
+            <input
+              value={kpiForm.beskrivelse}
+              onChange={e => setKpiForm(p => ({ ...p, beskrivelse: e.target.value }))}
+              placeholder="Hva måler denne KPI-en?"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <button onClick={() => setAddKpiViewId(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">Avbryt</button>
+          <button
+            onClick={leggTilKpi}
+            disabled={!kpiForm.navn.trim() || !kpiForm.visningsnavn.trim() || !kpiForm.sql_uttrykk.trim()}
+            className="px-4 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50 font-medium transition-colors"
+          >
+            Legg til KPI
+          </button>
         </DialogFooter>
       </Dialog>
 

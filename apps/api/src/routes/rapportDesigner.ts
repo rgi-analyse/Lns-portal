@@ -344,11 +344,36 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           if (metaAlle.length > 0) {
             console.warn('[view-kolonner] er_aktiv er ikke 1 for dette viewet — bruk likevel metadata');
             return reply.send({ kolonner: metaAlle, kilde: 'metadata' });
+            // NB: KPI ikke lastet i denne fallback-stien (view er inaktivt)
           }
         }
 
         if (metaRows.length > 0) {
-          return reply.send({ kolonner: metaRows, kilde: 'metadata' });
+          // Hent KPI-er og legg til som virtuelle kolonner
+          let kpiKolonner: { kolonne_navn: string; kolonne_type: string; datatype: string; sort_order: number; sql_uttrykk: string }[] = [];
+          try {
+            const viewIdRows = await queryAzureSQL(
+              `SELECT id FROM ai_metadata_views WHERE schema_name = @schema AND view_name = @view AND er_aktiv = 1`,
+              { schema, view },
+            );
+            if (viewIdRows.length > 0) {
+              const viewId = safeId(String(viewIdRows[0]['id'] ?? ''));
+              const kpiRows = await queryAzureSQL(
+                `SELECT navn, visningsnavn, sql_uttrykk, format FROM ai_metadata_kpi WHERE view_id = '${viewId}' AND er_aktiv = 1 ORDER BY visningsnavn`,
+              );
+              kpiKolonner = kpiRows.map(k => ({
+                kolonne_navn: String(k['navn'] ?? ''),
+                kolonne_type: 'kpi',
+                datatype:     'kpi',
+                sort_order:   9999,
+                sql_uttrykk:  String(k['sql_uttrykk'] ?? ''),
+              }));
+              console.log('[view-kolonner] KPI-er lastet:', kpiKolonner.length);
+            }
+          } catch (kpiErr) {
+            console.warn('[view-kolonner] KPI-henting feilet:', kpiErr);
+          }
+          return reply.send({ kolonner: [...metaRows, ...kpiKolonner], kilde: 'metadata' });
         }
 
         console.warn('[view-kolonner] ingen metadata funnet — fallback til INFORMATION_SCHEMA');

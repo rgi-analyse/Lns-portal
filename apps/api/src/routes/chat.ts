@@ -135,7 +135,7 @@ async function buildDynamicViewsSection(
   }
   console.log('[buildSystemPrompt] viewsFilter:', viewsFilter);
 
-  const [views, kolonner, regler, eksempler] = await Promise.all([
+  const [views, kolonner, regler, eksempler, kpi] = await Promise.all([
     queryAzureSQL(`
       SELECT v.id, v.schema_name, v.view_name, v.visningsnavn,
              v.beskrivelse, v.område, v.prosjekter, v.nøkkelord
@@ -163,6 +163,13 @@ async function buildDynamicViewsSection(
       JOIN ai_metadata_views v ON e.view_id = v.id
       ${viewsFilter}
     `),
+    queryAzureSQL(`
+      SELECT k.view_id, k.navn, k.visningsnavn, k.sql_uttrykk, k.format, k.beskrivelse
+      FROM ai_metadata_kpi k
+      JOIN ai_metadata_views v ON k.view_id = v.id
+      ${viewsFilter}
+      AND k.er_aktiv = 1
+    `).catch(() => [] as Record<string, unknown>[]),
   ]);
 
   console.log(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
@@ -228,6 +235,11 @@ async function buildDynamicViewsSection(
       ? `\n   Regler:\n${viewRegler.map(r => `   • ${r}`).join('\n')}`
       : '';
 
+    const viewKpi = kpi.filter(k => k['view_id'] === view['id']);
+    const kpiTekst = viewKpi.length > 0
+      ? `\n   KPI-er (bruk sql_uttrykk direkte i SELECT — allerede aggregert):\n${viewKpi.map(k => `   - ${k['visningsnavn']}${k['format'] ? ` (${k['format']})` : ''}: ${k['sql_uttrykk']}`).join('\n')}`
+      : '';
+
     const viewEksempler = eksempler.filter(e => e['view_id'] === view['id']);
     const eksempelTekst = viewEksempler.length > 0
       ? `   Eksempelspørringer:\n${viewEksempler.map(e => [e['spørsmål'] ? `   -- ${e['spørsmål']}` : '', e['sql_eksempel'] ? `   ${e['sql_eksempel']}` : ''].filter(Boolean).join('\n')).join('\n')}`
@@ -239,6 +251,7 @@ async function buildDynamicViewsSection(
       view['beskrivelse'] ? `   ${view['beskrivelse']}` : '',
       kolonnerTekst ? `   Kolonner:\n${kolonnerTekst}` : '',
       reglerTekst,
+      kpiTekst,
       eksempelTekst,
     ].filter(Boolean).join('\n');
   }).join('\n\n');
