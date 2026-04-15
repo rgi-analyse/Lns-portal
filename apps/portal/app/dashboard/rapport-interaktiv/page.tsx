@@ -10,7 +10,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis,
+  ComposedChart, Bar, Line, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ReferenceLine, Cell,
   BarChart as RechartBarChart,
@@ -537,54 +537,56 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
   );
 }
 
-// ── Line / Area chart ─────────────────────────────────────────────────────────
+// ── Line / Area chart (ComposedChart) ────────────────────────────────────────
 function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
-  const W = 800, H = 400, padL = 80, padR = 20, padT = 20, padB = 60;
-  console.log('[LineChart] yCol ved domain-beregning:', yCol);
-  console.log('[LineChart] data.length:', data.length);
-  console.log('[LineChart] data[0]:', data[0]);
-  const linjeDomain = beregnDomain(data, yCol);
-  console.log('[LineChart] linjeDomain:', linjeDomain);
-  const vals   = data.map(r => Number(r[yCol]) || 0);
-  const maxVal = Math.max(...vals, 1);
-  const plotW  = W - padL - padR;
-  const plotH  = H - padT - padB;
-  const pts    = data.map((r, i) => ({
-    x: padL + (i / Math.max(data.length-1,1)) * plotW,
-    y: padT + plotH - (vals[i]/maxVal)*plotH,
-    label: String(r[xCol] ?? ''),
-  }));
-  const polyline = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const areaPath = pts.length
-    ? `M${pts[0].x.toFixed(1)},${padT+plotH} ` + pts.map(p=>`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ` L${pts[pts.length-1].x.toFixed(1)},${padT+plotH} Z`
-    : '';
-  const step = Math.max(1, Math.floor(pts.length/10));
+  const domain = beregnDomain(data, yCol);
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-      <text x={14} y={padT + plotH / 2} fontSize={10} fill="var(--text-muted)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
-      {[0,.25,.5,.75,1].map(t => {
-        const y = padT+plotH - t*plotH;
-        return (
-          <g key={t}>
-            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
-            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
-              {fmt(t*maxVal)}
-            </text>
-          </g>
-        );
-      })}
-      {area && <path d={areaPath} fill="var(--glass-gold-bg)"/>}
-      <polyline points={polyline} fill="none" stroke="var(--gold)" strokeWidth={2}/>
-      {pts.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r={3} fill="var(--gold)"/>
-          {i%step===0 && <text x={p.x} y={padT+plotH+16} fontSize={10} textAnchor="middle" fill="var(--text-muted)">{p.label.slice(0,8)}</text>}
-        </g>
-      ))}
-      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="var(--text-muted)"/>
-      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="var(--text-muted)"/>
-    </svg>
+    <ResponsiveContainer width="100%" height={400}>
+      <ComposedChart data={data} margin={{ top: 10, right: 20, left: 20, bottom: 60 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+        <XAxis
+          dataKey={xCol}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          angle={-35}
+          textAnchor="end"
+          interval={0}
+        />
+        <YAxis
+          type="number"
+          domain={domain}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          tickFormatter={fmt}
+          label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 11, dy: 50 }}
+        />
+        <Tooltip
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
+          formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
+        />
+        <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
+        {area ? (
+          <Area
+            type="monotone"
+            dataKey={yCol}
+            stroke="#f5a623"
+            strokeWidth={2}
+            fill="rgba(245,166,35,0.2)"
+            dot={{ fill: '#f5a623', r: 3 }}
+            activeDot={{ r: 5 }}
+          />
+        ) : (
+          <Line
+            type="monotone"
+            dataKey={yCol}
+            stroke="#f5a623"
+            strokeWidth={2}
+            dot={{ fill: '#f5a623', r: 3 }}
+            activeDot={{ r: 5 }}
+          />
+        )}
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }
 
