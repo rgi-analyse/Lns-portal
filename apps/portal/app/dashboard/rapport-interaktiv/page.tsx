@@ -63,7 +63,8 @@ interface AktivFilter {
   kolonne:  string;
   operator: string;
   verdi:    string;
-  verdi2?:  string; // brukes for BETWEEN: [årmåned] BETWEEN verdi AND verdi2
+  verdi2?:  string;    // brukes for BETWEEN: [årmåned] BETWEEN verdi AND verdi2
+  erLåst?:  boolean;  // true = fra AI-SQL, vises som ikke-redigerbart badge
 }
 
 const API    = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -99,6 +100,7 @@ const OPERATORER = [
   { verdi: '<=',       label: 'mi.el.' },
   { verdi: 'LIKE',     label: 'inneholder' },
   { verdi: 'NOT LIKE', label: 'inneh. ikke' },
+  { verdi: 'BETWEEN',  label: 'mellom' },
 ];
 
 const selectStyle: React.CSSProperties = {
@@ -142,10 +144,10 @@ function parseFiltreTilObjekter(
     .map(b => {
       // BETWEEN: [kolonne] BETWEEN val1 AND val2
       const bm = b.match(/^\[?([^\]]+)\]?\s+BETWEEN\s+(\S+)\s+AND\s+(\S+)$/i);
-      if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim() };
+      if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim(), erLåst: true };
       // Vanlig: [kolonne] operator verdi
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
-      if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim() };
+      if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim(), erLåst: true };
       return null;
     })
     .filter((f): f is AktivFilter => {
@@ -852,7 +854,7 @@ function FilterVerdiInput({
   // Initial last ved endring av kolonne, view, operator eller aktive filtre
   useEffect(() => {
     if (!erTekst || !kolonne || !viewNavn) { setVerdier([]); return; }
-    if (operator === 'LIKE' || operator === 'NOT LIKE') { setVerdier([]); return; }
+    if (operator === 'LIKE' || operator === 'NOT LIKE' || operator === 'BETWEEN') { setVerdier([]); return; }
     setSide(0);
     setHarFlere(false);
     void hentVerdier(0, true);
@@ -881,12 +883,12 @@ function FilterVerdiInput({
 
   const filtrerte = verdier.filter(v => v.toLowerCase().includes(sok.toLowerCase()));
 
-  // LIKE/NOT LIKE → fritekst
-  if (operator === 'LIKE' || operator === 'NOT LIKE') {
+  // LIKE/NOT LIKE/BETWEEN → fritekst (BETWEEN håndteres med to felt i call-site, men andre felt bruker dette)
+  if (operator === 'LIKE' || operator === 'NOT LIKE' || operator === 'BETWEEN') {
     return (
       <input type="text" value={verdi} onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onEnter?.(); }}
-        placeholder="søketekst..." style={{ ...fvInputStyle, flex: 1 }} />
+        placeholder={operator === 'BETWEEN' ? 'Fra...' : 'søketekst...'} style={{ ...fvInputStyle, flex: 1 }} />
     );
   }
 
@@ -1704,8 +1706,21 @@ export default function RapportInteraktivPage() {
     if (verdi && cfg) hentData(cfg, oppdaterte);
   };
 
+  const oppdaterFilterVerdi2 = (idx: number, verdi2: string) => {
+    const oppdaterte = aktiveFiltre.map((f, i) => i === idx ? { ...f, verdi2 } : f);
+    setAktiveFiltre(oppdaterte);
+    const cfg = configRef.current;
+    // Trigger kun når begge verdier er satt (BETWEEN krever begge)
+    if (verdi2 && aktiveFiltre[idx]?.verdi && cfg) hentData(cfg, oppdaterte);
+  };
+
   const oppdaterFilterOperator = (idx: number, operator: string) => {
-    const oppdaterte = aktiveFiltre.map((f, i) => i === idx ? { ...f, operator } : f);
+    const oppdaterte = aktiveFiltre.map((f, i) => {
+      if (i !== idx) return f;
+      const { verdi2, ...rest } = f;
+      // Behold verdi2 kun ved BETWEEN, fjern ellers
+      return operator === 'BETWEEN' ? { ...f, operator } : { ...rest, operator };
+    });
     setAktiveFiltre(oppdaterte);
     const cfg = configRef.current;
     if (aktiveFiltre[idx]?.verdi && cfg) hentData(cfg, oppdaterte);
@@ -2141,36 +2156,60 @@ export default function RapportInteraktivPage() {
         </span>
         {aktiveFiltre.map((filter, idx) => (
           filter.kolonne ? (
-            <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:6, padding:'3px 6px 3px 8px', fontSize:12 }}>
-              <select value={filter.kolonne}
-                onChange={e => oppdaterFilterKolonne(idx, e.target.value)}
-                style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:12, cursor:'pointer', outline:'none', maxWidth:130 }}>
-                {tilgjengeligeKolonner
-                  .filter(k => k !== (forslag.prosjektKolonne ?? ''))
-                  .map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-              <select value={filter.operator}
-                onChange={e => oppdaterFilterOperator(idx, e.target.value)}
-                style={{ background:'transparent', border:'none', color:'var(--text-secondary)', fontSize:11, cursor:'pointer', outline:'none' }}>
-                {OPERATORER.map(op => <option key={op.verdi} value={op.verdi}>{op.label}</option>)}
-              </select>
-              <FilterVerdiInput
-                kolonne={filter.kolonne}
-                operator={filter.operator}
-                verdi={filter.verdi}
-                onChange={verdi => oppdaterFilterVerdi(idx, verdi)}
-                viewNavn={forslag.viewNavn}
-                prosjektFilter={forslag.prosjektFilter}
-                kolonneTyper={kolonnTyper}
-                alleViewKolonner={forslag?.alleViewKolonner ?? []}
-                onEnter={() => { const cfg = configRef.current; if (cfg) hentData(cfg, aktiveFiltre); }}
-                aktiveFiltre={aktiveFiltre.filter((_, filterIdx) => filterIdx !== idx)}
-              />
-              <button type="button" onClick={() => fjernFilter(idx)}
-                style={{ background:'none', border:'none', color:'rgba(255,100,100,0.6)', cursor:'pointer', fontSize:13, padding:'0 2px', lineHeight:1, flexShrink:0 }}>
-                ✕
-              </button>
-            </div>
+            filter.erLåst ? (
+              // Låst filter fra AI-SQL — vises som gult ikke-redigerbart badge
+              <div key={idx} style={{ display:'flex', alignItems:'center', gap:5, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.25)', borderRadius:6, padding:'3px 9px', fontSize:12, color:'rgba(251,191,36,0.85)', flexShrink:0 }}>
+                <span style={{ fontSize:10, opacity:0.7 }}>🔒</span>
+                <span style={{ fontWeight:500 }}>{filter.kolonne}</span>
+                <span style={{ color:'rgba(251,191,36,0.55)', fontSize:11 }}>
+                  {filter.operator === 'BETWEEN'
+                    ? `mellom ${filter.verdi} og ${filter.verdi2 ?? '?'}`
+                    : `${filter.operator} ${filter.verdi}`}
+                </span>
+              </div>
+            ) : (
+              // Dynamisk filter — redigerbart
+              <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:6, padding:'3px 6px 3px 8px', fontSize:12 }}>
+                <select value={filter.kolonne}
+                  onChange={e => oppdaterFilterKolonne(idx, e.target.value)}
+                  style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:12, cursor:'pointer', outline:'none', maxWidth:130 }}>
+                  {tilgjengeligeKolonner
+                    .filter(k => k !== (forslag.prosjektKolonne ?? ''))
+                    .map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+                <select value={filter.operator}
+                  onChange={e => oppdaterFilterOperator(idx, e.target.value)}
+                  style={{ background:'transparent', border:'none', color:'var(--text-secondary)', fontSize:11, cursor:'pointer', outline:'none' }}>
+                  {OPERATORER.map(op => <option key={op.verdi} value={op.verdi}>{op.label}</option>)}
+                </select>
+                {filter.operator === 'BETWEEN' ? (
+                  <>
+                    <input type="text" value={filter.verdi} onChange={e => oppdaterFilterVerdi(idx, e.target.value)}
+                      placeholder="Fra..." style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-primary)', borderRadius:4, fontSize:11, padding:'3px 6px', outline:'none', width:72 }} />
+                    <span style={{ color:'var(--text-muted)', fontSize:11, flexShrink:0 }}>og</span>
+                    <input type="text" value={filter.verdi2 ?? ''} onChange={e => oppdaterFilterVerdi2(idx, e.target.value)}
+                      placeholder="Til..." style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-primary)', borderRadius:4, fontSize:11, padding:'3px 6px', outline:'none', width:72 }} />
+                  </>
+                ) : (
+                  <FilterVerdiInput
+                    kolonne={filter.kolonne}
+                    operator={filter.operator}
+                    verdi={filter.verdi}
+                    onChange={verdi => oppdaterFilterVerdi(idx, verdi)}
+                    viewNavn={forslag.viewNavn}
+                    prosjektFilter={forslag.prosjektFilter}
+                    kolonneTyper={kolonnTyper}
+                    alleViewKolonner={forslag?.alleViewKolonner ?? []}
+                    onEnter={() => { const cfg = configRef.current; if (cfg) hentData(cfg, aktiveFiltre); }}
+                    aktiveFiltre={aktiveFiltre.filter((_, filterIdx) => filterIdx !== idx)}
+                  />
+                )}
+                <button type="button" onClick={() => fjernFilter(idx)}
+                  style={{ background:'none', border:'none', color:'rgba(255,100,100,0.6)', cursor:'pointer', fontSize:13, padding:'0 2px', lineHeight:1, flexShrink:0 }}>
+                  ✕
+                </button>
+              </div>
+            )
           ) : null
         ))}
         <button type="button" onClick={leggTilFilter}
