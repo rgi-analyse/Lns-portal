@@ -620,6 +620,12 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   const stolpeDomain   = beregnFlereKolonner(stolpeKolonner);
   const linjeDomain    = beregnFlereKolonner(linjeKolonner);
 
+  console.log('[KombinertChart] sender domain til YAxis:');
+  console.log('  stolpeDomain:', stolpeDomain, '| stolpeKolonner:', stolpeKolonner);
+  console.log('  linjeDomain:', linjeDomain, '| linjeKolonner:', linjeKolonner);
+  console.log('  harLinjeAkse:', harLinjeAkse, '| behandletData.length:', behandletData.length);
+  console.log('  allowDataOverflow satt: true | type="number" satt: true');
+
   return (
     <ResponsiveContainer width="100%" height={400}>
       <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
@@ -634,6 +640,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
         <YAxis
           yAxisId="stolpe"
           orientation="left"
+          type="number"
           domain={stolpeDomain}
           allowDataOverflow={true}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
@@ -643,10 +650,14 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
           <YAxis
             yAxisId="linje"
             orientation="right"
+            type="number"
             domain={linjeDomain}
             allowDataOverflow={true}
             tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-            tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
+            tickFormatter={(v) => {
+              console.log('[KombinertChart] linjeDomain ved render:', linjeDomain, '| tick-verdi:', v);
+              return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v);
+            }}
           />
         )}
         <Tooltip
@@ -680,6 +691,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
                 opacity={0.85}
                 radius={[3, 3, 0, 0] as [number, number, number, number]}
                 name={s.navn}
+                background={false}
               />
             ))}
             {linjeSerier.map((s, i) => (
@@ -705,6 +717,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
               opacity={0.85}
               radius={[3, 3, 0, 0] as [number, number, number, number]}
               name={stolpeKol}
+              background={false}
             />
             {linjeKol && (
               <Line
