@@ -554,13 +554,23 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
 
   const beregnDomain = (kolonner: string[]): [number, number] | ['auto', 'auto'] => {
     const verdier = behandletData.flatMap(d =>
-      kolonner.map(k => Number(d[k])).filter(v => isFinite(v))
+      kolonner.map(k => {
+        const v = d[k];
+        if (typeof v === 'number') return v;
+        // Håndter norsk/internasjonal tallformat: mellomrom som tusenskille, komma som desimal
+        const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.'));
+        return n;
+      }).filter((v): v is number => isFinite(v) && !isNaN(v))
     );
     if (verdier.length === 0) return ['auto', 'auto'];
-    const min = Math.min(...verdier);
-    const max = Math.max(...verdier);
-    const pad = Math.abs(max - min) * 0.1 || 1;
-    return [min < 0 ? min - pad : 0, max >= 0 ? max + pad : 0];
+    const yMin = Math.min(...verdier);
+    const yMax = Math.max(...verdier);
+    const spenn = Math.abs(yMax - yMin) || Math.abs(yMin) || 1;
+    const pad = spenn * 0.1;
+    return [
+      yMin < 0 ? yMin - pad : 0,   // gå under 0 hvis negative verdier, ellers baser på 0
+      yMax > 0 ? yMax + pad : pad,  // alltid vis litt over 0 (nullinje synlig)
+    ];
   };
 
   const stolpeKolonner = harSerier ? stolpeSerier.map(s => s.navn) : [stolpeKol];
