@@ -64,7 +64,7 @@ interface AktivFilter {
   operator: string;
   verdi:    string;
   verdi2?:  string;    // brukes for BETWEEN: [årmåned] BETWEEN verdi AND verdi2
-  erLåst?:  boolean;  // true = fra AI-SQL, vises som ikke-redigerbart badge
+  erLåst?:  boolean;  // true = låst av workspace-kontekst (prosjektfilter), vises uten ×-knapp
 }
 
 const API    = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -148,11 +148,11 @@ function parseFiltreTilObjekter(
 
       // BETWEEN: [kolonne] BETWEEN val1 AND val2
       const bm = b.match(/^\[?([^\]]+)\]?\s+BETWEEN\s+(\S+)\s+AND\s+(\S+)$/i);
-      if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim(), erLåst: true };
+      if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim() };
 
       // Vanlig: [kolonne] operator verdi
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
-      if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim(), erLåst: true };
+      if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim() };
 
       return null;
     })
@@ -1161,18 +1161,15 @@ export default function RapportInteraktivPage() {
     });
   }, [forslag]);
 
-  // ── Sett låste filtre fra forslag.sql når SQL ankommer eller endres ──
+  // ── Sett filtre fra forslag.sql når SQL ankommer eller endres ──
   // Dekker alle paths: sessionStorage, fraLagret og URL-params.
-  // Behold eksisterende ikke-låste bruker-filtre — erstatt kun låste med fersk parsing.
+  // Alle SQL-filtre er redigerbare (erLåst = false).
   useEffect(() => {
     if (!forslag?.sql) return;
     const parsed = parseFiltreTilObjekter(forslag.sql, forslag.prosjektFilter ?? '', forslag.prosjektKolonne);
     if (parsed.length === 0) return;
-    console.log('[filtre fra SQL] setter', parsed.length, 'låste filtre:', parsed.map(f => f.kolonne));
-    setAktiveFiltre(prev => {
-      const brukerFiltre = prev.filter(f => !f.erLåst); // behold bruker-lagt-til filtre
-      return [...parsed, ...brukerFiltre];
-    });
+    console.log('[filtre fra SQL] setter', parsed.length, 'filtre:', parsed.map(f => f.kolonne));
+    setAktiveFiltre(parsed);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forslag?.sql]);
 
@@ -2206,7 +2203,7 @@ export default function RapportInteraktivPage() {
         {aktiveFiltre.map((filter, idx) => (
           filter.kolonne ? (
             filter.erLåst ? (
-              // Låst filter fra AI-SQL — vises som gult ikke-redigerbart badge
+              // Låst filter — kun for workspace-kontekst (prosjektfilter), ikke redigerbart
               <div key={idx} style={{ display:'flex', alignItems:'center', gap:5, background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.25)', borderRadius:6, padding:'3px 9px', fontSize:12, color:'rgba(251,191,36,0.85)', flexShrink:0 }}>
                 <span style={{ fontSize:10, opacity:0.7 }}>🔒</span>
                 <span style={{ fontWeight:500 }}>{filter.kolonne}</span>
@@ -2217,7 +2214,7 @@ export default function RapportInteraktivPage() {
                 </span>
               </div>
             ) : (
-              // Dynamisk filter — redigerbart
+              // Redigerbart filter
               <div key={idx} style={{ display:'flex', alignItems:'center', gap:4, background:'var(--glass-bg)', border:'1px solid var(--glass-border)', borderRadius:6, padding:'3px 6px 3px 8px', fontSize:12 }}>
                 <select value={filter.kolonne}
                   onChange={e => oppdaterFilterKolonne(idx, e.target.value)}
