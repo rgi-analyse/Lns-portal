@@ -1168,8 +1168,18 @@ export default function RapportInteraktivPage() {
     if (!forslag?.sql) return;
     const parsed = parseFiltreTilObjekter(forslag.sql, forslag.prosjektFilter ?? '', forslag.prosjektKolonne);
     if (parsed.length === 0) return;
-    console.log('[filtre fra SQL] setter', parsed.length, 'filtre:', parsed.map(f => f.kolonne));
-    setAktiveFiltre(parsed);
+
+    // Normaliser kolonnenavn til eksakt case fra view-metadata.
+    // SQL kan ha [årmåned] mens tilgjengeligeKolonner har "Årmåned" —
+    // <select value="årmåned"> finner ingen <option> og viser første alternativ.
+    const alleKolNavn = (forslag.alleViewKolonner ?? []).map(k => k.kolonne_navn);
+    const normalisert = parsed.map(f => {
+      const match = alleKolNavn.find(k => k.toLowerCase() === f.kolonne.toLowerCase());
+      return match ? { ...f, kolonne: match } : f;
+    });
+
+    console.log('[filtre fra SQL] setter', normalisert.length, 'filtre:', normalisert.map(f => f.kolonne));
+    setAktiveFiltre(normalisert);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forslag?.sql]);
 
