@@ -40,6 +40,28 @@ export const BASIS_REGLER = `
 - ALDRI bruk DATEPART(), YEAR(), MONTH() — viewet har egne dato-kolonner
 - Dimensjonskolonner for tid: år, måned, månedsnavn, årmåned, åruke
 
+## SALDO vs. REGNSKAPSPERIODE
+
+SALDO-views (balanse, saldo, beholdning, akkumulert):
+  → Spørringer gjelder ALLTID alle år opp til valgt periode
+  → Bruk: WHERE [årmåned] <= [år][mm]
+  → Eksempel "saldo mars 2026": WHERE [årmåned] <= 202603
+  → Kjennetegn: view-navn inneholder "balanse", "saldo",
+    "beholdning" eller bruker spørrer om "saldo", "utgående",
+    "inngående", "akkumulert beholdning"
+
+REGNSKAPSTRANSAKSJONER (kostnader, inntekter, bilag):
+  → Spørringer gjelder ALLTID innenfor ett kalenderår
+  → Bruk: WHERE [årmåned] BETWEEN [år]01 AND [år][mm]
+  → Eksempel "lønnskostnader 2026 til mars":
+    WHERE [årmåned] BETWEEN 202601 AND 202603
+  → Kjennetegn: view-navn inneholder "transaksjoner",
+    "bilag", "faktura" eller bruker spørrer om kostnader,
+    inntekter, betalinger innenfor et år
+
+VED TVIL: spør bruker om det er saldo eller
+transaksjoner som ønskes.
+
 ## WHERE-KLAUSUL REGLER
 - Skriv alltid enkle betingelser uten sammensatte parenteser:
   ✅ WHERE [år] = 2026 AND [måned] = 3
