@@ -614,12 +614,16 @@ export async function chat(
             // Norsk-safe regex: \w stopper ved æøå — bruk eksplisitt tegnklasse
             const norskBokstav = '[a-zA-ZæøåÆØÅ0-9_]';
             const sqlViewRegex = new RegExp(`(${norskBokstav}+\\.${norskBokstav}+)`, 'gi');
-            const viewsISql = (sqlLower.match(sqlViewRegex) ?? []).map(v => v.toLowerCase());
-            const referertViews = viewsISql.filter(v => /^(vw_|ai_gold\.)/.test(v));
-            const ikketillatt = referertViews.filter(v =>
+            // Strip schema-prefix (f.eks. ai_gold.vw_Fact_X → vw_fact_x) før sammenligning.
+            // workspace-lista inneholder kun view-navn uten schema.
+            const viewsISql = (sqlLower.match(sqlViewRegex) ?? []).map(v => {
+              const deler = v.toLowerCase().split('.');
+              return deler[deler.length - 1];
+            }).filter(v => v.startsWith('vw_'));
+            const ikketillatt = viewsISql.filter(v =>
               !context.tillatteViewNavn!.some(t => t.toLowerCase() === v)
             );
-            console.log('[tilgang] SQL refererer views:', referertViews);
+            console.log('[tilgang] SQL views (uten schema):', viewsISql);
             if (ikketillatt.length > 0) {
               console.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
               result = { error: 'Du har ikke tilgang til denne datakilden.' };
