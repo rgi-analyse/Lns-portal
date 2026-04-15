@@ -449,10 +449,10 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
   );
 
   // GET /api/rapport-designer/kolonneverdier
-  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string; kaskadefiltere?: string; limit?: string; offset?: string } }>(
+  fastify.get<{ Querystring: { viewNavn: string; kolonne: string; prosjektFilter?: string; kaskadefiltere?: string; limit?: string; offset?: string; søk?: string } }>(
     '/api/rapport-designer/kolonneverdier',
     async (request, reply) => {
-      const { viewNavn, kolonne, prosjektFilter, kaskadefiltere, limit: limitStr, offset: offsetStr } = request.query;
+      const { viewNavn, kolonne, prosjektFilter, kaskadefiltere, limit: limitStr, offset: offsetStr, søk } = request.query;
 
       console.log('[kolonneverdier] viewNavn:', viewNavn, '| kolonne:', kolonne);
 
@@ -491,6 +491,12 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         } catch {
           fastify.log.warn('[kolonneverdier] ugyldig kaskadefiltere JSON — ignorerer');
         }
+      }
+
+      // Fritekst-søk: begrens til verdier som inneholder søketeksten
+      if (søk) {
+        const safeSøk = søk.replace(/'/g, "''");
+        whereParts.push(`CAST([${safeKolonne}] AS NVARCHAR(MAX)) LIKE '%${safeSøk}%'`);
       }
 
       const limit  = Math.min(Math.max(parseInt(limitStr  ?? '200'), 1), 500);

@@ -976,6 +976,7 @@ function FilterVerdiInput({
   const [sok,             setSok]             = useState('');
   const [dropdownRetning, setDropdownRetning] = useState<'left' | 'right'>('left');
   const containerRef                          = useRef<HTMLDivElement>(null);
+  const søkDebounceRef                        = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Bruk kolonne_type fra metadata (alleViewKolonner) som autoritativ kilde.
   // Faller tilbake til kolonneTyper (som også er metadata-basert om API fungerer).
@@ -988,8 +989,9 @@ function FilterVerdiInput({
   console.log('[FilterVerdi] kolonne:', kolonne, '| type:', type, '| datatype:', kolonneMeta?.datatype ?? '?', '| erTekst:', erTekst);
 
   // Hent verdier med lazy-loading-støtte (offset-basert paginering)
-  const hentVerdier = useCallback(async (offset: number, reset: boolean) => {
-    console.log('[hentVerdier] kolonne:', kolonne, '| viewNavn:', viewNavn, '| erTekst:', erTekst, '| offset:', offset);
+  // søkTekst sendes til server når angitt (≥3 tegn) for server-side filtrering
+  const hentVerdier = useCallback(async (offset: number, reset: boolean, søkTekst?: string) => {
+    console.log('[hentVerdier] kolonne:', kolonne, '| viewNavn:', viewNavn, '| erTekst:', erTekst, '| offset:', offset, '| søk:', søkTekst ?? '—');
     if (!erTekst || !kolonne || !viewNavn) {
       console.warn('[hentVerdier] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
       return;
@@ -1000,6 +1002,7 @@ function FilterVerdiInput({
     if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
     const andreFiltre = (aktiveFiltre ?? []).filter(f => f.kolonne && f.verdi && f.kolonne !== kolonne);
     if (andreFiltre.length > 0) params.set('kaskadefiltere', JSON.stringify(andreFiltre));
+    if (søkTekst && søkTekst.length >= 3) params.set('søk', søkTekst);
 
     try {
       const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
@@ -1110,7 +1113,16 @@ function FilterVerdiInput({
           overflow: 'hidden',
         }}>
           <div style={{ padding: 6 }}>
-            <input type="text" value={sok} onChange={e => setSok(e.target.value)}
+            <input type="text" value={sok} onChange={e => {
+                const nyTekst = e.target.value;
+                setSok(nyTekst);
+                if (søkDebounceRef.current) clearTimeout(søkDebounceRef.current);
+                if (nyTekst.length >= 3) {
+                  søkDebounceRef.current = setTimeout(() => void hentVerdier(0, true, nyTekst), 300);
+                } else if (nyTekst.length === 0) {
+                  void hentVerdier(0, true);
+                }
+              }}
               placeholder="Søk..." autoFocus
               onClick={e => e.stopPropagation()}
               style={{
