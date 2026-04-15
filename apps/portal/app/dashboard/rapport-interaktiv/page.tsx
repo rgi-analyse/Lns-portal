@@ -998,6 +998,7 @@ export default function RapportInteraktivPage() {
   const [aktivData,  setAktivData]  = useState<Record<string, unknown>[]>([]);
   const [lasterData, setLasterData] = useState(false);
   const [tilgjengeligeKolonner, setTilgjengeligeKolonner] = useState<string[]>([]);
+  const [viewKolonner, setViewKolonner] = useState<string[]>([]);
   const [kolonnTyper, setKolonnTyper] = useState<Record<string, string>>({});
   const [kpiUttrykk,      setKpiUttrykk]      = useState<Record<string, string>>({});
   const [kpiFormat,       setKpiFormat]       = useState<Record<string, string>>({});
@@ -1142,6 +1143,25 @@ export default function RapportInteraktivPage() {
       aggregering: config?.aggregering,
     });
   }, [config]);
+
+  // ── Hent alle viewkolonner fra metadata når forslag.viewNavn endres ──
+  useEffect(() => {
+    if (!forslag?.viewNavn) return;
+    apiFetch('/api/admin/metadata/views')
+      .then(r => r.json())
+      .then((views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[]) => {
+        const view = views.find(v =>
+          v.view_name === forslag.viewNavn ||
+          `${v.schema_name}.${v.view_name}` === forslag.viewNavn
+        );
+        if (view) {
+          const kolonner = view.kolonner?.map(k => k.kolonne_navn) ?? [];
+          const kpier = view.kpi?.map(k => k.navn) ?? [];
+          setViewKolonner([...kolonner, ...kpier]);
+        }
+      })
+      .catch(() => {});
+  }, [forslag?.viewNavn]);
 
   // ── Sekvensielt initialiser fra URL-parametre (Ny rapport-wizard → rapport-interaktiv) ──
   useEffect(() => {
@@ -1668,12 +1688,14 @@ export default function RapportInteraktivPage() {
 
   const alleCols = useMemo(() => {
     const dataCols = aktivData.length ? Object.keys(aktivData[0]) : [];
-    const merged = [...dataCols];
-    for (const k of tilgjengeligeKolonner) {
+    // Prioriter viewKolonner (alle kolonner fra view metadata), fall tilbake til dataCols
+    const base = viewKolonner.length > 0 ? viewKolonner : dataCols;
+    const merged = [...base];
+    for (const k of [...tilgjengeligeKolonner, ...dataCols]) {
       if (!merged.includes(k)) merged.push(k);
     }
     return merged;
-  }, [aktivData, tilgjengeligeKolonner]);
+  }, [aktivData, tilgjengeligeKolonner, viewKolonner]);
 
   // Kolonner gruppert etter type (for optgroup-dropdowns)
   const kolGroups = useMemo(() => {
