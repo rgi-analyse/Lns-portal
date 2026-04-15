@@ -2966,7 +2966,10 @@ export default function RapportInteraktivPage() {
                     const gyldigeKol2 = new Set((forslag.alleViewKolonner ?? []).map(k => k.kolonne_navn.toLowerCase()));
                     setAktiveFiltre(gyldigeKol2.size > 0 ? parsed2.filter(ff => gyldigeKol2.has(ff.kolonne.toLowerCase())) : parsed2);
                   }
-                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:null, sorterRetning:defaultSorterRetning(x), maksRader:50 });
+                  const xLReset = x.toLowerCase();
+                  const resetSorterPaa = (xLReset === 'månedsnavn' || xLReset === 'månednavn') ? 'årmåned'
+                    : xLReset === 'måned' ? 'måned' : null;
+                  setConfig({ visualType:forslag.visualType, xAkse:x, yAkse:y, aggregering:'SUM', grupperPaa:forslag.grupperPaa??null, ekstraKolonner:[], kombinertSerier:[], sorterPaa:resetSorterPaa, sorterRetning:defaultSorterRetning(x), maksRader:50 });
                 }}
                 style={{ marginTop:4, padding:8, borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-muted)' }}>
                 Tilbakestill til AI-forslag
