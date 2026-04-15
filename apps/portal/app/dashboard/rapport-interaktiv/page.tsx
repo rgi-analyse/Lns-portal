@@ -527,7 +527,7 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
             {chartData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={Number(entry[yCol]) >= 0 ? 'var(--gull)' : '#e05c5c'}
+                fill={Number(entry[yCol]) >= 0 ? '#f5a623' : '#e05c5c'}
               />
             ))}
           </Bar>
