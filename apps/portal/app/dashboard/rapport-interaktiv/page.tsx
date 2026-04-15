@@ -139,19 +139,22 @@ function parseFiltreTilObjekter(
   where = where.replace(/^\s*\(/, '').replace(/\)\s*$/, '').trim();
   return where
     .split(/\s+AND\s+/i)
-    .map(b => b.replace(/^\(|\)$/g, '').trim()) // fjern parenteser rundt enkeltfiltre
-    .filter(b => b.length > 0 && !/\s+OR\s+/i.test(b)) // ignorer OR-betingelser — for komplekse for filter-UI
-    .map(b => {
+    .map((b): AktivFilter | null => {
+      b = b.replace(/^\(|\)$/g, '').trim();
+      if (!b || /\s+OR\s+/i.test(b)) return null; // ignorer OR-betingelser — for komplekse for filter-UI
+
       // BETWEEN: [kolonne] BETWEEN val1 AND val2
       const bm = b.match(/^\[?([^\]]+)\]?\s+BETWEEN\s+(\S+)\s+AND\s+(\S+)$/i);
       if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim(), erLåst: true };
+
       // Vanlig: [kolonne] operator verdi
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
       if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim(), erLåst: true };
+
       return null;
     })
     .filter((f): f is AktivFilter => {
-      if (!f) return false;
+      if (f === null) return false;
       const kolLower = f.kolonne.toLowerCase().replace(/[\[\]]/g, '');
       // Fjern filtre på prosjektkolonnen (eksplisitt navn eller kjente prosjekt-nøkkelkolonner)
       if (prosjektKolonne && kolLower === prosjektKolonne.toLowerCase()) {
