@@ -1327,6 +1327,10 @@ export default function RapportInteraktivPage() {
   const [aktiveFiltre,     setAktiveFiltre]     = useState<AktivFilter[]>([]);
   // Valgte kolonner for tabell-visning (styres av checkbox-panelet)
   const [valgteKolonner,   setValgteKolonner]   = useState<string[]>([]);
+  // IN_LIST dropdown state
+  const [åpenListeFilter,  setÅpenListeFilter]  = useState<number | null>(null);
+  const [filterVerdier,    setFilterVerdier]    = useState<Record<string, string[]>>({});
+  const [filterSøk,        setFilterSøk]        = useState<Record<string, string>>({});
 
   // Track initial mount to avoid double-fetch on load
   // Keep configRef current on every render (prevents stale closure in effects/timeouts)
@@ -2122,6 +2126,23 @@ export default function RapportInteraktivPage() {
     if (cfg) hentData(cfg, oppdaterte);
   };
 
+  const hentListeVerdier = useCallback(async (kolonne: string, søkTekst?: string) => {
+    const vn = viewNavnRef.current ?? forslag?.viewNavn;
+    if (!kolonne || !vn) return;
+    const params = new URLSearchParams({ viewNavn: vn, kolonne, limit: '200', offset: '0' });
+    if (forslag?.prosjektFilter) params.set('prosjektFilter', forslag.prosjektFilter);
+    const andreFiltre = aktiveFiltre.filter(f => f.kolonne && f.kolonne !== kolonne);
+    if (andreFiltre.length > 0) params.set('kaskadefiltere', JSON.stringify(andreFiltre));
+    if (søkTekst && søkTekst.length >= 3) params.set('søk', søkTekst);
+    try {
+      const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json() as { verdier: unknown[] };
+        setFilterVerdier(prev => ({ ...prev, [kolonne]: (d.verdier ?? []).map(String) }));
+      }
+    } catch { /* ignorer */ }
+  }, [forslag?.viewNavn, forslag?.prosjektFilter, aktiveFiltre]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const oppdaterFilterKolonne = (idx: number, kolonne: string) => {
     const oppdaterte = aktiveFiltre.map((f, i) => i === idx ? { ...f, kolonne, verdi: '' } : f);
     setAktiveFiltre(oppdaterte);
@@ -2589,14 +2610,139 @@ export default function RapportInteraktivPage() {
                       placeholder="Til..." style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-primary)', borderRadius:4, fontSize:11, padding:'3px 6px', outline:'none', width:72 }} />
                   </>
                 ) : filter.operator === 'IN_LIST' ? (
-                  <InListFilterInput
-                    kolonne={filter.kolonne}
-                    valgte={filter.verdier ?? []}
-                    onChange={verdier => oppdaterFilterVerdier(idx, verdier)}
-                    viewNavn={forslag.viewNavn}
-                    prosjektFilter={forslag.prosjektFilter ?? undefined}
-                    aktiveFiltre={aktiveFiltre.filter((_, filterIdx) => filterIdx !== idx)}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (åpenListeFilter === idx) {
+                          setÅpenListeFilter(null);
+                        } else {
+                          setÅpenListeFilter(idx);
+                          if (!filterVerdier[filter.kolonne]) {
+                            void hentListeVerdier(filter.kolonne);
+                          }
+                        }
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        background: 'var(--navy)',
+                        border: '1px solid var(--glass-border)',
+                        borderRadius: '4px',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        minWidth: '140px',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <span>
+                        {(filter.verdier ?? []).length === 0
+                          ? 'Velg verdier...'
+                          : (filter.verdier ?? []).length === 1
+                            ? (filter.verdier ?? [])[0]
+                            : `${(filter.verdier ?? []).length} valgt`}
+                      </span>
+                      <span style={{ fontSize: '10px', opacity: 0.6 }}>
+                        {åpenListeFilter === idx ? '▲' : '▼'}
+                      </span>
+                    </button>
+                    {åpenListeFilter === idx && (
+                      <>
+                        <div
+                          style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                          onClick={() => setÅpenListeFilter(null)}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          zIndex: 100,
+                          marginTop: '4px',
+                          minWidth: '220px',
+                          maxHeight: '260px',
+                          overflowY: 'auto',
+                          background: 'var(--navy-dark)',
+                          border: '1px solid var(--glass-border)',
+                          borderRadius: '6px',
+                          padding: '6px',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                        }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Søk..."
+                            value={filterSøk[filter.kolonne] ?? ''}
+                            onChange={e => {
+                              const tekst = e.target.value;
+                              setFilterSøk(prev => ({ ...prev, [filter.kolonne]: tekst }));
+                              if (tekst.length >= 3) void hentListeVerdier(filter.kolonne, tekst);
+                              else if (tekst.length === 0) void hentListeVerdier(filter.kolonne);
+                            }}
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              width: '100%', padding: '4px 8px', marginBottom: '6px',
+                              background: 'var(--navy)', border: '1px solid var(--glass-border)',
+                              borderRadius: '4px', color: 'var(--text-primary)', fontSize: '12px',
+                              boxSizing: 'border-box', outline: 'none',
+                            }}
+                          />
+                          {(filterVerdier[filter.kolonne] ?? []).length === 0 && (
+                            <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)' }}>Laster...</div>
+                          )}
+                          {(filterVerdier[filter.kolonne] ?? []).map((v: string) => (
+                            <label key={v} style={{
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              padding: '4px 6px', cursor: 'pointer', fontSize: '12px',
+                              color: 'var(--text-primary)', borderRadius: '3px',
+                            }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-bg)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(filter.verdier ?? []).includes(v)}
+                                onChange={e => {
+                                  const valgte = filter.verdier ?? [];
+                                  const nyeVerdier = e.target.checked
+                                    ? [...valgte, v]
+                                    : valgte.filter(x => x !== v);
+                                  oppdaterFilterVerdier(idx, nyeVerdier);
+                                }}
+                                onClick={e => e.stopPropagation()}
+                                style={{ accentColor: '#f5a623', flexShrink: 0 }}
+                              />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+                            </label>
+                          ))}
+                          {(filter.verdier ?? []).length > 0 && (
+                            <div style={{
+                              marginTop: '6px', paddingTop: '6px',
+                              borderTop: '1px solid var(--glass-border)',
+                              fontSize: '11px', color: 'var(--text-secondary)',
+                              display: 'flex', justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}>
+                              <span>{(filter.verdier ?? []).length} valgt</span>
+                              <button
+                                type="button"
+                                onClick={() => oppdaterFilterVerdier(idx, [])}
+                                style={{
+                                  background: 'none', border: 'none',
+                                  color: 'var(--text-secondary)', fontSize: '11px',
+                                  cursor: 'pointer', padding: '0',
+                                }}
+                              >
+                                Nullstill
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <FilterVerdiInput
                     kolonne={filter.kolonne}
