@@ -77,6 +77,8 @@ export interface RapportForslag {
   prosjektKolonne?: string | null;
   prosjektKolonneType?: string | null;
   prosjektFilter?: string | null;
+  laastFilter?: { kolonne: string; verdi: string } | null;
+  referanseLinje?: { verdi: number; etikett?: string; farge?: string } | null;
 }
 
 export interface FilterConfig {
