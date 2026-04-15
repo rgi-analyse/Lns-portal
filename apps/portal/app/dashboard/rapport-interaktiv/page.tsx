@@ -1014,7 +1014,7 @@ function FilterVerdiInput({
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function RapportInteraktivPage() {
   const router = useRouter();
-  const { entraObjectId } = usePortalAuth();
+  const { entraObjectId, authHeaders } = usePortalAuth();
   const [forslag,    setForslag]    = useState<RapportForslag | null>(null);
   const [config,     setConfig]     = useState<RedigertConfig | null>(null);
   const [aktivData,  setAktivData]  = useState<Record<string, unknown>[]>([]);
@@ -1171,7 +1171,7 @@ export default function RapportInteraktivPage() {
     const vn = forslag?.viewNavn;
     if (!vn) return; // vent til viewNavn er satt
 
-    apiFetch('/api/admin/metadata/views', { credentials: 'include' })
+    apiFetch('/api/admin/metadata/views', { credentials: 'include', headers: authHeaders })
       .then(r => r.json())
       .then((res: unknown) => {
         // API kan returnere ren array eller { views: [...] } / { data: [...] }
@@ -1196,8 +1196,8 @@ export default function RapportInteraktivPage() {
         }
       })
       .catch(e => console.error('[viewKolonner] feil:', e));
-  // Dependency: selve viewNavn-strengen — React sammenligner verdien, ikke forslag-objektreferansen
-  }, [forslag?.viewNavn]);
+  // authHeaders er memoized i usePortalAuth — ny referanse kun når entraObjectId faktisk endres
+  }, [forslag?.viewNavn, authHeaders]);
 
   // ── Sekvensielt initialiser fra URL-parametre (Ny rapport-wizard → rapport-interaktiv) ──
   useEffect(() => {
