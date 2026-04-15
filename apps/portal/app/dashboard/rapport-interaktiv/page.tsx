@@ -16,6 +16,7 @@ import {
   BarChart as RechartBarChart,
   PieChart as RechartPieChart, Pie,
 } from 'recharts';
+import type { PieLabelRenderProps } from 'recharts';
 
 interface RapportForslag {
   tittel: string;
@@ -772,18 +773,21 @@ function PieChart({ data, xCol, yCol, formaterVerdi }: { data: Record<string,unk
     .map(d => ({ name: String(d[xCol] ?? ''), value: Math.abs(Number(d[yCol]) || 0) }))
     .filter(d => d.value > 0);
 
-  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
-    cx: number; cy: number; midAngle: number;
-    innerRadius: number; outerRadius: number; percent: number;
-  }) => {
-    if (percent < 0.05) return null;
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: PieLabelRenderProps) => {
     const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const cxN   = Number(cx ?? 0);
+    const cyN   = Number(cy ?? 0);
+    const mid   = Number(midAngle ?? 0);
+    const inner = Number(innerRadius ?? 0);
+    const outer = Number(outerRadius ?? 0);
+    const pct   = Number(percent ?? 0);
+    if (pct < 0.05) return null;
+    const radius = inner + (outer - inner) * 0.5;
+    const x = cxN + radius * Math.cos(-mid * RADIAN);
+    const y = cyN + radius * Math.sin(-mid * RADIAN);
     return (
       <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11}>
-        {`${(percent * 100).toFixed(1)}%`}
+        {`${(pct * 100).toFixed(1)}%`}
       </text>
     );
   };
