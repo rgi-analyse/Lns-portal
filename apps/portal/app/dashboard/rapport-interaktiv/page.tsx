@@ -13,6 +13,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ReferenceLine,
+  BarChart as RechartBarChart,
 } from 'recharts';
 
 interface RapportForslag {
@@ -455,77 +456,97 @@ function beregnDomain(
   return domain;
 }
 
-// ── Bar chart ─────────────────────────────────────────────────────────────────
+// ── Bar chart (Recharts) ───────────────────────────────────────────────────────
 function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
-  const W = 800, H = 400, padL = 80, padR = 20, padT = 20, padB = 90;
-  const groups     = grupperPaa ? [...new Set(data.map(r => String(r[grupperPaa] ?? '')))] : [''];
-  const categories = [...new Set(data.map(r => String(r[xCol] ?? '')))];
-  const grouped: Record<string, Record<string, number>> = {};
-  for (const r of data) {
-    const cat = String(r[xCol] ?? '');
-    const grp = grupperPaa ? String(r[grupperPaa] ?? '') : '';
-    if (!grouped[cat]) grouped[cat] = {};
-    grouped[cat][grp] = (grouped[cat][grp] ?? 0) + (Number(r[yCol]) || 0);
-  }
-  const allVals = categories.flatMap(c => groups.map(g => grouped[c]?.[g] ?? 0));
+
   console.log('[BarChart] yCol ved domain-beregning:', yCol);
   console.log('[BarChart] data.length:', data.length);
   console.log('[BarChart] data[0]:', data[0]);
   const stolpeDomain = beregnDomain(data, yCol);
   console.log('[BarChart] stolpeDomain:', stolpeDomain);
-  const maxVal  = Math.max(...allVals, 1);
-  const plotW   = W - padL - padR;
-  const plotH   = H - padT - padB;
-  const groupW  = plotW / Math.max(categories.length, 1);
-  const barW    = Math.max(4, (groupW * 0.8) / groups.length);
+
+  // Gruppert modus: pivot flat data → { [xCol]: cat, [grp1]: val, [grp2]: val }
+  const groups     = grupperPaa ? [...new Set(data.map(r => String(r[grupperPaa] ?? '')))] : null;
+  const categories = [...new Set(data.map(r => String(r[xCol] ?? '')))];
+  const chartData: Record<string, unknown>[] = groups
+    ? categories.map(cat => {
+        const entry: Record<string, unknown> = { [xCol]: cat };
+        for (const grp of groups) {
+          entry[grp] = data
+            .filter(r => String(r[xCol] ?? '') === cat && String(r[grupperPaa ?? ''] ?? '') === grp)
+            .reduce((s, r) => s + (Number(r[yCol]) || 0), 0);
+        }
+        return entry;
+      })
+    : data;
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
-      {/* Y-axis label */}
-      <text x={14} y={padT + plotH / 2} fontSize={10} fill="var(--text-muted)" textAnchor="middle" transform={`rotate(-90,14,${padT + plotH / 2})`}>{yLabel}</text>
-      {[0,.25,.5,.75,1].map(t => {
-        const y = padT + plotH - t * plotH;
-        return (
-          <g key={t}>
-            <line x1={padL} y1={y} x2={padL+plotW} y2={y} stroke="var(--glass-bg-hover)"/>
-            <text x={padL-6} y={y+4} fontSize={11} textAnchor="end" fill="var(--text-muted)">
-              {fmt(t*maxVal)}
-            </text>
-          </g>
-        );
-      })}
-      {categories.map((cat, ci) => {
-        const cx = padL + ci * groupW + groupW * 0.1;
-        return (
-          <g key={cat}>
-            {groups.map((grp, gi) => {
-              const val = grouped[cat]?.[grp] ?? 0;
-              const bh  = Math.max(1, (val/maxVal)*plotH);
-              const bx  = cx + gi*(barW+1);
-              const by  = padT + plotH - bh;
-              return (
-                <g key={grp}>
-                  <rect x={bx} y={by} width={barW} height={bh} fill={COLORS[gi%COLORS.length]} rx={2} opacity={0.85}/>
-                  {bh>20 && <text x={bx+barW/2} y={by+12} fontSize={9} textAnchor="middle" fill="var(--text-secondary)">{fmt(val)}</text>}
-                </g>
-              );
-            })}
-            <text x={padL+ci*groupW+groupW/2} y={padT+plotH+16} fontSize={11} textAnchor="middle" fill="var(--text-secondary)"
-              transform={`rotate(-30,${padL+ci*groupW+groupW/2},${padT+plotH+16})`}>
-              {cat.slice(0,14)}
-            </text>
-          </g>
-        );
-      })}
-      <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="var(--text-muted)"/>
-      <line x1={padL} y1={padT+plotH} x2={padL+plotW} y2={padT+plotH} stroke="var(--text-muted)"/>
-      {grupperPaa && groups.map((g,i) => (
-        <g key={g}>
-          <rect x={padL+i*120} y={H-20} width={10} height={10} fill={COLORS[i%COLORS.length]} rx={1}/>
-          <text x={padL+i*120+14} y={H-11} fontSize={11} fill="var(--text-secondary)">{g.slice(0,14)}</text>
-        </g>
-      ))}
-    </svg>
+    <ResponsiveContainer width="100%" height={400}>
+      <RechartBarChart
+        data={chartData}
+        margin={{ top: 10, right: 20, left: 20, bottom: 60 }}
+        stackOffset="sign"
+      >
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
+        <XAxis
+          dataKey={xCol}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          angle={-35}
+          textAnchor="end"
+          interval={0}
+        />
+        <YAxis
+          type="number"
+          domain={stolpeDomain}
+          allowDataOverflow={true}
+          tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+          tickFormatter={fmt}
+          label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 11, dy: 50 }}
+        />
+        <Tooltip
+          contentStyle={{ background: 'var(--navy-dark)', border: '1px solid var(--glass-border)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12 }}
+          formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
+        />
+        <ReferenceLine y={0} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+
+        {groups ? (
+          <>
+            {groups.map((grp, i) => (
+              <Bar
+                key={grp}
+                dataKey={grp}
+                stackId="stack"
+                fill={COLORS[i % COLORS.length]}
+                opacity={0.85}
+                radius={[2, 2, 0, 0] as [number, number, number, number]}
+                name={grp}
+                background={false}
+                label={(props: Record<string, unknown>) => {
+                  console.log('[Bar grouped] value:', props.value, 'y:', props.y, 'height:', props.height);
+                  return null;
+                }}
+              />
+            ))}
+            <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
+          </>
+        ) : (
+          <Bar
+            dataKey={yCol}
+            stackId="stack"
+            fill="var(--gold)"
+            opacity={0.85}
+            radius={[2, 2, 0, 0] as [number, number, number, number]}
+            name={yLabel || yCol}
+            background={false}
+            label={(props: Record<string, unknown>) => {
+              console.log('[Bar] value:', props.value, 'y:', props.y, 'height:', props.height);
+              return null;
+            }}
+          />
+        )}
+      </RechartBarChart>
+    </ResponsiveContainer>
   );
 }
 
