@@ -1492,29 +1492,48 @@ export default function RapportInteraktivPage() {
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
       } else if (forslag?.sql) {
         // Bruk original AI-SQL som base — bevarer alle WHERE-betingelser (BETWEEN, Kontonr, etc.)
-        // som ellers forsvinner fordi parseFiltreTilObjekter ikke håndterer BETWEEN korrekt.
-        // Erstatt kun ORDER BY basert på brukerens sort-konfig.
+        // Erstatt ORDER BY og sørg for at sorteringskolonne finnes i GROUP BY og SELECT.
         const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
         const råKol = cfg.sorterPaa ?? cfg.xAkse;
         // månedsnavn sorteres via [måned] (INT) — ikke alfabetisk på navnekolonnen
         const sorterKol = (råKol?.toLowerCase() === 'månedsnavn' || råKol?.toLowerCase() === 'månednavn')
           ? 'måned'
           : råKol;
+
+        let baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+
+        // Legg til sorteringskolonne i GROUP BY (og SELECT) hvis den mangler.
+        // Azure SQL krever at ORDER BY-kolonner er i SELECT/GROUP BY.
+        if (sorterKol && /GROUP\s+BY/i.test(baseUtenOrder)) {
+          // Sjekk om kolonnen allerede finnes — match [kolonne] eller bare kolonnenavn
+          const kolInneholdt = new RegExp(
+            `GROUP\\s+BY[\\s\\S]*(?:\\[${sorterKol}\\]|(?<![\\wæøåÆØÅ])${sorterKol}(?![\\wæøåÆØÅ]))`, 'i'
+          ).test(baseUtenOrder);
+
+          if (!kolInneholdt) {
+            // Legg til i GROUP BY
+            baseUtenOrder = baseUtenOrder.replace(
+              /GROUP\s+BY\s+([\s\S]*?)(\s*$)/i,
+              (_, cols) => `GROUP BY ${cols.trim()}, [${sorterKol}]`,
+            );
+            // Legg til i SELECT hvis den heller ikke er der
+            const kolISelect = new RegExp(
+              `SELECT\\s+TOP\\s+\\d+[\\s\\S]*?(?:\\[${sorterKol}\\]|(?<![\\wæøåÆØÅ])${sorterKol}(?![\\wæøåÆØÅ]))`, 'i'
+            ).test(baseUtenOrder);
+            if (!kolISelect) {
+              baseUtenOrder = baseUtenOrder.replace(
+                /^(SELECT\s+TOP\s+\d+)\s+/i,
+                (_, prefix) => `${prefix} [${sorterKol}], `,
+              );
+            }
+          }
+        }
+
         const orderByStr = sorterKol
           ? (tallKolonner.has(sorterKol.toLowerCase())
               ? `ORDER BY CAST([${sorterKol}] AS INT) ${cfg.sorterRetning}`
               : `ORDER BY [${sorterKol}] ${cfg.sorterRetning}`)
           : '';
-        let baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
-
-        // Når sorterKol er [måned] (pga. månedsnavn-xAkse) må [måned] også finnes i GROUP BY.
-        // Original AI-SQL har bare [månedsnavn] i GROUP BY — legg til [måned] hvis den mangler.
-        if (sorterKol === 'måned' && /GROUP\s+BY/i.test(baseUtenOrder) && !/GROUP\s+BY\s+[\s\S]*\[?måned\]?(?!\s*s)/i.test(baseUtenOrder)) {
-          baseUtenOrder = baseUtenOrder.replace(
-            /GROUP\s+BY\s+([\s\S]*?)(\s*$)/i,
-            (_, cols) => `GROUP BY ${cols.trim()}, [måned]`,
-          );
-        }
 
         sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
         console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
