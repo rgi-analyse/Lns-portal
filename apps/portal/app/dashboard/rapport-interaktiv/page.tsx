@@ -329,8 +329,8 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
   // Kronologisk sortering: månedsnavn sorteres via [måned]-kolonnen (tall), ikke alfabetisk
   const erMånedsnavn = ['månedsnavn', 'månednavn'].includes(cfg.xAkse.toLowerCase());
   // [måned] must be in both SELECT and GROUP BY for ORDER BY [måned] to work in SQL Server
-  const ekstraMånedSel = erMånedsnavn ? ', [måned]' : '';
-  const ekstraGroupBy  = erMånedsnavn ? ', [måned]' : '';
+  const ekstraMånedSel = erMånedsnavn ? ', [måned], [årmåned]' : '';
+  const ekstraGroupBy  = erMånedsnavn ? ', [måned], [årmåned]' : '';
 
   const selKols = grp
     ? `${x}${ekstraMånedSel}, ${grp}, ${yUttrykk} AS ${alias}${ekstraSelect}`
@@ -359,7 +359,7 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
   const orderBy = cfg.sorterPaa
     ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning)
     : erMånedsnavn
-      ? `ORDER BY CAST([måned] AS INT) ${cfg.sorterRetning}`
+      ? `ORDER BY CAST([årmåned] AS INT) ${cfg.sorterRetning}`
       : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
 
   return `SELECT TOP 500 ${selKols} FROM ${viewNavn}${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
@@ -1464,8 +1464,8 @@ export default function RapportInteraktivPage() {
           : `SUM([${yAkse}]) AS [${yAkse}]`;
         // Kronologisk sortering for månedsnavn
         const erMånedInitial = ['månedsnavn', 'månednavn'].includes(xAkse.toLowerCase());
-        const initialGroupBy = erMånedInitial ? `GROUP BY [${xAkse}], [måned]` : `GROUP BY [${xAkse}]`;
-        const initialOrder   = erMånedInitial ? `ORDER BY [måned] ASC` : `ORDER BY ${kpiMap[yAkse] ?? `SUM([${yAkse}])`} DESC`;
+        const initialGroupBy = erMånedInitial ? `GROUP BY [${xAkse}], [måned], [årmåned]` : `GROUP BY [${xAkse}]`;
+        const initialOrder   = erMånedInitial ? `ORDER BY CAST([årmåned] AS INT) ASC` : `ORDER BY ${kpiMap[yAkse] ?? `SUM([${yAkse}])`} DESC`;
         const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} ${initialGroupBy} ${initialOrder}`;
         console.log('[Designer] initial SQL:', sql);
         setLasterData(true);
@@ -1592,9 +1592,9 @@ export default function RapportInteraktivPage() {
         // bevar GROUP BY og sørg for at sorteringskolonne finnes i SELECT/GROUP BY.
         const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
         const råKol = cfg.sorterPaa ?? cfg.xAkse;
-        // månedsnavn sorteres via [måned] (INT) — ikke alfabetisk på navnekolonnen
+        // månedsnavn sorteres via [årmåned] (INT) — sikrer kronologisk rekkefølge over år
         const sorterKol = (råKol?.toLowerCase() === 'månedsnavn' || råKol?.toLowerCase() === 'månednavn')
-          ? 'måned'
+          ? 'årmåned'
           : råKol;
 
         // Fjern ORDER BY fra original SQL
