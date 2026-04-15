@@ -522,10 +522,6 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
                 radius={[2, 2, 0, 0] as [number, number, number, number]}
                 name={grp}
                 background={false}
-                label={(props: Record<string, unknown>) => {
-                  console.log('[Bar grouped] value:', props.value, 'y:', props.y, 'height:', props.height);
-                  return null;
-                }}
               />
             ))}
             <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
@@ -539,10 +535,6 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
             radius={[2, 2, 0, 0] as [number, number, number, number]}
             name={yLabel || yCol}
             background={false}
-            label={(props: Record<string, unknown>) => {
-              console.log('[Bar] value:', props.value, 'y:', props.y, 'height:', props.height);
-              return null;
-            }}
           />
         )}
       </RechartBarChart>
