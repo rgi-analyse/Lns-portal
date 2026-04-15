@@ -989,7 +989,11 @@ function FilterVerdiInput({
 
   // Hent verdier med lazy-loading-støtte (offset-basert paginering)
   const hentVerdier = useCallback(async (offset: number, reset: boolean) => {
-    if (!erTekst || !kolonne || !viewNavn) return;
+    console.log('[hentVerdier] kolonne:', kolonne, '| viewNavn:', viewNavn, '| erTekst:', erTekst, '| offset:', offset);
+    if (!erTekst || !kolonne || !viewNavn) {
+      console.warn('[hentVerdier] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
+      return;
+    }
     if (offset === 0) setLaster(true); else setLasterFlere(true);
 
     const params = new URLSearchParams({ viewNavn, kolonne, limit: '200', offset: String(offset) });
@@ -999,8 +1003,10 @@ function FilterVerdiInput({
 
     try {
       const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
+      console.log('[hentVerdier] HTTP status:', r.status);
       if (!r.ok) { if (reset) setVerdier([]); return; }
       const d = await r.json() as { verdier: unknown[] };
+      console.log('[hentVerdier] d.verdier (første 5):', (d.verdier ?? []).slice(0, 5));
       const nyeVerdier = (d.verdier ?? []).map(String);
       if (reset) setVerdier(nyeVerdier); else setVerdier(prev => [...prev, ...nyeVerdier]);
       setHarFlere(nyeVerdier.length === 200);
@@ -1016,7 +1022,10 @@ function FilterVerdiInput({
 
   // Initial last ved endring av kolonne, view, operator eller aktive filtre
   useEffect(() => {
-    if (!erTekst || !kolonne || !viewNavn) { setVerdier([]); return; }
+    if (!erTekst || !kolonne || !viewNavn) {
+      console.warn('[FilterVerdi useEffect] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
+      setVerdier([]); return;
+    }
     if (operator === 'LIKE' || operator === 'NOT LIKE' || operator === 'BETWEEN') { setVerdier([]); return; }
     setSide(0);
     setHarFlere(false);
