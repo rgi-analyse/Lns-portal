@@ -36,6 +36,7 @@ interface RapportForslag {
   prosjektKolonneType?: string | null;
   prosjektFilter?: string | null;
   laastFilter?: { kolonne: string; verdi: string } | null;
+  referanseLinje?: { verdi: number; etikett?: string; farge?: string } | null;
 }
 
 interface KombinertSerie {
@@ -61,6 +62,7 @@ interface RedigertConfig {
   sorterPaa:        string | null;
   sorterRetning:    string;
   maksRader:        number;
+  referanseLinje?:  { verdi: number; etikett?: string; farge?: string } | null;
 }
 
 interface AktivFilter {
@@ -459,7 +461,7 @@ function beregnDomain(
 }
 
 // ── Bar chart (Recharts positive/negative) ────────────────────────────────────
-function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
+function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi, referanseLinje }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string; referanseLinje?: { verdi: number; etikett?: string; farge?: string } | null }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
 
   const domain = beregnDomain(data, yCol);
@@ -508,6 +510,15 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
+        {referanseLinje && (
+          <ReferenceLine
+            y={referanseLinje.verdi}
+            stroke={referanseLinje.farge ?? '#e05c5c'}
+            strokeWidth={1.5}
+            strokeDasharray="6 3"
+            label={{ value: referanseLinje.etikett ?? String(referanseLinje.verdi), fill: referanseLinje.farge ?? '#e05c5c', fontSize: 11, position: 'insideTopRight' }}
+          />
+        )}
 
         {groups ? (
           <>
@@ -543,7 +554,7 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
 }
 
 // ── Line / Area chart (ComposedChart) ────────────────────────────────────────
-function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
+function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi, referanseLinje }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string; referanseLinje?: { verdi: number; etikett?: string; farge?: string } | null }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
   const domain = beregnDomain(data, yCol);
 
@@ -573,6 +584,15 @@ function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: {
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
+        {referanseLinje && (
+          <ReferenceLine
+            y={referanseLinje.verdi}
+            stroke={referanseLinje.farge ?? '#e05c5c'}
+            strokeWidth={1.5}
+            strokeDasharray="6 3"
+            label={{ value: referanseLinje.etikett ?? String(referanseLinje.verdi), fill: referanseLinje.farge ?? '#e05c5c', fontSize: 11, position: 'insideTopRight' }}
+          />
+        )}
         {area ? (
           <Area
             type="monotone"
@@ -620,12 +640,13 @@ function beregnKumulativ(
   });
 }
 
-function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
+function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier, referanseLinje }: {
   data:      Record<string, unknown>[];
   xCol:      string;
   stolpeKol: string;
   linjeKol:  string;
   serier?:   KombinertSerie[];
+  referanseLinje?: { verdi: number; etikett?: string; farge?: string } | null;
 }) {
   const harSerier    = serier && serier.length > 0;
   const stolpeSerier = serier?.filter(s => s.visningsType === 'stolpe') ?? [];
@@ -710,6 +731,16 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
         />
         <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
         <ReferenceLine yAxisId="stolpe" y={0} stroke="var(--text-secondary)" strokeWidth={1} />
+        {referanseLinje && (
+          <ReferenceLine
+            yAxisId="stolpe"
+            y={referanseLinje.verdi}
+            stroke={referanseLinje.farge ?? '#e05c5c'}
+            strokeWidth={1.5}
+            strokeDasharray="6 3"
+            label={{ value: referanseLinje.etikett ?? String(referanseLinje.verdi), fill: referanseLinje.farge ?? '#e05c5c', fontSize: 11, position: 'insideTopRight' }}
+          />
+        )}
 
         {harSerier ? (
           <>
@@ -1228,6 +1259,7 @@ export default function RapportInteraktivPage() {
         aggregering: 'SUM',
         grupperPaa: f.grupperPaa ?? null,
         ekstraKolonner: [], kombinertSerier: [], sorterPaa: defaultSorterPaa0, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
+        referanseLinje: f.referanseLinje ?? null,
       });
 
       {
@@ -2262,13 +2294,13 @@ export default function RapportInteraktivPage() {
       <div style={{ color:'var(--text-muted)', padding:40, textAlign:'center' }}>Ingen data å vise.</div>
     );
     switch (config.visualType) {
-      case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
-      case 'line':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
-      case 'area':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} area yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
+      case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi} referanseLinje={config.referanseLinje}/>;
+      case 'line':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi} referanseLinje={config.referanseLinje}/>;
+      case 'area':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} area yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi} referanseLinje={config.referanseLinje}/>;
       case 'pie':       return <PieChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse} formaterVerdi={formaterVerdi}/>;
       case 'card':      return <CardChart      data={behandletData} yCol={config.yAkse} yLabel={yAkseLabel}/>;
       case 'table':     return null;
-      case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''} serier={config.kombinertSerier.length > 0 ? config.kombinertSerier : undefined}/>;
+      case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''} serier={config.kombinertSerier.length > 0 ? config.kombinertSerier : undefined} referanseLinje={config.referanseLinje}/>;
       default:          return <BarChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel}/>;
     }
   }
