@@ -553,16 +553,25 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   const behandletData = harSerier ? beregnKumulativ(data, serier ?? []) : data;
 
   const beregnDomain = (kolonner: string[]): [number, number] | ['auto', 'auto'] => {
-    const verdier = behandletData.flatMap(d =>
-      kolonner.map(k => {
-        const v = d[k];
+    const verdier = behandletData.flatMap(d => {
+      const radNøkler = Object.keys(d);
+      return kolonner.map(k => {
+        // Eksakt match først, deretter case-insensitiv fallback
+        const nøkkel = radNøkler.includes(k)
+          ? k
+          : (radNøkler.find(rk => rk.toLowerCase() === k.toLowerCase()) ?? k);
+        const v = d[nøkkel];
         if (typeof v === 'number') return v;
         // Håndter norsk/internasjonal tallformat: mellomrom som tusenskille, komma som desimal
         const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.'));
         return n;
-      }).filter((v): v is number => isFinite(v) && !isNaN(v))
-    );
-    if (verdier.length === 0) return ['auto', 'auto'];
+      }).filter((v): v is number => isFinite(v) && !isNaN(v));
+    });
+    if (verdier.length === 0) {
+      console.warn('[beregnDomain] ingen gyldige verdier for kolonner:', kolonner,
+        '| første rad:', behandletData[0] ? Object.keys(behandletData[0]).join(', ') : '(tom)');
+      return ['auto', 'auto'];
+    }
     const yMin = Math.min(...verdier);
     const yMax = Math.max(...verdier);
     const spenn = Math.abs(yMax - yMin) || Math.abs(yMin) || 1;
