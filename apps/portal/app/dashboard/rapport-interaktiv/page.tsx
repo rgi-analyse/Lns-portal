@@ -1169,7 +1169,7 @@ export default function RapportInteraktivPage() {
   // ── Hent alle viewkolonner fra metadata når forslag.viewNavn endres ──
   useEffect(() => {
     if (!forslag?.viewNavn) return;
-    apiFetch('/api/admin/metadata/views')
+    apiFetch('/api/admin/metadata/views', { credentials: 'include' })
       .then(r => r.json())
       .then((views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[]) => {
         const view = views.find(v =>
@@ -1466,7 +1466,11 @@ export default function RapportInteraktivPage() {
         // som ellers forsvinner fordi parseFiltreTilObjekter ikke håndterer BETWEEN korrekt.
         // Erstatt kun ORDER BY basert på brukerens sort-konfig.
         const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
-        const sorterKol = cfg.sorterPaa ?? cfg.xAkse;
+        const råKol = cfg.sorterPaa ?? cfg.xAkse;
+        // månedsnavn sorteres via [måned] (INT) — ikke alfabetisk på navnekolonnen
+        const sorterKol = (råKol?.toLowerCase() === 'månedsnavn' || råKol?.toLowerCase() === 'månednavn')
+          ? 'måned'
+          : råKol;
         const orderByStr = sorterKol
           ? (tallKolonner.has(sorterKol.toLowerCase())
               ? `ORDER BY CAST([${sorterKol}] AS INT) ${cfg.sorterRetning}`
