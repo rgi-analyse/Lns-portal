@@ -188,6 +188,7 @@ function rankViews(
   spørsmål: string,
   profilViews?: string[],
 ): Record<string, unknown>[] {
+  console.log('[rankViews] spørsmål:', spørsmål);
   if (!spørsmål) return views;
   const s = spørsmål.toLowerCase();
   const ord = s.split(/\s+/).filter(o => o.length > 2);
@@ -400,6 +401,9 @@ async function buildSystemPrompt(
   tillatteViewIds?: string[] | null,
   profilViews?: string[],
 ): Promise<string> {
+  console.log('[buildSystemPrompt] rapportId:', rapportId);
+  console.log('[buildSystemPrompt] tillatteViewIds:', tillatteViewIds);
+
   // Prøv rapport-spesifikk kobling først
   let kobletViewIds: string[] | null = null;
   if (rapportId) {
@@ -768,6 +772,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         console.log('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
         const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews);
+        console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
+        console.log('[systemPrompt] lengde:', basisPrompt.length);
         // FIX 4: token-estimat (ingen-rapport branch)
         console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
         console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
@@ -1007,6 +1013,8 @@ Tilgjengelige visualiseringstyper:
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
       const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews);
+      console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
+      console.log('[systemPrompt] lengde:', basisPrompt.length);
 
       // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
       const slicerValuesSummary = slicerValues
