@@ -237,6 +237,12 @@ function byggWhereKlausul(
   return betingelser.length > 0 ? `WHERE ${betingelser.join(' AND ')}` : '';
 }
 
+// ── Rengjør kolonnenavn — fjern JSON-anførselstegn og SQL-brackets ────────────
+function renKolNavn(navn: string | undefined | null): string {
+  if (!navn) return '';
+  return navn.replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+}
+
 // ── Smart default sorteringsretning ──────────────────────────────────────────
 function defaultSorterRetning(xAkse: string): 'ASC' | 'DESC' {
   const tidskolonner = ['månedsnavn', 'månednavn', 'år', 'måned', 'årmåned'];
@@ -407,20 +413,23 @@ function beregnDomain(
   data: Record<string, unknown>[],
   yKol: string,
 ): [number, number] | ['auto', 'auto'] {
-  console.log('[beregnDomain] kalt med yKol:', JSON.stringify(yKol));
+  // Fjern eventuelle JSON-encoded anførselstegn og SQL-brackets som kan følge med kolonnenavnet
+  const renYKol = yKol.replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
+
+  console.log('[beregnDomain] yKol input:', yKol, '| renYKol:', renYKol);
   console.log('[beregnDomain] data.length:', data.length);
   if (data.length > 0) {
     console.log('[beregnDomain] første rad nøkler:', Object.keys(data[0]));
-    console.log('[beregnDomain] første rad[yKol]:', data[0][yKol]);
+    console.log('[beregnDomain] første rad[renYKol]:', data[0][renYKol]);
   }
-  if (!yKol) return ['auto', 'auto'];
+  if (!renYKol) return ['auto', 'auto'];
   const radNøkler0 = data.length > 0 ? Object.keys(data[0]) : [];
   const verdier = data.map(d => {
     const radNøkler = Object.keys(d);
     // Eksakt match først, deretter case-insensitiv fallback
-    const nøkkel = radNøkler.includes(yKol)
-      ? yKol
-      : (radNøkler.find(rk => rk.toLowerCase() === yKol.toLowerCase()) ?? yKol);
+    const nøkkel = radNøkler.includes(renYKol)
+      ? renYKol
+      : (radNøkler.find(rk => rk.toLowerCase() === renYKol.toLowerCase()) ?? renYKol);
     const v = d[nøkkel];
     if (v === undefined || v === null || v === '') return NaN; // kolonne mangler — utelat
     if (typeof v === 'number') return v;
@@ -429,7 +438,7 @@ function beregnDomain(
   }).filter((v): v is number => isFinite(v) && !isNaN(v));
 
   if (verdier.length === 0) {
-    console.warn('[beregnDomain] ingen gyldige verdier for yKol:', yKol,
+    console.warn('[beregnDomain] ingen gyldige verdier for renYKol:', renYKol,
       '| faktiske nøkler:', radNøkler0.join(', '));
     return ['auto', 'auto'];
   }
@@ -1155,9 +1164,9 @@ export default function RapportInteraktivPage() {
       setForslag(f);
       setAktivData(f.data ?? []);
 
-      const dataCols = f.data?.[0] ? Object.keys(f.data[0]) : [];
-      const xAkse = f.xAkse ?? dataCols[0] ?? '';
-      const yAkse = f.yAkse ?? dataCols[1] ?? dataCols[0] ?? '';
+      const dataCols = f.data?.[0] ? Object.keys(f.data[0]).map(renKolNavn) : [];
+      const xAkse = renKolNavn(f.xAkse) || dataCols[0] || '';
+      const yAkse = renKolNavn(f.yAkse) || dataCols[1] || dataCols[0] || '';
 
       setConfig({
         visualType: f.visualType, xAkse, yAkse,
@@ -1363,11 +1372,10 @@ export default function RapportInteraktivPage() {
       // Steg 3: Finn xAkse/yAkse fra kolonnetyper (lokale variabler)
       const alleKolonnerMedDatatype = alleKolonner as (typeof alleKolonner[0] & { datatype?: string })[];
       console.log('[Designer] alle kolonnetyper:', alleKolonnerMedDatatype.map(k => `${k.kolonne_navn}:${k.kolonne_type}(${k.datatype ?? '?'})`).join(', '));
-      const xAkse = alleKolonner.find(k => k.kolonne_type === 'dimensjon')?.kolonne_navn ?? '';
+      const xAkse = renKolNavn(alleKolonner.find(k => k.kolonne_type === 'dimensjon')?.kolonne_navn);
       const numericDatatypes = ['int','bigint','decimal','float','numeric','money','smallmoney','smallint','tinyint','real'];
-      const yAkse = alleKolonner.find(k => k.kolonne_type === 'measure')?.kolonne_navn
-        ?? alleKolonnerMedDatatype.find(k => numericDatatypes.includes((k.datatype ?? '').toLowerCase()))?.kolonne_navn
-        ?? '';
+      const yAkse = renKolNavn(alleKolonner.find(k => k.kolonne_type === 'measure')?.kolonne_navn
+        ?? alleKolonnerMedDatatype.find(k => numericDatatypes.includes((k.datatype ?? '').toLowerCase()))?.kolonne_navn);
       console.log('[Designer] valgte kolonner:', { xAkse, yAkse });
 
       if (!xAkse || !yAkse) {
@@ -1668,8 +1676,8 @@ export default function RapportInteraktivPage() {
 
       const nyConfig: RedigertConfig = {
         visualType:     (cfg.visualType as string) ?? 'bar',
-        xAkse:          (cfg.xAkse as string) ?? '',
-        yAkse:          (cfg.yAkse as string) ?? '',
+        xAkse:          renKolNavn(cfg.xAkse as string),
+        yAkse:          renKolNavn(cfg.yAkse as string),
         aggregering:    (cfg.aggregering as string) ?? 'SUM',
         grupperPaa:     (cfg.grupperPaa as string | null) ?? null,
         ekstraKolonner:  (cfg.ekstraKolonner as string[]) ?? [],
