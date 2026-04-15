@@ -504,6 +504,7 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
           contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
+          cursor={{ fill: 'rgba(255,255,255,0.06)' }}
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
@@ -568,6 +569,7 @@ function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: {
           contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
+          cursor={{ fill: 'rgba(255,255,255,0.06)' }}
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
@@ -695,6 +697,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
           }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
+          cursor={{ fill: 'rgba(255,255,255,0.06)' }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={((value: unknown, name: unknown) => {
             const navnStr = String(name ?? '');
@@ -818,6 +821,7 @@ function PieChart({ data, xCol, yCol, formaterVerdi }: { data: Record<string,unk
           contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
+          cursor={{ fill: 'rgba(255,255,255,0.06)' }}
         />
         <Legend
           formatter={(value) => (
