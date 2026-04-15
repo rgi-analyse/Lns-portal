@@ -1591,8 +1591,8 @@ export default function RapportInteraktivPage() {
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
       } else if (forslag?.sql) {
-        // Bruk original AI-SQL som base — bevarer alle WHERE-betingelser (BETWEEN, Kontonr, etc.)
-        // Erstatt ORDER BY og sørg for at sorteringskolonne finnes i GROUP BY og SELECT.
+        // Bruk original AI-SQL som base — erstatt WHERE med brukerens aktive filtre,
+        // bevar GROUP BY og sørg for at sorteringskolonne finnes i SELECT/GROUP BY.
         const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
         const råKol = cfg.sorterPaa ?? cfg.xAkse;
         // månedsnavn sorteres via [måned] (INT) — ikke alfabetisk på navnekolonnen
@@ -1600,7 +1600,26 @@ export default function RapportInteraktivPage() {
           ? 'måned'
           : råKol;
 
+        // Fjern ORDER BY fra original SQL
         let baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+
+        // Erstatt original WHERE-klausul med nåværende aktiveFiltre (inkl. brukerendringer).
+        // Finn WHERE- og GROUP BY-posisjon for å splice riktig.
+        const whereMatch   = /\bWHERE\b/i.exec(baseUtenOrder);
+        const groupByMatch = /\bGROUP\s+BY\b/i.exec(baseUtenOrder);
+        if (whereMatch) {
+          const beforeWhere = baseUtenOrder.slice(0, whereMatch.index).trimEnd();
+          const afterWhere  = groupByMatch ? baseUtenOrder.slice(groupByMatch.index) : '';
+          baseUtenOrder = `${beforeWhere}${where ? ' ' + where : ''} ${afterWhere}`.replace(/\s+/g, ' ').trim();
+        } else if (where) {
+          // Ingen original WHERE — sett inn foran GROUP BY (eller på slutten)
+          if (groupByMatch) {
+            baseUtenOrder = `${baseUtenOrder.slice(0, groupByMatch.index).trimEnd()} ${where} ${baseUtenOrder.slice(groupByMatch.index)}`.replace(/\s+/g, ' ').trim();
+          } else {
+            baseUtenOrder = `${baseUtenOrder} ${where}`.trim();
+          }
+        }
+        console.log('[hentData] where fra aktiveFiltre:', where || '(ingen)');
 
         // Legg til sorteringskolonne i GROUP BY (og SELECT) hvis den mangler.
         // Azure SQL krever at ORDER BY-kolonner er i SELECT/GROUP BY.
