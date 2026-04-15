@@ -25,7 +25,7 @@ interface RapportForslag {
   xAkse?: string;
   yAkse?: string;
   grupperPaa?: string;
-  sql: string;
+  sql?: string;
   data: Record<string, unknown>[];
   foreslåSlicere?: string[];
   alleViewKolonner?: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[];
@@ -1610,13 +1610,11 @@ export default function RapportInteraktivPage() {
       }
 
       // Steg 4: Sett ALT state på én gang — kolonner, config og forslag er klare
+      // sql settes IKKE for manuell modus — hentData bruker då byggSQL med korrekt GROUP BY
       const nyttForslag: RapportForslag = {
         tittel, beskrivelse,
         viewNavn, visualType: 'bar',
         xAkse, yAkse,
-        sql: prosjektFilter
-          ? `SELECT TOP 100 * FROM ${viewNavn} ${prosjektFilter}`
-          : `SELECT TOP 100 * FROM ${viewNavn}`,
         data: [],
         alleViewKolonner: alleKolonner,
         prosjektNr:          prosjektNr ?? null,
@@ -1858,6 +1856,7 @@ export default function RapportInteraktivPage() {
         console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
       } else {
         sql = byggSQL(cfg, vn, where, kolonnTyperRef.current, kpiUtrykkRef.current);
+        console.log('[hentData manuell] SQL:', sql);
       }
       console.log('[rapport-interaktiv] hentData SQL:', sql);
       const res = await apiFetch('/api/pbi/query-sql', {
