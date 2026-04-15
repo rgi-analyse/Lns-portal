@@ -402,6 +402,49 @@ function exportToCsv(data: Record<string, unknown>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// ── Felles domain-beregning for alle chart-typer ─────────────────────────────
+function beregnDomain(
+  data: Record<string, unknown>[],
+  yKol: string,
+): [number, number] | ['auto', 'auto'] {
+  console.log('[beregnDomain] kalt med yKol:', JSON.stringify(yKol));
+  console.log('[beregnDomain] data.length:', data.length);
+  if (data.length > 0) {
+    console.log('[beregnDomain] første rad nøkler:', Object.keys(data[0]));
+    console.log('[beregnDomain] første rad[yKol]:', data[0][yKol]);
+  }
+  if (!yKol) return ['auto', 'auto'];
+  const radNøkler0 = data.length > 0 ? Object.keys(data[0]) : [];
+  const verdier = data.map(d => {
+    const radNøkler = Object.keys(d);
+    // Eksakt match først, deretter case-insensitiv fallback
+    const nøkkel = radNøkler.includes(yKol)
+      ? yKol
+      : (radNøkler.find(rk => rk.toLowerCase() === yKol.toLowerCase()) ?? yKol);
+    const v = d[nøkkel];
+    if (v === undefined || v === null || v === '') return NaN; // kolonne mangler — utelat
+    if (typeof v === 'number') return v;
+    // Håndter norsk/internasjonal tallformat: mellomrom som tusenskille, komma som desimal
+    return Number(String(v).replace(/\s/g, '').replace(',', '.'));
+  }).filter((v): v is number => isFinite(v) && !isNaN(v));
+
+  if (verdier.length === 0) {
+    console.warn('[beregnDomain] ingen gyldige verdier for yKol:', yKol,
+      '| faktiske nøkler:', radNøkler0.join(', '));
+    return ['auto', 'auto'];
+  }
+  const yMin = Math.min(...verdier);
+  const yMax = Math.max(...verdier);
+  const spenn = Math.abs(yMax - yMin) || Math.abs(yMin) || 1;
+  const pad = spenn * 0.1;
+  const domain: [number, number] = [
+    yMin < 0 ? yMin - pad : 0,
+    yMax > 0 ? yMax + pad : pad,
+  ];
+  console.log('[beregnDomain] domain:', domain, '| yMin:', yMin, '| yMax:', yMax);
+  return domain;
+}
+
 // ── Bar chart ─────────────────────────────────────────────────────────────────
 function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
@@ -416,6 +459,11 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
     grouped[cat][grp] = (grouped[cat][grp] ?? 0) + (Number(r[yCol]) || 0);
   }
   const allVals = categories.flatMap(c => groups.map(g => grouped[c]?.[g] ?? 0));
+  console.log('[BarChart] yCol ved domain-beregning:', yCol);
+  console.log('[BarChart] data.length:', data.length);
+  console.log('[BarChart] data[0]:', data[0]);
+  const stolpeDomain = beregnDomain(data, yCol);
+  console.log('[BarChart] stolpeDomain:', stolpeDomain);
   const maxVal  = Math.max(...allVals, 1);
   const plotW   = W - padL - padR;
   const plotH   = H - padT - padB;
@@ -475,6 +523,11 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
 function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; area?: boolean; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
   const W = 800, H = 400, padL = 80, padR = 20, padT = 20, padB = 60;
+  console.log('[LineChart] yCol ved domain-beregning:', yCol);
+  console.log('[LineChart] data.length:', data.length);
+  console.log('[LineChart] data[0]:', data[0]);
+  const linjeDomain = beregnDomain(data, yCol);
+  console.log('[LineChart] linjeDomain:', linjeDomain);
   const vals   = data.map(r => Number(r[yCol]) || 0);
   const maxVal = Math.max(...vals, 1);
   const plotW  = W - padL - padR;
@@ -552,40 +605,20 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   const harLinjeAkse = harSerier ? linjeSerier.length > 0 : !!linjeKol;
   const behandletData = harSerier ? beregnKumulativ(data, serier ?? []) : data;
 
-  const beregnDomain = (kolonner: string[]): [number, number] | ['auto', 'auto'] => {
-    const verdier = behandletData.flatMap(d => {
-      const radNøkler = Object.keys(d);
-      return kolonner.map(k => {
-        // Eksakt match først, deretter case-insensitiv fallback
-        const nøkkel = radNøkler.includes(k)
-          ? k
-          : (radNøkler.find(rk => rk.toLowerCase() === k.toLowerCase()) ?? k);
-        const v = d[nøkkel];
-        if (typeof v === 'number') return v;
-        // Håndter norsk/internasjonal tallformat: mellomrom som tusenskille, komma som desimal
-        const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.'));
-        return n;
-      }).filter((v): v is number => isFinite(v) && !isNaN(v));
-    });
-    if (verdier.length === 0) {
-      console.warn('[beregnDomain] ingen gyldige verdier for kolonner:', kolonner,
-        '| første rad:', behandletData[0] ? Object.keys(behandletData[0]).join(', ') : '(tom)');
-      return ['auto', 'auto'];
-    }
-    const yMin = Math.min(...verdier);
-    const yMax = Math.max(...verdier);
-    const spenn = Math.abs(yMax - yMin) || Math.abs(yMin) || 1;
-    const pad = spenn * 0.1;
-    return [
-      yMin < 0 ? yMin - pad : 0,   // gå under 0 hvis negative verdier, ellers baser på 0
-      yMax > 0 ? yMax + pad : pad,  // alltid vis litt over 0 (nullinje synlig)
-    ];
+  // Slår sammen domener fra flere kolonner (f.eks. flere serier på samme akse)
+  const beregnFlereKolonner = (kolonner: string[]): [number, number] | ['auto', 'auto'] => {
+    const gyldige = kolonner.filter(k => k !== '');
+    if (gyldige.length === 0) return ['auto', 'auto'];
+    const domains = gyldige.map(k => beregnDomain(behandletData, k));
+    const nums = domains.filter((d): d is [number, number] => typeof d[0] === 'number');
+    if (nums.length === 0) return ['auto', 'auto'];
+    return [Math.min(...nums.map(d => d[0])), Math.max(...nums.map(d => d[1]))];
   };
 
   const stolpeKolonner = harSerier ? stolpeSerier.map(s => s.navn) : [stolpeKol];
   const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn)  : [linjeKol];
-  const stolpeDomain   = beregnDomain(stolpeKolonner);
-  const linjeDomain    = beregnDomain(linjeKolonner);
+  const stolpeDomain   = beregnFlereKolonner(stolpeKolonner);
+  const linjeDomain    = beregnFlereKolonner(linjeKolonner);
 
   return (
     <ResponsiveContainer width="100%" height={400}>
