@@ -1205,11 +1205,14 @@ export default function RapportInteraktivPage() {
       const xAkse = renKolNavn(f.xAkse) || dataCols[0] || '';
       const yAkse = renKolNavn(f.yAkse) || dataCols[1] || dataCols[0] || '';
 
+      const xL0 = xAkse.toLowerCase();
+      const defaultSorterPaa0 = (xL0 === 'månedsnavn' || xL0 === 'månednavn') ? 'årmåned'
+        : xL0 === 'måned' ? 'måned' : null;
       setConfig({
         visualType: f.visualType, xAkse, yAkse,
         aggregering: 'SUM',
         grupperPaa: f.grupperPaa ?? null,
-        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: defaultSorterPaa0, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
       });
 
       {
@@ -1449,10 +1452,13 @@ export default function RapportInteraktivPage() {
         prosjektFilter:      prosjektFilter || null,
       };
 
+      const xLNy = xAkse.toLowerCase();
+      const defaultSorterPaaNy = (xLNy === 'månedsnavn' || xLNy === 'månednavn') ? 'årmåned'
+        : xLNy === 'måned' ? 'måned' : null;
       const nyConfig: RedigertConfig = {
         visualType: 'bar', xAkse, yAkse,
         aggregering: 'SUM', grupperPaa: null,
-        ekstraKolonner: [], kombinertSerier: [], sorterPaa: null, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
+        ekstraKolonner: [], kombinertSerier: [], sorterPaa: defaultSorterPaaNy, sorterRetning: defaultSorterRetning(xAkse), maksRader: 50,
       };
 
       nyRapportAutoFetch.current = true; // Bloker debounced effect under init
@@ -1857,11 +1863,15 @@ export default function RapportInteraktivPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre, autoRefresh]);
 
-  // ── Auto-oppdater sorteringsretning når xAkse endres ────────────────────────
+  // ── Auto-oppdater sorteringsretning og sorterPaa når xAkse endres ────────────
   useEffect(() => {
     if (!config?.xAkse) return;
     const smartRetning = defaultSorterRetning(config.xAkse);
-    setConfig(prev => prev ? { ...prev, sorterRetning: smartRetning } : prev);
+    const xL = config.xAkse.toLowerCase();
+    const smartSorter = (xL === 'månedsnavn' || xL === 'månednavn') ? 'årmåned'
+      : xL === 'måned' ? 'måned'
+      : config.xAkse;
+    setConfig(prev => prev ? { ...prev, sorterRetning: smartRetning, sorterPaa: smartSorter } : prev);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.xAkse]);
 
@@ -2572,7 +2582,12 @@ export default function RapportInteraktivPage() {
                 <div>
                   <label style={labelStyle}>{config.visualType==='table'?'Primærkolonne':'Kategori (X-akse)'}</label>
                   <select value={config.xAkse} onChange={e=>{
-                    const nyCfg = {...config, xAkse: e.target.value};
+                    const nyXAkse = e.target.value;
+                    const xLDd = nyXAkse.toLowerCase();
+                    const nySort = (xLDd === 'månedsnavn' || xLDd === 'månednavn') ? 'årmåned'
+                      : xLDd === 'måned' ? 'måned'
+                      : nyXAkse;
+                    const nyCfg = {...config, xAkse: nyXAkse, sorterPaa: nySort};
                     setConfig(nyCfg);
                     hentData(nyCfg);
                   }} style={selectStyle}>
