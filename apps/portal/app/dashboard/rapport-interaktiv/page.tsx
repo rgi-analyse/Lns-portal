@@ -1168,21 +1168,29 @@ export default function RapportInteraktivPage() {
 
   // ── Hent alle viewkolonner fra metadata når forslag.viewNavn endres ──
   useEffect(() => {
-    if (!forslag?.viewNavn) return;
+    const vn = forslag?.viewNavn;
+    if (!vn) return; // vent til viewNavn er satt
+
     apiFetch('/api/admin/metadata/views', { credentials: 'include' })
       .then(r => r.json())
       .then((views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[]) => {
+        // Bruk lokalt fanget vn — ikke forslag.viewNavn via closure (kan ha endret seg)
         const view = views.find(v =>
-          v.view_name === forslag.viewNavn ||
-          `${v.schema_name}.${v.view_name}` === forslag.viewNavn
+          v.view_name === vn ||
+          `${v.schema_name}.${v.view_name}` === vn ||
+          vn.includes(v.view_name)
         );
         if (view) {
           const kolonner = view.kolonner?.map(k => k.kolonne_navn) ?? [];
           const kpier = view.kpi?.map(k => k.navn) ?? [];
           setViewKolonner([...kolonner, ...kpier]);
+          console.log('[viewKolonner] lastet:', kolonner.length, 'kolonner +', kpier.length, 'KPI-er for', vn);
+        } else {
+          console.warn('[viewKolonner] fant ikke view:', vn, 'blant', views.map(v => v.view_name));
         }
       })
-      .catch(() => {});
+      .catch(e => console.error('[viewKolonner] feil:', e));
+  // Dependency: selve viewNavn-strengen — React sammenligner verdien, ikke forslag-objektreferansen
   }, [forslag?.viewNavn]);
 
   // ── Sekvensielt initialiser fra URL-parametre (Ny rapport-wizard → rapport-interaktiv) ──
