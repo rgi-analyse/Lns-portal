@@ -12,7 +12,7 @@ import html2canvas from 'html2canvas';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ReferenceLine,
+  ReferenceLine, Cell,
   BarChart as RechartBarChart,
 } from 'recharts';
 
@@ -456,15 +456,11 @@ function beregnDomain(
   return domain;
 }
 
-// ── Bar chart (Recharts) ───────────────────────────────────────────────────────
+// ── Bar chart (Recharts positive/negative) ────────────────────────────────────
 function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; grupperPaa?: string | null; yLabel: string; yFormat?: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
   const fmt = (v: number) => formaterVerdi ? formaterVerdi(v, yFormat) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
 
-  console.log('[BarChart] yCol ved domain-beregning:', yCol);
-  console.log('[BarChart] data.length:', data.length);
-  console.log('[BarChart] data[0]:', data[0]);
-  const stolpeDomain = beregnDomain(data, yCol);
-  console.log('[BarChart] stolpeDomain:', stolpeDomain);
+  const domain = beregnDomain(data, yCol);
 
   // Gruppert modus: pivot flat data → { [xCol]: cat, [grp1]: val, [grp2]: val }
   const groups     = grupperPaa ? [...new Set(data.map(r => String(r[grupperPaa] ?? '')))] : null;
@@ -486,9 +482,8 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
       <RechartBarChart
         data={chartData}
         margin={{ top: 10, right: 20, left: 20, bottom: 60 }}
-        stackOffset="sign"
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
         <XAxis
           dataKey={xCol}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
@@ -498,17 +493,16 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
         />
         <YAxis
           type="number"
-          domain={stolpeDomain}
-          allowDataOverflow={true}
+          domain={domain}
           tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
           tickFormatter={fmt}
           label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 11, dy: 50 }}
         />
         <Tooltip
-          contentStyle={{ background: 'var(--navy-dark)', border: '1px solid var(--glass-border)', borderRadius: 8, color: 'var(--text-primary)', fontSize: 12 }}
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
-        <ReferenceLine y={0} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+        <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
 
         {groups ? (
           <>
@@ -516,12 +510,10 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
               <Bar
                 key={grp}
                 dataKey={grp}
-                stackId="stack"
                 fill={COLORS[i % COLORS.length]}
                 opacity={0.85}
                 radius={[2, 2, 0, 0] as [number, number, number, number]}
                 name={grp}
-                background={false}
               />
             ))}
             <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
@@ -529,13 +521,16 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
         ) : (
           <Bar
             dataKey={yCol}
-            stackId="stack"
-            fill="var(--gold)"
-            opacity={0.85}
             radius={[2, 2, 0, 0] as [number, number, number, number]}
             name={yLabel || yCol}
-            background={false}
-          />
+          >
+            {chartData.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={Number(entry[yCol]) >= 0 ? 'var(--gull)' : '#e05c5c'}
+              />
+            ))}
+          </Bar>
         )}
       </RechartBarChart>
     </ResponsiveContainer>
