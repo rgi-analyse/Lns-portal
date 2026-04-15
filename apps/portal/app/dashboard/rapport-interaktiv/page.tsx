@@ -63,6 +63,7 @@ interface AktivFilter {
   kolonne:  string;
   operator: string;
   verdi:    string;
+  verdi2?:  string; // brukes for BETWEEN: [årmåned] BETWEEN verdi AND verdi2
 }
 
 const API    = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -139,6 +140,10 @@ function parseFiltreTilObjekter(
     .map(b => b.replace(/^\(|\)$/g, '').trim()) // fjern parenteser rundt enkeltfiltre
     .filter(b => b.length > 0 && !/\s+OR\s+/i.test(b)) // ignorer OR-betingelser — for komplekse for filter-UI
     .map(b => {
+      // BETWEEN: [kolonne] BETWEEN val1 AND val2
+      const bm = b.match(/^\[?([^\]]+)\]?\s+BETWEEN\s+(\S+)\s+AND\s+(\S+)$/i);
+      if (bm) return { kolonne: bm[1].trim(), operator: 'BETWEEN', verdi: bm[2].trim(), verdi2: bm[3].trim() };
+      // Vanlig: [kolonne] operator verdi
       const m = b.match(/^\[?([^\]]+)\]?\s+(NOT LIKE|LIKE|>=|<=|!=|>|<|=)\s+'?%?([^'%]*?)%?'?$/i);
       if (m) return { kolonne: m[1].trim(), operator: m[2].toUpperCase(), verdi: m[3].trim() };
       return null;
@@ -187,6 +192,8 @@ function byggWhereKlausul(
       if (!f.kolonne) return false;
       // IS NOT NULL / IS NULL trenger ingen verdi
       if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') return true;
+      // BETWEEN krever begge verdier
+      if (f.operator === 'BETWEEN') return !!(f.verdi && f.verdi2);
       if (!f.verdi) return false;
       if (prosjektKolonne && f.kolonne === prosjektKolonne) return false;
       return true;
@@ -194,6 +201,16 @@ function byggWhereKlausul(
     .forEach(f => {
       if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') {
         betingelser.push(`[${f.kolonne}] ${f.operator}`);
+        return;
+      }
+      if (f.operator === 'BETWEEN' && f.verdi2) {
+        const meta = alleViewKolonner?.find(k => k.kolonne_navn === f.kolonne);
+        const erNumerisk = meta?.datatype
+          ? NUMERISK_DATATYPER.has(meta.datatype.toLowerCase())
+          : !isNaN(Number(f.verdi));
+        const v1 = erNumerisk ? f.verdi  : `'${f.verdi}'`;
+        const v2 = erNumerisk ? f.verdi2 : `'${f.verdi2}'`;
+        betingelser.push(`[${f.kolonne}] BETWEEN ${v1} AND ${v2}`);
         return;
       }
       let verdi: string;
@@ -1761,8 +1778,10 @@ export default function RapportInteraktivPage() {
 
   // Filter-badges for topbar — prosjektfilter er alltid låst, brukerfiltre vises separat
   const brukerFilterBadges = aktiveFiltre
-    .filter(f => f.kolonne && f.verdi && f.kolonne !== (forslag.prosjektKolonne ?? ''))
-    .map(f => `${f.kolonne} ${f.operator} ${f.verdi}`);
+    .filter(f => f.kolonne && (f.verdi || f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') && f.kolonne !== (forslag.prosjektKolonne ?? ''))
+    .map(f => f.operator === 'BETWEEN' && f.verdi2
+      ? `${f.kolonne} mellom ${f.verdi} og ${f.verdi2}`
+      : `${f.kolonne} ${f.operator} ${f.verdi}`);
 
   // Y-akse label: KPI-er viser visningsnavn, andre viser aggregering(kolonnenavn)
   const yAkseLabel = kpiUttrykk[config.yAkse]

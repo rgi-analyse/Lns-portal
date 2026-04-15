@@ -29,13 +29,20 @@ export const BASIS_REGLER = `
 - Ved konverteringsfeil: bytt til LIKE-søk, prøv aldri CAST-varianter
 
 ## DATO-RANGE REGLER
-- "hittil i år" / "akkumulert" / "t.o.m. [måned]":
-  ✅ WHERE [årmåned] <= 202604            ← enkel betingelse, fungerer i rapport-designer
+- Bruk årmåned-kolonnen (heltall, f.eks. 202604 for april 2026) for dato-range
   ❌ WHERE (år < 2026) OR (år = 2026 AND måned <= 4)   ← OR-betingelser bryter filter-parsingen
-- Bruk årmåned-kolonnen (heltall, f.eks. 202604 for april 2026) for dato-range:
-  Hittil i år april 2026:     WHERE [årmåned] <= 202604
+- "Hittil i år / pr måned / til og med [måned] i [år]" — Bruk ALLTID BETWEEN:
+  ✅ WHERE [årmåned] BETWEEN 202601 AND 202604
+  Eksempel: "lønnskostnader 2026 pr mars" / "til og med mars 2026" / "januar til mars 2026"
+  → WHERE [årmåned] BETWEEN 202601 AND 202603
+  NB: Bruk ALDRI <= for et spørsmål som nevner et spesifikt år.
+- <= brukes KUN når bruker eksplisitt sier "alle år" eller "akkumulert fra starten" uten å nevne et år:
+  ✅ WHERE [årmåned] <= 202604
+- Eksempler:
+  Hittil i år april 2026:     WHERE [årmåned] BETWEEN 202601 AND 202604
   Fra januar til april:       WHERE [årmåned] BETWEEN 202601 AND 202604
   Fra 2025 til april 2026:    WHERE [årmåned] BETWEEN 202501 AND 202604
+  Akkumulert alle år t.o.m.:  WHERE [årmåned] <= 202604
 - Bruk kolonnene år (int) og måned (int) kun for filtrering på enkelt år/måned
 - ALDRI bruk DATEPART(), YEAR(), MONTH() — viewet har egne dato-kolonner
 - Dimensjonskolonner for tid: år, måned, månedsnavn, årmåned, åruke
