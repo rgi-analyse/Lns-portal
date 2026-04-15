@@ -1173,7 +1173,13 @@ export default function RapportInteraktivPage() {
 
     apiFetch('/api/admin/metadata/views', { credentials: 'include' })
       .then(r => r.json())
-      .then((views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[]) => {
+      .then((res: unknown) => {
+        // API kan returnere ren array eller { views: [...] } / { data: [...] }
+        const views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[] =
+          Array.isArray(res) ? res
+          : Array.isArray((res as Record<string, unknown>).views) ? (res as Record<string, unknown[]>).views as typeof views
+          : Array.isArray((res as Record<string, unknown>).data)  ? (res as Record<string, unknown[]>).data  as typeof views
+          : [];
         // Bruk lokalt fanget vn — ikke forslag.viewNavn via closure (kan ha endret seg)
         const view = views.find(v =>
           v.view_name === vn ||
@@ -1484,7 +1490,17 @@ export default function RapportInteraktivPage() {
               ? `ORDER BY CAST([${sorterKol}] AS INT) ${cfg.sorterRetning}`
               : `ORDER BY [${sorterKol}] ${cfg.sorterRetning}`)
           : '';
-        const baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+        let baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+
+        // Når sorterKol er [måned] (pga. månedsnavn-xAkse) må [måned] også finnes i GROUP BY.
+        // Original AI-SQL har bare [månedsnavn] i GROUP BY — legg til [måned] hvis den mangler.
+        if (sorterKol === 'måned' && /GROUP\s+BY/i.test(baseUtenOrder) && !/GROUP\s+BY\s+[\s\S]*\[?måned\]?(?!\s*s)/i.test(baseUtenOrder)) {
+          baseUtenOrder = baseUtenOrder.replace(
+            /GROUP\s+BY\s+([\s\S]*?)(\s*$)/i,
+            (_, cols) => `GROUP BY ${cols.trim()}, [måned]`,
+          );
+        }
+
         sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
         console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
       } else {
