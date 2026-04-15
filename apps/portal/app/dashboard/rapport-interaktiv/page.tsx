@@ -501,7 +501,9 @@ function BarChart({ data, xCol, yCol, grupperPaa, yLabel, yFormat, formaterVerdi
           label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 11, dy: 50 }}
         />
         <Tooltip
-          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+          itemStyle={{ color: '#ffffff' }}
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
@@ -563,7 +565,9 @@ function LineChart({ data, xCol, yCol, area, yLabel, yFormat, formaterVerdi }: {
           label={{ value: yLabel, angle: -90, position: 'insideLeft', fill: 'var(--text-muted)', fontSize: 11, dy: 50 }}
         />
         <Tooltip
-          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+          itemStyle={{ color: '#ffffff' }}
           formatter={(value: unknown) => [typeof value === 'number' ? fmt(value) : String(value ?? ''), '']}
         />
         <ReferenceLine y={0} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
@@ -687,9 +691,10 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
             background: 'var(--navy-dark)',
             border: '1px solid var(--glass-border)',
             borderRadius: 8,
-            color: 'var(--text-primary)',
             fontSize: 12,
           }}
+          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+          itemStyle={{ color: '#ffffff' }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={((value: unknown, name: unknown) => {
             const navnStr = String(name ?? '');
@@ -810,7 +815,9 @@ function PieChart({ data, xCol, yCol, formaterVerdi }: { data: Record<string,unk
         </Pie>
         <Tooltip
           formatter={(v: unknown, name: unknown) => [fmt(Number(v)), String(name)]}
-          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
+          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+          itemStyle={{ color: '#ffffff' }}
         />
         <Legend
           formatter={(value) => (
