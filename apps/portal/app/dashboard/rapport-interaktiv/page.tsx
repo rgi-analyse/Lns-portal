@@ -70,6 +70,7 @@ interface AktivFilter {
   operator: string;
   verdi:    string;
   verdi2?:  string;    // brukes for BETWEEN: [årmåned] BETWEEN verdi AND verdi2
+  verdier?: string[];  // brukes for IN_LIST: [kolonne] IN (v1, v2, ...)
   erLåst?:  boolean;  // true = låst av workspace-kontekst (prosjektfilter), vises uten ×-knapp
 }
 
@@ -107,6 +108,7 @@ const OPERATORER = [
   { verdi: 'LIKE',     label: 'inneholder' },
   { verdi: 'NOT LIKE', label: 'inneh. ikke' },
   { verdi: 'BETWEEN',  label: 'mellom' },
+  { verdi: 'IN_LIST',  label: 'i liste' },
 ];
 
 const selectStyle: React.CSSProperties = {
@@ -208,6 +210,8 @@ function byggWhereKlausul(
       if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') return true;
       // BETWEEN krever begge verdier
       if (f.operator === 'BETWEEN') return !!(f.verdi && f.verdi2);
+      // IN_LIST krever minst én valgt verdi
+      if (f.operator === 'IN_LIST') return !!(f.verdier && f.verdier.length > 0);
       if (!f.verdi) return false;
       if (prosjektKolonne && f.kolonne === prosjektKolonne) return false;
       return true;
@@ -215,6 +219,11 @@ function byggWhereKlausul(
     .forEach(f => {
       if (f.operator === 'IS NOT NULL' || f.operator === 'IS NULL') {
         betingelser.push(`[${f.kolonne}] ${f.operator}`);
+        return;
+      }
+      if (f.operator === 'IN_LIST' && f.verdier && f.verdier.length > 0) {
+        const liste = f.verdier.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
+        betingelser.push(`[${f.kolonne}] IN (${liste})`);
         return;
       }
       if (f.operator === 'BETWEEN' && f.verdi2) {
@@ -949,6 +958,103 @@ const fvInputStyle: React.CSSProperties = {
   background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
   color: 'var(--text-primary)', borderRadius: 5, outline: 'none',
 };
+
+// ── IN_LIST avkrysningsliste ──────────────────────────────────────────────────
+function InListFilterInput({
+  kolonne, valgte, onChange, viewNavn, prosjektFilter, aktiveFiltre,
+}: {
+  kolonne: string;
+  valgte: string[];
+  onChange: (verdier: string[]) => void;
+  viewNavn?: string | null;
+  prosjektFilter?: string | null;
+  aktiveFiltre?: AktivFilter[];
+}) {
+  const [apiVerdier, setApiVerdier] = useState<string[]>([]);
+  const [laster, setLaster]         = useState(false);
+  const [sok, setSok]               = useState('');
+  const debounceRef                 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hentVerdier = useCallback(async (søkTekst?: string) => {
+    if (!kolonne || !viewNavn) return;
+    setLaster(true);
+    const params = new URLSearchParams({ viewNavn, kolonne, limit: '200', offset: '0' });
+    if (prosjektFilter) params.set('prosjektFilter', prosjektFilter);
+    const andreFiltre = (aktiveFiltre ?? []).filter(f => f.kolonne && f.kolonne !== kolonne);
+    if (andreFiltre.length > 0) params.set('kaskadefiltere', JSON.stringify(andreFiltre));
+    if (søkTekst && søkTekst.length >= 3) params.set('søk', søkTekst);
+    try {
+      const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
+      if (r.ok) {
+        const d = await r.json() as { verdier: unknown[] };
+        setApiVerdier((d.verdier ?? []).map(String));
+      }
+    } catch { /* ignorer */ } finally { setLaster(false); }
+  }, [kolonne, viewNavn, prosjektFilter, JSON.stringify(aktiveFiltre)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { void hentVerdier(); }, [hentVerdier]);
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '4px 8px', marginBottom: 6,
+    background: 'var(--navy)', border: '1px solid var(--glass-border)',
+    borderRadius: 4, color: 'var(--text-primary)', fontSize: 12, outline: 'none',
+    boxSizing: 'border-box',
+  };
+
+  return (
+    <div style={{ minWidth: 200, maxWidth: 300 }}>
+      <input
+        type="text"
+        placeholder="Søk..."
+        value={sok}
+        onChange={e => {
+          const t = e.target.value;
+          setSok(t);
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          if (t.length >= 3) debounceRef.current = setTimeout(() => void hentVerdier(t), 300);
+          else if (t.length === 0) void hentVerdier();
+        }}
+        style={inputStyle}
+      />
+      <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--glass-border)', borderRadius: 4, background: '#0f1c30' }}>
+        {laster && <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)' }}>Laster...</div>}
+        {!laster && apiVerdier.length === 0 && (
+          <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-muted)' }}>Ingen verdier</div>
+        )}
+        {apiVerdier.map((v, i) => (
+          <label key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '3px 8px', cursor: 'pointer', fontSize: 12,
+            color: 'var(--text-primary)', borderBottom: '1px solid var(--glass-bg)',
+          }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--glass-bg)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >
+            <input
+              type="checkbox"
+              checked={valgte.includes(v)}
+              onChange={e => {
+                const ny = e.target.checked ? [...valgte, v] : valgte.filter(x => x !== v);
+                onChange(ny);
+              }}
+              style={{ accentColor: '#f5a623', flexShrink: 0 }}
+            />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+          </label>
+        ))}
+      </div>
+      {valgte.length > 0 && (
+        <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+          {valgte.length} valgt
+          <button type="button" onClick={() => onChange([])}
+            style={{ marginLeft: 8, background: 'none', border: 'none', color: 'rgba(255,100,100,0.7)', cursor: 'pointer', fontSize: 11 }}>
+            Tøm
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface FilterVerdiInputProps {
   kolonne:          string;
@@ -1999,13 +2105,22 @@ export default function RapportInteraktivPage() {
   const oppdaterFilterOperator = (idx: number, operator: string) => {
     const oppdaterte = aktiveFiltre.map((f, i) => {
       if (i !== idx) return f;
-      const { verdi2, ...rest } = f;
-      // Behold verdi2 kun ved BETWEEN, fjern ellers
-      return operator === 'BETWEEN' ? { ...f, operator } : { ...rest, operator };
+      const { verdi2, verdier, ...rest } = f;
+      // Behold verdi2 kun ved BETWEEN, verdier kun ved IN_LIST, fjern ellers
+      if (operator === 'BETWEEN') return { ...rest, operator };
+      if (operator === 'IN_LIST') return { ...rest, operator, verdier: verdier ?? [] };
+      return { ...rest, operator };
     });
     setAktiveFiltre(oppdaterte);
     const cfg = configRef.current;
-    if (aktiveFiltre[idx]?.verdi && cfg) hentData(cfg, oppdaterte);
+    if (aktiveFiltre[idx]?.verdi && cfg && operator !== 'IN_LIST') hentData(cfg, oppdaterte);
+  };
+
+  const oppdaterFilterVerdier = (idx: number, verdier: string[]) => {
+    const oppdaterte = aktiveFiltre.map((f, i) => i === idx ? { ...f, verdier } : f);
+    setAktiveFiltre(oppdaterte);
+    const cfg = configRef.current;
+    if (cfg) hentData(cfg, oppdaterte);
   };
 
   const oppdaterFilterKolonne = (idx: number, kolonne: string) => {
@@ -2446,6 +2561,8 @@ export default function RapportInteraktivPage() {
                 <span style={{ color:'rgba(251,191,36,0.55)', fontSize:11 }}>
                   {filter.operator === 'BETWEEN'
                     ? `mellom ${filter.verdi} og ${filter.verdi2 ?? '?'}`
+                    : filter.operator === 'IN_LIST'
+                      ? `i (${(filter.verdier ?? []).slice(0, 2).join(', ')}${(filter.verdier ?? []).length > 2 ? ` +${(filter.verdier ?? []).length - 2}` : ''})`
                     : `${filter.operator} ${filter.verdi}`}
                 </span>
               </div>
@@ -2472,6 +2589,15 @@ export default function RapportInteraktivPage() {
                     <input type="text" value={filter.verdi2 ?? ''} onChange={e => oppdaterFilterVerdi2(idx, e.target.value)}
                       placeholder="Til..." style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-primary)', borderRadius:4, fontSize:11, padding:'3px 6px', outline:'none', width:72 }} />
                   </>
+                ) : filter.operator === 'IN_LIST' ? (
+                  <InListFilterInput
+                    kolonne={filter.kolonne}
+                    valgte={filter.verdier ?? []}
+                    onChange={verdier => oppdaterFilterVerdier(idx, verdier)}
+                    viewNavn={forslag.viewNavn}
+                    prosjektFilter={forslag.prosjektFilter ?? undefined}
+                    aktiveFiltre={aktiveFiltre.filter((_, filterIdx) => filterIdx !== idx)}
+                  />
                 ) : (
                   <FilterVerdiInput
                     kolonne={filter.kolonne}
