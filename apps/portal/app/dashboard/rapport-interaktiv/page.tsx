@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 
 interface RapportForslag {
@@ -637,7 +638,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
 
   return (
     <ResponsiveContainer width="100%" height={400}>
-      <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }}>
+      <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }} stackOffset="sign">
         <CartesianGrid strokeDasharray="3 3" stroke="var(--glass-border)" />
         <XAxis
           dataKey={xCol}
@@ -688,6 +689,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
           }) as any}
         />
         <Legend wrapperStyle={{ color: 'var(--text-secondary)', fontSize: 12, paddingTop: 16 }} />
+        <ReferenceLine yAxisId="stolpe" y={0} stroke="var(--text-secondary)" strokeWidth={1} />
 
         {harSerier ? (
           <>
@@ -696,6 +698,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
                 key={s.id}
                 yAxisId="stolpe"
                 dataKey={s.navn}
+                stackId="stack"
                 fill={STOLPE_FARGER[i % STOLPE_FARGER.length]}
                 opacity={0.85}
                 radius={[3, 3, 0, 0] as [number, number, number, number]}
@@ -722,6 +725,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
             <Bar
               yAxisId="stolpe"
               dataKey={stolpeKol}
+              stackId="stack"
               fill="var(--gold)"
               opacity={0.85}
               radius={[3, 3, 0, 0] as [number, number, number, number]}
