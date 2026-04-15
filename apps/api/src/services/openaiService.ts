@@ -611,8 +611,15 @@ export async function chat(
           // Tilgangskontroll: avvis SQL som refererer views utenfor brukerens workspace-tilgang
           if (context?.tillatteViewNavn && context.tillatteViewNavn.length > 0) {
             const sqlLower = sqlQuery.toLowerCase();
-            const referertViews = [...sqlLower.matchAll(/\b(vw_\w+)\b/g)].map(m => m[1]);
-            const ikketillatt = referertViews.filter(v => !context.tillatteViewNavn!.includes(v));
+            // Norsk-safe regex: \w stopper ved æøå — bruk eksplisitt tegnklasse
+            const norskBokstav = '[a-zA-ZæøåÆØÅ0-9_]';
+            const sqlViewRegex = new RegExp(`(${norskBokstav}+\\.${norskBokstav}+)`, 'gi');
+            const viewsISql = (sqlLower.match(sqlViewRegex) ?? []).map(v => v.toLowerCase());
+            const referertViews = viewsISql.filter(v => /^(vw_|ai_gold\.)/.test(v));
+            const ikketillatt = referertViews.filter(v =>
+              !context.tillatteViewNavn!.some(t => t.toLowerCase() === v)
+            );
+            console.log('[tilgang] SQL refererer views:', referertViews);
             if (ikketillatt.length > 0) {
               console.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
               result = { error: 'Du har ikke tilgang til denne datakilden.' };
