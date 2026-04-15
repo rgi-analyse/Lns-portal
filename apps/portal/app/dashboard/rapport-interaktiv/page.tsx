@@ -137,10 +137,13 @@ function parseFiltreTilObjekter(
   if (!where) return [];
   // Fjern ytre parenteser rundt hele WHERE-blokken (AI skriver av og til "(a AND b)")
   where = where.replace(/^\s*\(/, '').replace(/\)\s*$/, '').trim();
-  return where
+  // Beskytt BETWEEN val1 AND val2 mot naiv AND-splitting:
+  // "[Årsperiode] BETWEEN 202401 AND 202412" ellers splittes i "[Årsperiode] BETWEEN 202401" og "202412"
+  const beskyttet = where.replace(/\bBETWEEN\s+(\S+)\s+AND\s+(\S+)/gi, 'BETWEEN $1 __BAND__ $2');
+  return beskyttet
     .split(/\s+AND\s+/i)
     .map((b): AktivFilter | null => {
-      b = b.replace(/^\(|\)$/g, '').trim();
+      b = b.replace(/__BAND__/g, 'AND').replace(/^\(|\)$/g, '').trim(); // gjenopprett BETWEEN's AND
       if (!b || /\s+OR\s+/i.test(b)) return null; // ignorer OR-betingelser — for komplekse for filter-UI
 
       // BETWEEN: [kolonne] BETWEEN val1 AND val2
@@ -1157,6 +1160,21 @@ export default function RapportInteraktivPage() {
       alleViewKolonnerAntall: forslag?.alleViewKolonner?.length,
     });
   }, [forslag]);
+
+  // ── Sett låste filtre fra forslag.sql når SQL ankommer eller endres ──
+  // Dekker alle paths: sessionStorage, fraLagret og URL-params.
+  // Behold eksisterende ikke-låste bruker-filtre — erstatt kun låste med fersk parsing.
+  useEffect(() => {
+    if (!forslag?.sql) return;
+    const parsed = parseFiltreTilObjekter(forslag.sql, forslag.prosjektFilter ?? '', forslag.prosjektKolonne);
+    if (parsed.length === 0) return;
+    console.log('[filtre fra SQL] setter', parsed.length, 'låste filtre:', parsed.map(f => f.kolonne));
+    setAktiveFiltre(prev => {
+      const brukerFiltre = prev.filter(f => !f.erLåst); // behold bruker-lagt-til filtre
+      return [...parsed, ...brukerFiltre];
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forslag?.sql]);
 
   useEffect(() => {
     console.log('[Designer] config oppdatert:', {
