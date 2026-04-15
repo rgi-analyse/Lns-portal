@@ -1456,6 +1456,20 @@ export default function RapportInteraktivPage() {
             : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
+      } else if (forslag?.sql) {
+        // Bruk original AI-SQL som base — bevarer alle WHERE-betingelser (BETWEEN, Kontonr, etc.)
+        // som ellers forsvinner fordi parseFiltreTilObjekter ikke håndterer BETWEEN korrekt.
+        // Erstatt kun ORDER BY basert på brukerens sort-konfig.
+        const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
+        const sorterKol = cfg.sorterPaa ?? cfg.xAkse;
+        const orderByStr = sorterKol
+          ? (tallKolonner.has(sorterKol.toLowerCase())
+              ? `ORDER BY CAST([${sorterKol}] AS INT) ${cfg.sorterRetning}`
+              : `ORDER BY [${sorterKol}] ${cfg.sorterRetning}`)
+          : '';
+        const baseUtenOrder = forslag.sql.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, '').trim();
+        sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
+        console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
       } else {
         sql = byggSQL(cfg, vn, where, kolonnTyperRef.current, kpiUtrykkRef.current);
       }
