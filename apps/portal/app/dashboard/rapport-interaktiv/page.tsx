@@ -14,6 +14,7 @@ import {
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ReferenceLine, Cell,
   BarChart as RechartBarChart,
+  PieChart as RechartPieChart, Pie,
 } from 'recharts';
 
 interface RapportForslag {
@@ -761,37 +762,59 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier }: {
   );
 }
 
-// ── Pie chart ─────────────────────────────────────────────────────────────────
-function PieChart({ data, xCol, yCol }: { data: Record<string,unknown>[]; xCol: string; yCol: string }) {
-  const W = 500, H = 320, cx = 160, cy = 150, r = 120;
-  const slices = data.slice(0,8).map(row => ({ label: String(row[xCol]??''), val: Math.abs(Number(row[yCol])||0) }));
-  const total  = slices.reduce((s,x)=>s+x.val,0)||1;
-  let cumAngle = -Math.PI/2;
-  const paths = slices.map((s,i) => {
-    const angle = (s.val/total)*2*Math.PI;
-    const x1=cx+r*Math.cos(cumAngle), y1=cy+r*Math.sin(cumAngle);
-    cumAngle += angle;
-    const x2=cx+r*Math.cos(cumAngle), y2=cy+r*Math.sin(cumAngle);
-    const large = angle>Math.PI?1:0;
-    const mid   = cumAngle - angle/2;
+// ── Pie chart (Recharts) ──────────────────────────────────────────────────────
+const PAI_FARGER = ['#f5a623', '#e05c5c', '#5c9ee0', '#5ce07a', '#e05cc4', '#e0c45c', '#5ce0d8', '#a05ce0'];
+
+function PieChart({ data, xCol, yCol, formaterVerdi }: { data: Record<string,unknown>[]; xCol: string; yCol: string; formaterVerdi?: (v: number, fmt?: string) => string }) {
+  const fmt = (v: number) => formaterVerdi ? formaterVerdi(v) : v.toLocaleString('nb-NO', { maximumFractionDigits: 0 });
+
+  const pieData = data
+    .map(d => ({ name: String(d[xCol] ?? ''), value: Math.abs(Number(d[yCol]) || 0) }))
+    .filter(d => d.value > 0);
+
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
+    cx: number; cy: number; midAngle: number;
+    innerRadius: number; outerRadius: number; percent: number;
+  }) => {
+    if (percent < 0.05) return null;
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
     return (
-      <g key={i}>
-        <path d={`M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`}
-          fill={COLORS[i%COLORS.length]} opacity={0.85}/>
-        {angle>0.3 && <text x={cx+r*0.6*Math.cos(mid)} y={cy+r*0.6*Math.sin(mid)} fontSize={11} textAnchor="middle" fill="rgba(0,0,0,0.75)" fontWeight={600}>{((s.val/total)*100).toFixed(0)}%</text>}
-      </g>
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11}>
+        {`${(percent * 100).toFixed(1)}%`}
+      </text>
     );
-  });
+  };
+
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', maxWidth: 500, margin: '0 auto' }}>
-      {paths}
-      {slices.map((s,i) => (
-        <g key={i}>
-          <rect x={W-160} y={20+i*24} width={12} height={12} fill={COLORS[i%COLORS.length]} rx={2}/>
-          <text x={W-144} y={31+i*24} fontSize={12} fill="var(--text-secondary)">{s.label.slice(0,16)} ({((s.val/total)*100).toFixed(0)}%)</text>
-        </g>
-      ))}
-    </svg>
+    <ResponsiveContainer width="100%" height={400}>
+      <RechartPieChart>
+        <Pie
+          data={pieData}
+          cx="50%"
+          cy="50%"
+          outerRadius="70%"
+          dataKey="value"
+          labelLine={false}
+          label={renderLabel}
+        >
+          {pieData.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={PAI_FARGER[index % PAI_FARGER.length]} opacity={0.9} />
+          ))}
+        </Pie>
+        <Tooltip
+          formatter={(v: unknown, name: unknown) => [fmt(Number(v)), String(name)]}
+          contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 12 }}
+        />
+        <Legend
+          formatter={(value) => (
+            <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{value}</span>
+          )}
+        />
+      </RechartPieChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -2217,7 +2240,7 @@ export default function RapportInteraktivPage() {
       case 'bar':   return <BarChart  data={behandletData} xCol={config.xAkse} yCol={config.yAkse} grupperPaa={config.grupperPaa} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
       case 'line':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
       case 'area':  return <LineChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} area yLabel={yAkseLabel} yFormat={yFormat} formaterVerdi={formaterVerdi}/>;
-      case 'pie':       return <PieChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse}/>;
+      case 'pie':       return <PieChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse} formaterVerdi={formaterVerdi}/>;
       case 'card':      return <CardChart      data={behandletData} yCol={config.yAkse} yLabel={yAkseLabel}/>;
       case 'table':     return null;
       case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''} serier={config.kombinertSerier.length > 0 ? config.kombinertSerier : undefined}/>;
