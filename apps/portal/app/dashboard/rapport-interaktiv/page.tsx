@@ -507,7 +507,7 @@ function computeWaterfallData(
   });
 }
 
-function WaterfallBar(props: unknown) {
+function WaterfallBar(props: Record<string, unknown>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = props as any;
   const { x, y, width, height } = p;
