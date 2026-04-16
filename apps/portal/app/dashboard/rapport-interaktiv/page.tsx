@@ -507,25 +507,34 @@ function computeWaterfallData(
   });
 }
 
-function WaterfallBar(props: Record<string, unknown>) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const p = props as any;
-  const { x, y, width, height } = p;
-  const isTotal    = !!(p.payload?.isTotal);
-  const yKolonne   = p.yKolonne as string;
+interface WaterfallBarProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  value?: unknown;
+  payload?: Record<string, unknown>;
+  yKolonne?: string;
+  isTotal?: boolean;
+  [key: string]: unknown; // tillat ekstra Recharts-props
+}
+
+function WaterfallBar(props: WaterfallBarProps) {
+  const { x, y, width, height, payload, yKolonne } = props;
+  const isTotal = !!(payload?.isTotal);
 
   // ALLTID bruk originalverdien med korrekt fortegn — aldri range-retning.
   // range[1] > range[0] er alltid sant for negative søyler (barTop > barBottom),
   // noe som feilaktig ville gitt grønn farge for negative verdier.
-  const originalVerdi = Number(p.payload?.[yKolonne] ?? 0);
+  const originalVerdi = Number(payload?.[yKolonne ?? ''] ?? 0);
 
   if (x == null || y == null || width == null || height == null) return null;
 
   const fill = isTotal
-    ? '#f5a623'              // Gull — totalrad
+    ? '#f5a623'            // Gull — totalrad
     : originalVerdi >= 0
-      ? '#5ce07a'            // Grønn — positiv yVal
-      : '#e05c5c';           // Rød — negativ yVal
+      ? '#5ce07a'          // Grønn — positiv yVal
+      : '#e05c5c';         // Rød — negativ yVal
 
   const radius: [number, number, number, number] =
     isTotal || originalVerdi >= 0 ? [2, 2, 0, 0] : [0, 0, 2, 2];
@@ -581,7 +590,7 @@ function WaterfallChart({
         />
         <Bar
           dataKey="waterfallRange"
-          shape={(props: unknown) => <WaterfallBar {...(props as object)} yKolonne={yCol} />}
+          shape={(props: unknown) => <WaterfallBar {...(props as WaterfallBarProps)} yKolonne={yCol} />}
           isAnimationActive={false}
         />
       </RechartBarChart>
