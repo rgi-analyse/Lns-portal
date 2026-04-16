@@ -510,29 +510,31 @@ function computeWaterfallData(
 function WaterfallBar(props: unknown) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const p = props as any;
-  const x = p.x, y = p.y, width = p.width, height = p.height, value = p.value;
+  const { x, y, width, height } = p;
+  const isTotal    = !!(p.payload?.isTotal);
+  const yKolonne   = p.yKolonne as string;
 
-  // isTotal ligger på payload (Recharts v3 data-entry) eller direkte på props
-  const isTotal = !!(p.payload?.isTotal || p.isTotal);
+  // ALLTID bruk originalverdien med korrekt fortegn — aldri range-retning.
+  // range[1] > range[0] er alltid sant for negative søyler (barTop > barBottom),
+  // noe som feilaktig ville gitt grønn farge for negative verdier.
+  const originalVerdi = Number(p.payload?.[yKolonne] ?? 0);
 
   if (x == null || y == null || width == null || height == null) return null;
 
-  const range = Array.isArray(value) ? value : [0, Number(value)];
-  const low  = range[0] as number;
-  const high = range[1] as number;
-  const erPositiv = high >= low;
-
   const fill = isTotal
-    ? '#f5a623'    // Gull — alltid for totalrad, uavhengig av fortegn
-    : erPositiv
-      ? '#5ce07a'  // Grønn
-      : '#e05c5c'; // Rød
+    ? '#f5a623'              // Gull — totalrad
+    : originalVerdi >= 0
+      ? '#5ce07a'            // Grønn — positiv yVal
+      : '#e05c5c';           // Rød — negativ yVal
+
+  const radius: [number, number, number, number] =
+    isTotal || originalVerdi >= 0 ? [2, 2, 0, 0] : [0, 0, 2, 2];
 
   return (
     <Rectangle
       x={x} y={y} width={width} height={height}
       fill={fill} opacity={0.9}
-      radius={erPositiv || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
+      radius={radius}
     />
   );
 }
@@ -579,7 +581,7 @@ function WaterfallChart({
         />
         <Bar
           dataKey="waterfallRange"
-          shape={(props: unknown) => <WaterfallBar {...(props as object)} />}
+          shape={(props: unknown) => <WaterfallBar {...(props as object)} yKolonne={yCol} />}
           isAnimationActive={false}
         />
       </RechartBarChart>
