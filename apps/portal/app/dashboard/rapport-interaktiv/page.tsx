@@ -508,16 +508,25 @@ function computeWaterfallData(
 }
 
 function WaterfallBar(props: BarShapeProps & { isTotal?: boolean }) {
-  const { x, y, width, height, isTotal, value } = props;
+  const { x, y, width, height, value } = props;
+  // isTotal kan ligge direkte på props (eksplisitt prop) eller på payload (Recharts v3 data-entry)
+  const isTotal = !!(props.isTotal || (props as unknown as { payload?: { isTotal?: boolean } }).payload?.isTotal);
+
   if (x == null || y == null || width == null || height == null || !value) return null;
   const range = Array.isArray(value) ? value : [0, value as number];
-  const isGain = (range[1] ?? 0) >= (range[0] ?? 0) && !isTotal;
-  const fill = isTotal ? '#f5a623' : isGain ? '#5ce07a' : '#e05c5c';
+  const isPositiv = (range[1] ?? 0) >= (range[0] ?? 0);
+
+  const fill = isTotal
+    ? '#f5a623'    // Gull — alltid for totalrad, uavhengig av fortegn
+    : isPositiv
+      ? '#5ce07a'  // Grønn — positiv
+      : '#e05c5c'; // Rød — negativ
+
   return (
     <Rectangle
       x={x} y={y} width={width} height={Math.max(height, 1)}
       fill={fill} opacity={0.9}
-      radius={isGain || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
+      radius={isPositiv || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
     />
   );
 }
@@ -571,9 +580,9 @@ function WaterfallChart({
         <Bar
           dataKey="waterfallRange"
           shape={(props: unknown) => {
-            const p = props as BarShapeProps & { isTotal?: boolean };
-            // isTotal leses fra payload (dataraden) for å håndtere negativ totalrad korrekt
-            const isTotal = !!(p as unknown as WaterfallDatum).isTotal;
+            const p = props as BarShapeProps & { isTotal?: boolean; payload?: WaterfallDatum };
+            // I Recharts v3 ligger data-entry-properties på payload, ikke direkte på props
+            const isTotal = !!(p.payload?.isTotal || (p as unknown as WaterfallDatum).isTotal);
             return <WaterfallBar {...p} isTotal={isTotal} />;
           }}
           isAnimationActive={false}
