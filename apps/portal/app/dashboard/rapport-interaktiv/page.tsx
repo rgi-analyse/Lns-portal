@@ -568,19 +568,13 @@ function WaterfallChart({
           contentStyle={{ background: 'var(--navy-dark)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
-          formatter={(v: unknown, _name: unknown, props: unknown) => {
+          formatter={(value: unknown, _name: unknown, props: unknown) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const entry = (props as any)?.payload;
-            if (Array.isArray(v)) {
-              const low  = v[0] as number;
-              const high = v[1] as number;
-              // Faktisk verdi med korrekt fortegn
-              const faktisk = entry?.isTotal
-                ? Number(entry[yCol])  // totalrad — bruk originalverdi
-                : high - low;          // vanlig rad — differanse med fortegn
-              return [formaterVerdi(faktisk), entry?.isTotal ? 'Total' : yCol];
-            }
-            return [formaterVerdi(Number(v)), yCol];
+            // Bruk alltid originalverdien fra dataene — high-low gir alltid positivt for negative søyler
+            const originalVerdi = entry ? Number(entry[yCol]) : Number(value);
+            const label = entry?.isTotal ? 'Total' : yCol;
+            return [formaterVerdi(originalVerdi), label];
           }}
         />
         <Bar
