@@ -553,10 +553,17 @@ function WaterfallChart({
           contentStyle={{ background: 'var(--navy-dark)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
-          formatter={(value: unknown) => {
+          formatter={(value: unknown, _name: unknown, props: unknown) => {
             if (Array.isArray(value)) {
-              const diff = (value[1] as number) - (value[0] as number);
-              return [formaterVerdi(diff), yCol];
+              const entry = (props as { payload?: WaterfallDatum })?.payload;
+              const low  = value[0] as number;
+              const high = value[1] as number;
+              // Totalrad: bruk faktisk yKol-verdi (kan være negativ).
+              // Vanlig rad: differanse med fortegn (high - low er alltid ≥ 0 for positiv, ≤ 0 for negativ).
+              const diff = entry?.isTotal
+                ? Number(entry?.[yCol] ?? 0)
+                : high - low;
+              return [formaterVerdi(diff), entry?.isTotal ? 'Total' : yCol];
             }
             return [formaterVerdi(Number(value)), yCol];
           }}
@@ -565,7 +572,9 @@ function WaterfallChart({
           dataKey="waterfallRange"
           shape={(props: unknown) => {
             const p = props as BarShapeProps & { isTotal?: boolean };
-            return <WaterfallBar {...p} isTotal={!!(p as unknown as WaterfallDatum).isTotal} />;
+            // isTotal leses fra payload (dataraden) for å håndtere negativ totalrad korrekt
+            const isTotal = !!(p as unknown as WaterfallDatum).isTotal;
+            return <WaterfallBar {...p} isTotal={isTotal} />;
           }}
           isAnimationActive={false}
         />
