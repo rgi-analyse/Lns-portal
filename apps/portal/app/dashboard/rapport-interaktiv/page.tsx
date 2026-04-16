@@ -532,8 +532,8 @@ function WaterfallChart({
 }) {
   const wData = computeWaterfallData(data, xCol, yCol);
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <RechartBarChart data={wData} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={400}>
+      <RechartBarChart data={wData} margin={{ top: 10, right: 20, left: 20, bottom: 60 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
         <XAxis dataKey={xCol} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
         <YAxis tickFormatter={formaterVerdi} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />

@@ -476,10 +476,21 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       // Kaskadefiltrering: begrens verdier til gyldige gitt aktive filtre fra klient
       if (kaskadefiltere) {
         try {
-          const filtre = JSON.parse(kaskadefiltere) as { kolonne: string; operator: string; verdi: string }[];
+          const filtre = JSON.parse(kaskadefiltere) as { kolonne: string; operator: string; verdi: string; verdi2?: string }[];
           for (const f of filtre) {
             if (!f.kolonne || !f.verdi) continue;
             const kol = `[${f.kolonne.replace(/[\[\]']/g, '')}]`;
+
+            if (f.operator === 'BETWEEN') {
+              // BETWEEN krever begge grenser — uten verdi2 gir det ugyldig SQL
+              if (!f.verdi2) continue;
+              const erNumerisk = !isNaN(Number(f.verdi));
+              const v1 = erNumerisk ? f.verdi : `'${f.verdi.replace(/'/g, "''")}'`;
+              const v2 = erNumerisk ? f.verdi2 : `'${f.verdi2.replace(/'/g, "''")}'`;
+              whereParts.push(`${kol} BETWEEN ${v1} AND ${v2}`);
+              continue;
+            }
+
             const erNumerisk = f.verdi.trim() !== '' && !isNaN(Number(f.verdi));
             const val = (f.operator === 'LIKE' || f.operator === 'NOT LIKE')
               ? `'%${f.verdi.replace(/'/g, "''")}%'`
@@ -506,12 +517,12 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       // Azure SQL: DISTINCT + OFFSET/FETCH må wrappes — DISTINCT kjøres i subquery,
       // deretter pagineres resultatet med OFFSET/FETCH i ytre spørring
       const sql = `
-        SELECT verdi FROM (
+        SELECT [verdi] FROM (
           SELECT DISTINCT [${safeKolonne}] AS verdi
           FROM ${viewNavn}
           ${where}
         ) _d
-        ORDER BY verdi
+        ORDER BY [verdi]
         OFFSET ${offset} ROWS
         FETCH NEXT ${limit} ROWS ONLY
       `.replace(/\s+/g, ' ').trim();
