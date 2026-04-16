@@ -85,7 +85,7 @@ const VIS_TYPE_OPTIONS = [
   { type: 'table',     ikon: '📋', navn: 'Tabell' },
   { type: 'card',      ikon: '🔢', navn: 'Kort' },
   { type: 'kombinert', ikon: '📊', navn: 'Kombinert' },
-  { type: 'waterfall', ikon: '🏔', navn: 'Fossefall' },
+  { type: 'waterfall', ikon: '🏔', navn: 'Waterfall' },
 ];
 
 const AGG_OPTIONS = [
@@ -530,7 +530,18 @@ function WaterfallChart({
   yCol: string;
   formaterVerdi: (v: number) => string;
 }) {
-  const wData = computeWaterfallData(data, xCol, yCol);
+  // Beregn totalrad internt — påvirker ikke global data-state
+  const total = data.reduce((sum, rad) => sum + Number(rad[yCol] ?? 0), 0);
+  const harTotal = data.some(d =>
+    String(d[xCol]).toLowerCase().includes('total') ||
+    String(d[xCol]).toLowerCase().includes('sum') ||
+    !!(d['isTotal'] || d['erTotal']),
+  );
+  const waterfallData = harTotal
+    ? data
+    : [...data, { [xCol]: 'Total', [yCol]: total, isTotal: true }];
+
+  const wData = computeWaterfallData(waterfallData, xCol, yCol);
   return (
     <ResponsiveContainer width="100%" height={400}>
       <RechartBarChart data={wData} margin={{ top: 10, right: 20, left: 20, bottom: 60 }}>

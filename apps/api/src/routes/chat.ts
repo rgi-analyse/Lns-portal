@@ -152,11 +152,12 @@ IKKE FORESLÅ KPI når spørsmålet:
 ## RAPPORT-OPPRETTING
 
 Velg visualType basert på spørsmålet:
-- bar    → sammenligning per kategori (per kunde, per prosjekt)
-- line   → tidsserier og trender (per måned, per uke)
-- table  → detaljdata og lister
-- pie    → andeler og prosenter (maks 8 kategorier)
-- card   → enkeltverdi / nøkkeltall (sum, snitt, antall)
+- bar       → sammenligning per kategori (per kunde, per prosjekt)
+- line      → tidsserier og trender (per måned, per uke)
+- table     → detaljdata og lister
+- pie       → andeler og prosenter (maks 8 kategorier)
+- card      → enkeltverdi / nøkkeltall (sum, snitt, antall)
+- waterfall → fossefall/waterfall-diagram for å vise hvordan verdier bygger seg opp eller ned. Perfekt for resultatregnskap, budsjettavvik og kostnadsanalyse. Trigger-ord: fossefall, waterfall, bygger opp, bidrag, resultat, margin, fra-til.
 
 ## GENERELLE PRINSIPPER
 - Svar alltid på norsk
