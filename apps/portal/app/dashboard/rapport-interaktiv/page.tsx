@@ -369,8 +369,12 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   const groupBy = erAggregert ? `GROUP BY ${grpKols}${ekstraGroupBy}` : '';
   // Default: sorter på x-aksen (ikke y-aksen). månedsnavn sorteres via [måned] (INT).
+  // Når sorterPaa er yAkse og kolonnen er aggregert: bruk aggregeringsuttrykket direkte
+  // for å unngå SQL-feil (ORDER BY [Beløp] er ugyldig — kolonnen finnes bare som SUM([Beløp])).
   const orderBy = cfg.sorterPaa
-    ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning)
+    ? (erAggregert && cfg.sorterPaa === cfg.yAkse
+        ? `ORDER BY ${yUttrykk} ${cfg.sorterRetning}`
+        : byggOrderBy(cfg.sorterPaa, cfg.sorterRetning))
     : erMånedsnavn
       ? `ORDER BY CAST([årmåned] AS INT) ${cfg.sorterRetning}`
       : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
@@ -2959,7 +2963,9 @@ export default function RapportInteraktivPage() {
                       if (!p) return p;
                       // Auto-switch til COUNT om valgt kolonne er dimensjon/dato/id
                       const foreslåttAgg = (type === 'measure' || !type) ? p.aggregering : (p.aggregering === 'SUM' || p.aggregering === 'AVG' || p.aggregering === 'MEDIAN' ? 'COUNT' : p.aggregering);
-                      return { ...p, yAkse: col, aggregering: foreslåttAgg };
+                      // Hvis sortering pekte på gammelt yAkse, flytt den til nytt yAkse
+                      const nySorterPaa = p.sorterPaa === p.yAkse ? col : p.sorterPaa;
+                      return { ...p, yAkse: col, aggregering: foreslåttAgg, sorterPaa: nySorterPaa };
                     });
                   }} style={selectStyle}>
                     {harTyper ? (
