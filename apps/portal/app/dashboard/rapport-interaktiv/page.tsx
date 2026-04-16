@@ -12,11 +12,11 @@ import html2canvas from 'html2canvas';
 import {
   ComposedChart, Bar, Line, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  ReferenceLine, Cell,
+  ReferenceLine, Cell, Rectangle,
   BarChart as RechartBarChart,
   PieChart as RechartPieChart, Pie,
 } from 'recharts';
-import type { PieLabelRenderProps } from 'recharts';
+import type { PieLabelRenderProps, BarShapeProps } from 'recharts';
 
 interface RapportForslag {
   tittel: string;
@@ -85,6 +85,7 @@ const VIS_TYPE_OPTIONS = [
   { type: 'table',     ikon: '📋', navn: 'Tabell' },
   { type: 'card',      ikon: '🔢', navn: 'Kort' },
   { type: 'kombinert', ikon: '📊', navn: 'Kombinert' },
+  { type: 'waterfall', ikon: '🏔', navn: 'Fossefall' },
 ];
 
 const AGG_OPTIONS = [
@@ -471,6 +472,95 @@ function beregnDomain(
   ];
   console.log('[beregnDomain] domain:', domain, '| yMin:', yMin, '| yMax:', yMax);
   return domain;
+}
+
+// ── Waterfall helpers ─────────────────────────────────────────────────────────
+interface WaterfallDatum {
+  [key: string]: unknown;
+  waterfallRange: [number, number];
+  isTotal: boolean;
+}
+
+function computeWaterfallData(
+  data: Record<string, unknown>[],
+  xKol: string,
+  yKol: string,
+): WaterfallDatum[] {
+  let runningTotal = 0;
+  void xKol; // xKol brukes som dataKey i XAxis, ikke beregning
+  return data.map(entry => {
+    const value = Number(entry[yKol] ?? 0);
+    const isTotal = !!(entry['isTotal'] || entry['erTotal']);
+    let barBottom: number, barTop: number;
+    if (isTotal) {
+      barBottom = Math.min(0, value);
+      barTop    = Math.max(0, value);
+    } else if (value >= 0) {
+      barBottom = runningTotal;
+      barTop    = runningTotal + value;
+    } else {
+      barBottom = runningTotal + value;
+      barTop    = runningTotal;
+    }
+    if (!isTotal) runningTotal += value;
+    return { ...entry, waterfallRange: [barBottom, barTop] as [number, number], isTotal };
+  });
+}
+
+function WaterfallBar(props: BarShapeProps & { isTotal?: boolean }) {
+  const { x, y, width, height, isTotal, value } = props;
+  if (x == null || y == null || width == null || height == null || !value) return null;
+  const range = Array.isArray(value) ? value : [0, value as number];
+  const isGain = (range[1] ?? 0) >= (range[0] ?? 0) && !isTotal;
+  const fill = isTotal ? '#f5a623' : isGain ? '#5ce07a' : '#e05c5c';
+  return (
+    <Rectangle
+      x={x} y={y} width={width} height={Math.max(height, 1)}
+      fill={fill} opacity={0.9}
+      radius={isGain || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
+    />
+  );
+}
+
+function WaterfallChart({
+  data, xCol, yCol, formaterVerdi,
+}: {
+  data: Record<string, unknown>[];
+  xCol: string;
+  yCol: string;
+  formaterVerdi: (v: number) => string;
+}) {
+  const wData = computeWaterfallData(data, xCol, yCol);
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <RechartBarChart data={wData} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.1)" />
+        <XAxis dataKey={xCol} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+        <YAxis tickFormatter={formaterVerdi} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+        <Tooltip
+          cursor={{ fill: 'rgba(255,255,255,0.06)' }}
+          contentStyle={{ background: 'var(--navy-dark)', border: '1px solid var(--glass-border)', borderRadius: '6px' }}
+          labelStyle={{ color: '#ffffff', fontWeight: 600 }}
+          itemStyle={{ color: '#ffffff' }}
+          formatter={(value: unknown) => {
+            if (Array.isArray(value)) {
+              const diff = (value[1] as number) - (value[0] as number);
+              return [formaterVerdi(diff), yCol];
+            }
+            return [formaterVerdi(Number(value)), yCol];
+          }}
+        />
+        <Bar
+          dataKey="waterfallRange"
+          shape={(props: unknown) => {
+            const p = props as BarShapeProps & { isTotal?: boolean };
+            return <WaterfallBar {...p} isTotal={!!(p as unknown as WaterfallDatum).isTotal} />;
+          }}
+          isAnimationActive={false}
+        />
+      </RechartBarChart>
+    </ResponsiveContainer>
+  );
 }
 
 // ── Bar chart (Recharts positive/negative) ────────────────────────────────────
@@ -2464,6 +2554,7 @@ export default function RapportInteraktivPage() {
       case 'card':      return <CardChart      data={behandletData} yCol={config.yAkse} yLabel={yAkseLabel}/>;
       case 'table':     return null;
       case 'kombinert': return <KombinertChart data={behandletData} xCol={config.xAkse} stolpeKol={config.yAkse} linjeKol={config.ekstraKolonner?.[0] ?? ''} serier={config.kombinertSerier.length > 0 ? config.kombinertSerier : undefined} referanseLinje={config.referanseLinje}/>;
+      case 'waterfall': return <WaterfallChart data={behandletData} xCol={config.xAkse} yCol={config.yAkse} formaterVerdi={v => formaterVerdi(v, yFormat)}/>;
       default:          return <BarChart       data={behandletData} xCol={config.xAkse} yCol={config.yAkse} yLabel={yAkseLabel}/>;
     }
   }
