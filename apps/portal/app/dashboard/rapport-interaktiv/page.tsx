@@ -507,26 +507,32 @@ function computeWaterfallData(
   });
 }
 
-function WaterfallBar(props: BarShapeProps & { isTotal?: boolean }) {
-  const { x, y, width, height, value } = props;
-  // isTotal kan ligge direkte på props (eksplisitt prop) eller på payload (Recharts v3 data-entry)
-  const isTotal = !!(props.isTotal || (props as unknown as { payload?: { isTotal?: boolean } }).payload?.isTotal);
+function WaterfallBar(props: unknown) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const p = props as any;
+  const x = p.x, y = p.y, width = p.width, height = p.height, value = p.value;
 
-  if (x == null || y == null || width == null || height == null || !value) return null;
-  const range = Array.isArray(value) ? value : [0, value as number];
-  const isPositiv = (range[1] ?? 0) >= (range[0] ?? 0);
+  // isTotal ligger på payload (Recharts v3 data-entry) eller direkte på props
+  const isTotal = !!(p.payload?.isTotal || p.isTotal);
+
+  if (x == null || y == null || width == null || height == null) return null;
+
+  const range = Array.isArray(value) ? value : [0, Number(value)];
+  const low  = range[0] as number;
+  const high = range[1] as number;
+  const erPositiv = high >= low;
 
   const fill = isTotal
     ? '#f5a623'    // Gull — alltid for totalrad, uavhengig av fortegn
-    : isPositiv
-      ? '#5ce07a'  // Grønn — positiv
-      : '#e05c5c'; // Rød — negativ
+    : erPositiv
+      ? '#5ce07a'  // Grønn
+      : '#e05c5c'; // Rød
 
   return (
     <Rectangle
-      x={x} y={y} width={width} height={Math.max(height, 1)}
+      x={x} y={y} width={width} height={height}
       fill={fill} opacity={0.9}
-      radius={isPositiv || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
+      radius={erPositiv || isTotal ? [2, 2, 0, 0] : [0, 0, 2, 2]}
     />
   );
 }
@@ -563,28 +569,22 @@ function WaterfallChart({
           labelStyle={{ color: '#ffffff', fontWeight: 600 }}
           itemStyle={{ color: '#ffffff' }}
           formatter={(value: unknown, _name: unknown, props: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const entry = (props as any)?.payload;
             if (Array.isArray(value)) {
-              const entry = (props as { payload?: WaterfallDatum })?.payload;
               const low  = value[0] as number;
               const high = value[1] as number;
-              // Totalrad: bruk faktisk yKol-verdi (kan være negativ).
-              // Vanlig rad: differanse med fortegn (high - low er alltid ≥ 0 for positiv, ≤ 0 for negativ).
-              const diff = entry?.isTotal
-                ? Number(entry?.[yCol] ?? 0)
-                : high - low;
-              return [formaterVerdi(diff), entry?.isTotal ? 'Total' : yCol];
+              const faktiskVerdi = entry?.isTotal
+                ? entry[yCol]   // totalrad: originalverdi med fortegn
+                : high - low;   // vanlig rad: differanse med fortegn
+              return [formaterVerdi(faktiskVerdi), entry?.isTotal ? 'Total' : yCol];
             }
             return [formaterVerdi(Number(value)), yCol];
           }}
         />
         <Bar
           dataKey="waterfallRange"
-          shape={(props: unknown) => {
-            const p = props as BarShapeProps & { isTotal?: boolean; payload?: WaterfallDatum };
-            // I Recharts v3 ligger data-entry-properties på payload, ikke direkte på props
-            const isTotal = !!(p.payload?.isTotal || (p as unknown as WaterfallDatum).isTotal);
-            return <WaterfallBar {...p} isTotal={isTotal} />;
-          }}
+          shape={(props: unknown) => <WaterfallBar {...(props as object)} />}
           isAnimationActive={false}
         />
       </RechartBarChart>
