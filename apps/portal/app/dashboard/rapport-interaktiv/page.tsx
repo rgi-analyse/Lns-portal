@@ -1792,9 +1792,10 @@ export default function RapportInteraktivPage() {
             : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
-      } else if (forslag?.sql) {
-        // Bruk original AI-SQL som base — erstatt WHERE med brukerens aktive filtre,
-        // bevar GROUP BY og sørg for at sorteringskolonne finnes i SELECT/GROUP BY.
+      } else if (forslag?.sql && cfg.xAkse === (forslag.xAkse ?? cfg.xAkse) && cfg.yAkse === (forslag.yAkse ?? cfg.yAkse) && cfg.grupperPaa === (forslag.grupperPaa ?? cfg.grupperPaa)) {
+        // Bruk original AI-SQL som base — KUN når x/y/grupperPaa er uendret fra forslaget.
+        // Erstatt WHERE med brukerens aktive filtre, bevar GROUP BY og sørg for at
+        // sorteringskolonne finnes i SELECT/GROUP BY.
         const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
         const råKol = cfg.sorterPaa ?? cfg.xAkse;
         // månedsnavn sorteres via [årmåned] (INT) — sikrer kronologisk rekkefølge over år
@@ -1859,6 +1860,8 @@ export default function RapportInteraktivPage() {
         sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
         console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
       } else {
+        // Manuell modus ELLER x/y/grupperPaa endret fra original forslag → bygg SQL fra cfg
+        console.log('[hentData] bygger SQL fra cfg (xAkse/yAkse endret eller ingen forslag.sql)');
         sql = byggSQL(cfg, vn, where, kolonnTyperRef.current, kpiUtrykkRef.current);
         console.log('[hentData manuell] SQL:', sql);
       }
