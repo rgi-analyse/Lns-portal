@@ -71,6 +71,8 @@ interface AIChatProps {
   øktId?: string;
   /** Rendrer chat som full-side komponent i stedet for flytende widget */
   standaloneMode?: boolean;
+  /** Skjul intern header (brukes når ChatWidget har sin egen header) */
+  hideHeader?: boolean;
   /** Seed meldinger fra historikk ved opplasting av eksisterende samtale */
   initialMessages?: { role: string; content: string }[];
   getVisualsData?: () => Promise<Record<string, string>>;
@@ -96,7 +98,7 @@ function exportToExcel(data: Record<string, unknown>[], filename: string) {
 export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
-  øktId, standaloneMode, initialMessages,
+  øktId, standaloneMode, hideHeader, initialMessages,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
@@ -586,7 +588,7 @@ export default function AIChat({
           }}
         >
           {/* Header */}
-          <div
+          {!hideHeader && <div
             className="flex items-center justify-between px-4 py-3 shrink-0"
             style={{
               background: 'rgba(10,18,35,0.95)',
@@ -684,7 +686,7 @@ export default function AIChat({
                 </button>
               )}
             </div>
-          </div>
+          </div>}
 
           {/* STEG 3 – TTS Innstillinger-panel */}
           {visTTSInstillinger && (

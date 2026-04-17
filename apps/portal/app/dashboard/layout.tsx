@@ -1,11 +1,18 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import TopbarClient from '@/components/TopbarClient';
 import { useTema } from '@/components/ThemeProvider';
+import ChatWidget from '@/components/chat/ChatWidget';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { organisasjonNavn } = useTema();
+  const pathname = usePathname();
+
+  // Rapport-siden har sin egen kontekstuell AIChat-widget (med rapportId, slicere osv.)
+  // — ikke vis global widget der for å unngå dobbel chat-knapp
+  const skjulGlobalWidget = pathname.startsWith('/dashboard/rapport/');
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -42,6 +49,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+
+      {/* Global AI-chat widget — tilgjengelig fra alle sider unntatt rapport */}
+      {!skjulGlobalWidget && <ChatWidget />}
     </div>
   );
 }

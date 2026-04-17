@@ -15,6 +15,8 @@ interface Props {
   aktivtØktId: string | null;
   onVelgSamtale: (øktId: string) => void;
   onNySamtale: () => void;
+  /** Kompakt layout for bruk inne i widget (smalere bredde, mindre padding) */
+  kompaktMode?: boolean;
 }
 
 function formaterDato(iso: string): string {
@@ -34,6 +36,7 @@ export default function SamtaleHistorikkSidebar({
   aktivtØktId,
   onVelgSamtale,
   onNySamtale,
+  kompaktMode = false,
 }: Props) {
   const [samtaler, setSamtaler] = useState<Samtale[]>([]);
   const [kollapset, setKollapset] = useState(false);
@@ -126,7 +129,7 @@ export default function SamtaleHistorikkSidebar({
   return (
     <div
       style={{
-        width: 240,
+        width: kompaktMode ? 200 : 240,
         flexShrink: 0,
         background: 'rgba(10,22,40,0.95)',
         borderRight: '1px solid rgba(255,255,255,0.08)',
@@ -141,7 +144,7 @@ export default function SamtaleHistorikkSidebar({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 12px 8px',
+          padding: kompaktMode ? '8px 10px 6px' : '12px 12px 8px',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >

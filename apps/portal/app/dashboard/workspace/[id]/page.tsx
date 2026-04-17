@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
-import AIChat from '@/components/AIChat';
 import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
@@ -459,7 +458,7 @@ export default function WorkspacePage() {
           </>
         )}
       </div>
-      {lisens.chatAktivert && brukerChatAktivert === true && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
+      {/* Chat-widget leveres globalt fra dashboard/layout.tsx */}
 
       {visNyRapportModal && workspace && (
         <NyRapportModal

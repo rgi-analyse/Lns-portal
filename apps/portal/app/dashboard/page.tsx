@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Clock, FileBarChart2, RefreshCw, Star } from 'lucide-react';
-import AIChat from '@/components/AIChat';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useLisens } from '@/components/LisensProvider';
@@ -473,7 +472,7 @@ export default function DashboardPage() {
           );
         })()}
       </div>
-      {lisens.chatAktivert && brukerChatAktivert === true && <AIChat entraObjectId={entraObjectId} grupper={grupper} />}
+      {/* Chat-widget leveres globalt fra dashboard/layout.tsx */}
     </>
   );
 }
