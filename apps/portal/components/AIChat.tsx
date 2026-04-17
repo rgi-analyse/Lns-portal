@@ -68,6 +68,11 @@ interface AIChatProps {
   aktivSide?: string;
   kanLageRapport?: boolean;
   grupper?: string[];
+  øktId?: string;
+  /** Rendrer chat som full-side komponent i stedet for flytende widget */
+  standaloneMode?: boolean;
+  /** Seed meldinger fra historikk ved opplasting av eksisterende samtale */
+  initialMessages?: { role: string; content: string }[];
   getVisualsData?: () => Promise<Record<string, string>>;
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
@@ -91,11 +96,12 @@ function exportToExcel(data: Record<string, unknown>[], filename: string) {
 export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
+  øktId, standaloneMode, initialMessages,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
   const { organisasjonNavn } = useTema();
-  const [open, setOpen]       = useState(false);
+  const [open, setOpen]       = useState(!!standaloneMode);
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -138,6 +144,23 @@ export default function AIChat({
       setTimeout(() => { inputRef.current?.focus(); }, 100);
     }
   }, [open]);
+
+  // Seed meldinger fra historikk (ved bytte av samtale i standalone-modus)
+  useEffect(() => {
+    if (!initialMessages || initialMessages.length === 0) return;
+    const chatMsgs: ChatMessage[] = initialMessages.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+    const displayMsgs = initialMessages.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+    conversationHistoryRef.current = chatMsgs;
+    setMessages(chatMsgs);
+    setDisplay(displayMsgs);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Registrer entraObjectId i Azure Speech service for auth-header
   useEffect(() => {
@@ -392,6 +415,7 @@ export default function AIChat({
       aktivSide, visualData,
       grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
+      ...(øktId ? { øktId } : {}),
     };
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));
@@ -545,11 +569,14 @@ export default function AIChat({
   };
 
   return (
-    <div className="fixed bottom-6 right-6 flex flex-col items-end gap-3" style={{ zIndex: 10000 }}>
+    <div
+      className={standaloneMode ? 'flex flex-col h-full' : 'fixed bottom-6 right-6 flex flex-col items-end gap-3'}
+      style={standaloneMode ? {} : { zIndex: 10000 }}
+    >
       {/* Chat panel */}
-      {open && (
+      {(standaloneMode || open) && (
         <div
-          className="w-[360px] h-[520px] rounded-2xl flex flex-col overflow-hidden relative"
+          className={standaloneMode ? 'flex flex-col overflow-hidden relative flex-1 w-full' : 'w-[360px] h-[520px] rounded-2xl flex flex-col overflow-hidden relative'}
           style={{
             background: 'rgba(15,25,45,0.92)',
             backdropFilter: 'blur(8px)',
@@ -639,21 +666,23 @@ export default function AIChat({
               >
                 <Settings className="w-3.5 h-3.5" />
               </button>
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded p-1 transition-colors"
-                style={{ color: 'var(--text-muted)' }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                  (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
-                }}
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {!standaloneMode && (
+                <button
+                  onClick={() => setOpen(false)}
+                  className="rounded p-1 transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg-hover)';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)';
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -1112,28 +1141,30 @@ export default function AIChat({
         </div>
       )}
 
-      {/* Toggle button */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-12 h-12 rounded-full shadow-lg transition-all flex items-center justify-center"
-        style={{
-          background: 'var(--gold)',
-          border: 'none',
-          color: 'var(--navy-dark)',
-          boxShadow: '0 4px 20px var(--gold-dim)',
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 24px var(--gold-dim)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px var(--gold-dim)';
-        }}
-        aria-label="Åpne AI-assistent"
-      >
-        {open ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
-      </button>
+      {/* Toggle button — vises kun i widget-modus */}
+      {!standaloneMode && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-12 h-12 rounded-full shadow-lg transition-all flex items-center justify-center"
+          style={{
+            background: 'var(--gold)',
+            border: 'none',
+            color: 'var(--navy-dark)',
+            boxShadow: '0 4px 20px var(--gold-dim)',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 24px var(--gold-dim)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px var(--gold-dim)';
+          }}
+          aria-label="Åpne AI-assistent"
+        >
+          {open ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+        </button>
+      )}
     </div>
   );
 }

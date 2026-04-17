@@ -135,6 +135,7 @@ model ChatHistorikk {
   tidspunkt  DateTime @default(now())
   øktId      String   @db.NVarChar(500)
   tenantSlug String   @default("lns")
+  tittel     String?  @db.NVarChar(200)
 }
 
 model Tenant {

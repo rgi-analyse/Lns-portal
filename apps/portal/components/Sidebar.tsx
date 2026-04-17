@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, LayoutDashboard, Building2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutDashboard, Building2, PanelLeftClose, PanelLeftOpen, MessageSquare } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useTema } from '@/components/ThemeProvider';
+import { harBetaTilgang } from '@/lib/featureFlags';
 
 interface Rapport {
   id: string;
@@ -35,7 +36,8 @@ function projectCode(navn: string): string {
 export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
-  const { authHeaders, grupper } = usePortalAuth();
+  const { authHeaders, grupper, entraObjectId } = usePortalAuth();
+  const betaBruker = harBetaTilgang(entraObjectId);
   const { organisasjonNavn } = useTema();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -173,6 +175,50 @@ export default function Sidebar() {
           <LayoutDashboard className="w-4 h-4 shrink-0" />
           {!collapsed && <span className="font-medium">Dashboard</span>}
         </Link>
+
+        {/* AI Samtaler — kun beta-brukere */}
+        {betaBruker && (
+          <Link
+            href="/dashboard/ai-chat"
+            className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all relative', collapsed && 'justify-center')}
+            style={isActive('/dashboard/ai-chat') ? {
+              background: 'var(--glass-gold-bg)',
+              border: '1px solid var(--glass-gold-border)',
+              color: 'var(--text-primary)',
+              borderLeft: '2px solid var(--gold)',
+              paddingLeft: collapsed ? undefined : '10px',
+            } : {
+              color: 'var(--text-secondary)',
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive('/dashboard/ai-chat')) {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)';
+                (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive('/dashboard/ai-chat')) {
+                (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
+                (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)';
+              }
+            }}
+            title={collapsed ? 'AI Samtaler' : undefined}
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            {!collapsed && <span className="font-medium">AI Samtaler</span>}
+            {!collapsed && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.10em',
+                textTransform: 'uppercase', color: 'var(--gold)',
+                background: 'var(--glass-gold-bg)',
+                border: '1px solid var(--glass-gold-border)',
+                borderRadius: 4, padding: '1px 5px', flexShrink: 0,
+              }}>
+                BETA
+              </span>
+            )}
+          </Link>
+        )}
 
         {/* Workspaces heading */}
         {!collapsed && (

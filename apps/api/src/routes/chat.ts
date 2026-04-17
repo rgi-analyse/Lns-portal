@@ -477,6 +477,7 @@ interface ChatBody {
   visualData?: Record<string, string>;
   kanLageRapport?: boolean;
   grupper?: string[];
+  øktId?: string;
 }
 
 /**
@@ -519,6 +520,55 @@ function rensConversationHistory(messages: ChatMessage[]): ChatMessage[] {
   }
 
   return pass2;
+}
+
+async function genererOgLagreTittel(
+  userId: string,
+  øktId: string,
+  tenantSlug: string,
+  brukerMelding: string,
+  aiMelding: string,
+): Promise<void> {
+  try {
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) return;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Lag en kort tittel (maks 6 ord) som oppsummerer samtalen. Svar kun med tittelen, ingen forklaring.',
+          },
+          {
+            role: 'user',
+            content: `Bruker: ${brukerMelding.slice(0, 300)}\nAI: ${aiMelding.slice(0, 300)}`,
+          },
+        ],
+        max_tokens: 30,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) return;
+    const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const tittel = json.choices?.[0]?.message?.content?.trim().slice(0, 200);
+    if (!tittel) return;
+
+    // Oppdater alle rader i denne økten med tittelen
+    await prisma.$executeRawUnsafe(
+      `UPDATE [ChatHistorikk] SET [tittel] = @P1 WHERE [userId] = @P2 AND [øktId] = @P3 AND [tenantSlug] = @P4`,
+      tittel,
+      userId,
+      øktId,
+      tenantSlug,
+    );
+  } catch {
+    // Ikke kritisk — logg stille
+  }
 }
 
 export async function chatRoutes(fastify: FastifyInstance) {
@@ -942,12 +992,18 @@ Tilgjengelige visualiseringstyper:
         // Lagre samtale i historikk (fire-and-forget)
         if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekst) {
           const iDagDato = new Date().toISOString().slice(0, 10);
-          const øktId = `${entraObjectId}-${iDagDato}`;
+          const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
           prisma.chatHistorikk.createMany({
             data: [
               { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
               { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000),                øktId, tenantSlug },
             ],
+          }).then(async () => {
+            // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
+            const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId, tenantSlug } });
+            if (antallIØkt === 4) {
+              genererOgLagreTittel(entraObjectId!, øktId, tenantSlug, String(sisteBrukermelding), fullAiTekst);
+            }
           }).catch(() => {});
         }
         return;
@@ -1189,14 +1245,112 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       // Lagre samtale i historikk (fire-and-forget)
       if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekstRapport) {
         const iDagDato = new Date().toISOString().slice(0, 10);
-        const øktId = `${entraObjectId}-${iDagDato}`;
+        const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
         prisma.chatHistorikk.createMany({
           data: [
             { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
             { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000),         øktId, tenantSlug },
           ],
+        }).then(async () => {
+          // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
+          const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId, tenantSlug } });
+          if (antallIØkt === 4) {
+            genererOgLagreTittel(entraObjectId!, øktId, tenantSlug, String(sisteBrukermelding), fullAiTekstRapport);
+          }
         }).catch(() => {});
       }
+    },
+  );
+
+  // ── GET /api/chat/samtaler — liste over samtaleøkter for innlogget bruker ──
+  fastify.get(
+    '/api/chat/samtaler',
+    { preHandler: [resolveTenant] },
+    async (request, reply) => {
+      const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+
+      // Hent en rad per øktId (siste rad = nyeste melding i økten)
+      const rader = await prisma.chatHistorikk.findMany({
+        where: { userId: entraObjectId, tenantSlug },
+        orderBy: { tidspunkt: 'desc' },
+        select: { øktId: true, tittel: true, tidspunkt: true },
+      });
+
+      // Dedupliser per øktId — behold første (nyeste) treff
+      const sett = new Set<string>();
+      const samtaler: { øktId: string; tittel: string | null; tidspunkt: Date }[] = [];
+      for (const rad of rader) {
+        if (!sett.has(rad.øktId)) {
+          sett.add(rad.øktId);
+          samtaler.push(rad);
+        }
+      }
+
+      return reply.send(samtaler);
+    },
+  );
+
+  // ── GET /api/chat/samtaler/:øktId — meldinger i en spesifikk samtaleøkt ──
+  fastify.get(
+    '/api/chat/samtaler/:øktId',
+    { preHandler: [resolveTenant] },
+    async (request, reply) => {
+      const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+      const { øktId } = request.params as { øktId: string };
+
+      const meldinger = await prisma.chatHistorikk.findMany({
+        where: { userId: entraObjectId, øktId, tenantSlug },
+        orderBy: { tidspunkt: 'asc' },
+        select: { rolle: true, innhold: true, tidspunkt: true },
+      });
+
+      return reply.send(meldinger);
+    },
+  );
+
+  // ── DELETE /api/chat/samtaler/:øktId — slett en samtaleøkt ──
+  fastify.delete(
+    '/api/chat/samtaler/:øktId',
+    { preHandler: [resolveTenant] },
+    async (request, reply) => {
+      const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+      const { øktId } = request.params as { øktId: string };
+
+      await prisma.chatHistorikk.deleteMany({
+        where: { userId: entraObjectId, øktId, tenantSlug },
+      });
+
+      return reply.send({ ok: true });
+    },
+  );
+
+  // ── PATCH /api/chat/samtaler/:øktId — oppdater tittel på en samtaleøkt ──
+  fastify.patch(
+    '/api/chat/samtaler/:øktId',
+    { preHandler: [resolveTenant] },
+    async (request, reply) => {
+      const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+      const { øktId } = request.params as { øktId: string };
+      const { tittel } = request.body as { tittel?: string };
+      if (!tittel) return reply.code(400).send({ error: 'tittel påkrevd' });
+
+      await prisma.$executeRawUnsafe(
+        `UPDATE [ChatHistorikk] SET [tittel] = @P1 WHERE [userId] = @P2 AND [øktId] = @P3 AND [tenantSlug] = @P4`,
+        tittel.slice(0, 200),
+        entraObjectId,
+        øktId,
+        tenantSlug,
+      );
+
+      return reply.send({ ok: true });
     },
   );
 }
