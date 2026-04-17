@@ -73,6 +73,8 @@ interface AIChatProps {
   standaloneMode?: boolean;
   /** Skjul intern header (brukes når ChatWidget har sin egen header) */
   hideHeader?: boolean;
+  /** Om samtalehistorikk er aktivert for brukeren — styrer om øktId sendes til API */
+  harSamtalehistorikk?: boolean;
   /** Seed meldinger fra historikk ved opplasting av eksisterende samtale */
   initialMessages?: { role: string; content: string }[];
   getVisualsData?: () => Promise<Record<string, string>>;
@@ -98,7 +100,7 @@ function exportToExcel(data: Record<string, unknown>[], filename: string) {
 export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
-  øktId, standaloneMode, hideHeader, initialMessages,
+  øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
@@ -417,7 +419,8 @@ export default function AIChat({
       aktivSide, visualData,
       grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
-      ...(øktId ? { øktId } : {}),
+      // Send øktId kun når samtalehistorikk er aktivert for brukeren
+      ...(øktId && harSamtalehistorikk ? { øktId } : {}),
     };
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));

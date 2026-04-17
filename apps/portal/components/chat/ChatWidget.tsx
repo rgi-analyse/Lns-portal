@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageCircle, Minus, X } from 'lucide-react';
+import { MessageCircle, Minus, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { harBetaTilgang } from '@/lib/featureFlags';
 import { useLisens } from '@/components/LisensProvider';
@@ -21,7 +21,10 @@ export default function ChatWidget() {
   const lisens = useLisens();
   const betaBruker = harBetaTilgang(entraObjectId);
 
+  const harSamtalehistorikk = betaBruker;
+
   const [åpen, setÅpen] = useState(false);
+  const [sidebarSynlig, setSidebarSynlig] = useState(true);
   const [chatKey, setChatKey] = useState(0);
   const [initialMessages, setInitialMessages] = useState<{ role: string; content: string }[] | undefined>(undefined);
 
@@ -109,7 +112,7 @@ export default function ChatWidget() {
   }
 
   // ── Widget-panel (åpent) ─────────────────────────────────────────────────
-  const panelBredd = betaBruker && entraObjectId ? 700 : 460;
+  const panelBredd = harSamtalehistorikk && sidebarSynlig ? 700 : 460;
 
   return (
     <div
@@ -145,6 +148,27 @@ export default function ChatWidget() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Sidebar-toggle — kun synlig for beta-brukere */}
+          {harSamtalehistorikk && (
+            <button
+              onClick={() => setSidebarSynlig(v => !v)}
+              title={sidebarSynlig ? 'Skjul samtalehistorikk' : 'Vis samtalehistorikk'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted, rgba(255,255,255,0.4))',
+                padding: '2px 4px',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))'}
+            >
+              {sidebarSynlig ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+            </button>
+          )}
           <div
             style={{
               width: 26,
@@ -212,7 +236,7 @@ export default function ChatWidget() {
 
       {/* Innhold: sidebar + chat side om side */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        {betaBruker && entraObjectId && (
+        {harSamtalehistorikk && sidebarSynlig && entraObjectId && (
           <SamtaleHistorikkSidebar
             entraObjectId={entraObjectId}
             aktivtØktId={aktivtØktId}
@@ -227,6 +251,7 @@ export default function ChatWidget() {
             entraObjectId={entraObjectId}
             grupper={grupper}
             øktId={aktivtØktId ?? undefined}
+            harSamtalehistorikk={harSamtalehistorikk}
             standaloneMode
             hideHeader
             initialMessages={initialMessages}
