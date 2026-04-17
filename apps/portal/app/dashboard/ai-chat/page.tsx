@@ -17,7 +17,29 @@ interface ChatMelding {
 
 export default function AiChatPage() {
   const { entraObjectId, grupper } = usePortalAuth();
-  const betaBruker = harBetaTilgang(entraObjectId);
+
+  // URL- og localStorage-fallback for beta-tilgang
+  const urlParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const betaViaUrl = urlParams?.get('beta') === 'true';
+  const betaViaStorage = typeof window !== 'undefined'
+    && localStorage.getItem('beta_samtalehistorikk') === 'true';
+
+  const betaViaFlag = harBetaTilgang(entraObjectId);
+  const betaBruker = betaViaFlag || betaViaUrl || betaViaStorage;
+
+  // DEBUG — fjernes etter verifisering
+  console.log('[FEATURE FLAG DEBUG]', {
+    entraObjectId,
+    entraObjectIdType: typeof entraObjectId,
+    entraObjectIdTrimmed: entraObjectId?.trim(),
+    betaViaFlag,
+    betaViaUrl,
+    betaViaStorage,
+    betaBruker,
+    BETA_BRUKERE_match: entraObjectId?.trim() === 'bb012447-096e-447f-8d0e-9052caaa0e1a',
+  });
 
   const iDagDato = new Date().toISOString().slice(0, 10);
   const defaultØktId = entraObjectId ? `${entraObjectId}-${iDagDato}` : undefined;
