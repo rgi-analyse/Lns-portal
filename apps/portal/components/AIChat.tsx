@@ -166,6 +166,7 @@ export default function AIChat({
   };
   // Effektiv øktId: intern overstyrer (rapport-modus), deretter ekstern prop (widget-modus)
   const effektivØktId = internØktId ?? øktId ?? undefined;
+  console.log('[AIChat-debug] render | effektivØktId:', effektivØktId, '| internØktId:', internØktId, '| øktId-prop:', øktId, '| visSidebar:', visSidebar, '| harSamtalehistorikk:', harSamtalehistorikk);
 
   // Ref som alltid holder siste effektivØktId — forhindrer stale closure i send()
   const øktIdRef = useRef(effektivØktId);
@@ -254,8 +255,13 @@ export default function AIChat({
 
   // STEG 3 — Last meldinger fra API når internØktId endres (kun rapport-/sidebar-modus)
   useEffect(() => {
-    if (!visSidebar || !harSamtalehistorikk || !internØktId || !entraObjectId) return;
+    console.log('[AIChat-debug] STEG 3 useEffect kjører | internØktId:', internØktId, '| visSidebar:', visSidebar, '| harSamtalehistorikk:', harSamtalehistorikk, '| entraObjectId:', entraObjectId);
+    if (!visSidebar || !harSamtalehistorikk || !internØktId || !entraObjectId) {
+      console.log('[AIChat-debug] STEG 3 hopper over fetch — mangler:', { visSidebar, harSamtalehistorikk, internØktId, entraObjectId });
+      return;
+    }
 
+    console.log('[AIChat-debug] STEG 3 fetcher meldinger for øktId:', internØktId);
     setHarLastetHistorikk(false);
     conversationHistoryRef.current = [];
     setMessages([]);
@@ -263,20 +269,30 @@ export default function AIChat({
 
     const headers: Record<string, string> = { 'x-entra-object-id': entraObjectId, ...apiHeaders() };
     apiFetch(`/api/chat/samtaler/${encodeURIComponent(internØktId)}`, { headers })
-      .then(res => res.ok ? res.json() : [])
-      .then((meldinger: Array<{ rolle: string; innhold: string }>) => {
-        const chatMsgs: ChatMessage[] = meldinger
+      .then(res => {
+        console.log('[AIChat-debug] STEG 3 HTTP status:', res.status, '| ok:', res.ok);
+        return res.ok ? res.json() : null;
+      })
+      .then((data: { meldinger?: Array<{ rolle: string; innhold: string }> } | Array<{ rolle: string; innhold: string }> | null) => {
+        console.log('[AIChat-debug] STEG 3 rådata fra API:', data);
+        // Støtt både gammelt format (array) og nytt format ({ meldinger: [...] })
+        const meldingerRaw = Array.isArray(data) ? data : (data?.meldinger ?? []);
+        console.log('[AIChat-debug] STEG 3 meldingerRaw etter normalisering:', meldingerRaw.length, 'rader');
+        const chatMsgs: ChatMessage[] = meldingerRaw
           .filter(m => m.rolle === 'user' || m.rolle === 'assistant')
           .map(m => ({ role: m.rolle as 'user' | 'assistant', content: m.innhold }));
         const displayMsgs: DisplayMessage[] = chatMsgs.map(m => ({
           role: m.role as 'user' | 'assistant',
           content: m.content ?? '',
         }));
+        console.log('[AIChat-debug] STEG 3 setter', chatMsgs.length, 'meldinger i state');
         conversationHistoryRef.current = chatMsgs;
         setMessages(chatMsgs);
         setDisplay(displayMsgs);
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error('[AIChat-debug] STEG 3 fetch feilet:', err);
+      })
       .finally(() => setHarLastetHistorikk(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [internØktId, visSidebar, harSamtalehistorikk]);
