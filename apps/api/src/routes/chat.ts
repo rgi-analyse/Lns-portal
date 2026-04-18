@@ -478,6 +478,8 @@ interface ChatBody {
   kanLageRapport?: boolean;
   grupper?: string[];
   øktId?: string;
+  /** Sendes med for å knytte samtalen til en spesifikk rapport i historikken */
+  chatRapportId?: string;
 }
 
 /**
@@ -993,10 +995,11 @@ Tilgjengelige visualiseringstyper:
         if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekst) {
           const iDagDato = new Date().toISOString().slice(0, 10);
           const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
+          const chatRapportId = request.body.chatRapportId ?? null;
           prisma.chatHistorikk.createMany({
             data: [
-              { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
-              { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000),                øktId, tenantSlug },
+              { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug, rapportId: chatRapportId },
+              { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000),                øktId, tenantSlug, rapportId: chatRapportId },
             ],
           }).then(async () => {
             // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
@@ -1246,10 +1249,12 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekstRapport) {
         const iDagDato = new Date().toISOString().slice(0, 10);
         const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
+        // rapportId fra body (chatRapportId) — fallback til rapportId (rapport-siden setter begge)
+        const chatRapportId = request.body.chatRapportId ?? request.body.rapportId ?? null;
         prisma.chatHistorikk.createMany({
           data: [
-            { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug },
-            { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000),         øktId, tenantSlug },
+            { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug, rapportId: chatRapportId },
+            { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000),         øktId, tenantSlug, rapportId: chatRapportId },
           ],
         }).then(async () => {
           // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
@@ -1263,6 +1268,11 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
   );
 
   // ── GET /api/chat/samtaler — liste over samtaleøkter for innlogget bruker ──
+  // Query-params:
+  //   rapportId=<id>      → kun samtaler med matchende rapportId
+  //   rapportId=null      → kun globale samtaler (rapportId IS NULL)
+  //   globaleOnly=true    → alias for rapportId=null
+  //   (ingen param)       → alle samtaler for brukeren
   fastify.get(
     '/api/chat/samtaler',
     { preHandler: [resolveTenant] },
@@ -1270,17 +1280,26 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
+      const query = request.query as Record<string, string | undefined>;
+
+      // Bygg rapportId-filter
+      let rapportIdFilter: { rapportId: string | null } | undefined = undefined;
+      if (query.globaleOnly === 'true' || query.rapportId === 'null') {
+        rapportIdFilter = { rapportId: null };
+      } else if (query.rapportId !== undefined) {
+        rapportIdFilter = { rapportId: query.rapportId };
+      }
 
       // Hent en rad per øktId (siste rad = nyeste melding i økten)
       const rader = await prisma.chatHistorikk.findMany({
-        where: { userId: entraObjectId, tenantSlug },
+        where: { userId: entraObjectId, tenantSlug, ...(rapportIdFilter ?? {}) },
         orderBy: { tidspunkt: 'desc' },
-        select: { øktId: true, tittel: true, tidspunkt: true },
+        select: { øktId: true, tittel: true, tidspunkt: true, rapportId: true },
       });
 
       // Dedupliser per øktId — behold første (nyeste) treff
       const sett = new Set<string>();
-      const samtaler: { øktId: string; tittel: string | null; tidspunkt: Date }[] = [];
+      const samtaler: { øktId: string; tittel: string | null; tidspunkt: Date; rapportId: string | null }[] = [];
       for (const rad of rader) {
         if (!sett.has(rad.øktId)) {
           sett.add(rad.øktId);
@@ -1305,7 +1324,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const meldinger = await prisma.chatHistorikk.findMany({
         where: { userId: entraObjectId, øktId, tenantSlug },
         orderBy: { tidspunkt: 'asc' },
-        select: { rolle: true, innhold: true, tidspunkt: true },
+        select: { rolle: true, innhold: true, tidspunkt: true, rapportId: true },
       });
 
       return reply.send(meldinger);

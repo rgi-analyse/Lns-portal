@@ -136,6 +136,9 @@ model ChatHistorikk {
   øktId      String   @db.NVarChar(500)
   tenantSlug String   @default("lns")
   tittel     String?  @db.NVarChar(200)
+  rapportId  String?  @db.NVarChar(500)
+
+  @@index([userId, rapportId])
 }
 
 model Tenant {
