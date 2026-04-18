@@ -113,8 +113,21 @@ export default function ChatWidget() {
     );
   }
 
+  // Auto-skjul sidebar på små skjermer (< 1100px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1100) setSidebarSynlig(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Widget-panel (åpent) ─────────────────────────────────────────────────
-  const panelBredd = harSamtalehistorikk && sidebarSynlig ? 700 : 460;
+  const panelBredd = harSamtalehistorikk && sidebarSynlig
+    ? 'min(720px, calc(100vw - 48px))'
+    : 'min(480px, calc(100vw - 48px))';
 
   return (
     <div
@@ -123,7 +136,6 @@ export default function ChatWidget() {
         bottom: 24,
         right: 24,
         width: panelBredd,
-        maxWidth: 'calc(100vw - 48px)',
         height: 620,
         maxHeight: 'calc(100vh - 48px)',
         background: 'rgba(12,20,38,0.98)',

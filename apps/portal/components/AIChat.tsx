@@ -131,6 +131,8 @@ export default function AIChat({
   });
   // Intern øktId-styring — brukes i rapport-modus (visSidebar=true)
   const [internØktId, setInternØktId] = useState<string | null>(null);
+  // Synlighet av sidebar i rapport-modus — skjules automatisk på små skjermer
+  const [sidebarSynligIntern, setSidebarSynligIntern] = useState(true);
   // Effektiv øktId: intern overstyrer (rapport-modus), deretter ekstern prop (widget-modus)
   const effektivØktId = internØktId ?? øktId ?? undefined;
 
@@ -182,6 +184,18 @@ export default function AIChat({
   useEffect(() => {
     settEntraObjectId(entraObjectId);
   }, [entraObjectId]);
+
+  // Auto-skjul sidebar på små skjermer i rapport-modus
+  useEffect(() => {
+    if (!visSidebar) return;
+    const handleResize = () => {
+      if (window.innerWidth < 1100) setSidebarSynligIntern(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visSidebar]);
 
   // STEG 2 — Initialiser internØktId: deterministisk per rapport, eller fra ekstern aktivØktId-prop
   useEffect(() => {
@@ -657,8 +671,8 @@ export default function AIChat({
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Sidebar — kun i rapport-modus */}
-          {visSidebar && harSamtalehistorikk && entraObjectId && (
+          {/* Sidebar — kun i rapport-modus, og kun når skjermen er bred nok */}
+          {visSidebar && harSamtalehistorikk && sidebarSynligIntern && entraObjectId && (
             <SamtaleHistorikkSidebar
               entraObjectId={entraObjectId}
               aktivtØktId={internØktId}

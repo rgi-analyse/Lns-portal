@@ -135,7 +135,9 @@ export default function SamtaleHistorikkSidebar({
   return (
     <div
       style={{
-        width: kompaktMode ? 200 : 240,
+        width: kompaktMode ? '220px' : '240px',
+        minWidth: '180px',
+        maxWidth: '260px',
         flexShrink: 0,
         background: 'rgba(10,22,40,0.95)',
         borderRight: '1px solid rgba(255,255,255,0.08)',
