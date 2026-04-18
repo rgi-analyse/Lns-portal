@@ -136,8 +136,15 @@ export default function AIChat({
     stemmNavn: 'nb-NO-PernilleNeural',
     hastighet: 1.0,
   });
+  // Hjelpefunksjon — localStorage-nøkkel per rapport
+  const storageKey = (rId: string) => `aktiv-okt-rapport-${rId}`;
+
   // Intern øktId-styring — brukes i rapport-modus (visSidebar=true)
-  const [internØktId, setInternØktId] = useState<string | null>(null);
+  // Initialiseres fra localStorage så valgt samtale overlever navigering
+  const [internØktId, setInternØktId] = useState<string | null>(() => {
+    if (typeof window === 'undefined' || !rapportId) return null;
+    return localStorage.getItem(`aktiv-okt-rapport-${rapportId}`);
+  });
   // Sporer om historikk-lasting er ferdig (for å unngå flash av velkomst under lasting)
   const [harLastetHistorikk, setHarLastetHistorikk] = useState(!visSidebar);
   // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
@@ -217,15 +224,24 @@ export default function AIChat({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visSidebar]);
 
-  // STEG 2 — Initialiser internØktId: deterministisk per rapport, eller fra ekstern aktivØktId-prop
+  // STEG 2 — Initialiser internØktId: aktivØktId-prop → localStorage → deterministisk default
   useEffect(() => {
-    if (aktivØktId !== undefined) {
-      setInternØktId(aktivØktId ?? null);
+    if (aktivØktId) {
+      setInternØktId(aktivØktId);
+      if (rapportId) localStorage.setItem(storageKey(rapportId), aktivØktId);
       return;
     }
-    if (rapportId && entraObjectId && harSamtalehistorikk) {
-      setInternØktId(genererRapportØktId(entraObjectId, rapportId));
+    if (!rapportId || !entraObjectId || !harSamtalehistorikk) return;
+
+    // Bruk lagret valg fra localStorage hvis det finnes
+    const lagret = localStorage.getItem(storageKey(rapportId));
+    if (lagret) {
+      setInternØktId(lagret);
+      return;
     }
+
+    // Fallback: deterministisk default-økt
+    setInternØktId(genererRapportØktId(entraObjectId, rapportId));
   }, [aktivØktId, rapportId, entraObjectId, harSamtalehistorikk]);
 
   // STEG 3 — Last meldinger fra API når internØktId endres (kun rapport-/sidebar-modus)
@@ -260,16 +276,20 @@ export default function AIChat({
   // Intern sidebar-handler: velg eksisterende samtale
   const velgSamtaleintern = useCallback((øktId: string) => {
     setInternØktId(øktId);
+    if (rapportId) localStorage.setItem(storageKey(rapportId), øktId);
     // STEG 3 useEffect tar seg av lasting
-  }, []);
+  }, [rapportId]);
 
   // Intern sidebar-handler: start ny samtale (tilfeldig øktId, ikke deterministisk)
   const nySamtaleintern = useCallback(() => {
     if (!entraObjectId) return;
-    const nyId = `${entraObjectId}-${new Date().toISOString()}`;
+    const nyId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${entraObjectId}-${new Date().toISOString()}`;
     setInternØktId(nyId);
+    if (rapportId) localStorage.setItem(storageKey(rapportId), nyId);
     // STEG 3 useEffect tømmer display og finner ingen meldinger for ny øktId
-  }, [entraObjectId]);
+  }, [entraObjectId, rapportId]);
 
   // Hent velkomstmelding første gang entraObjectId er tilgjengelig — kun på dashboard
   useEffect(() => {
