@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settings } from 'lucide-react';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch, apiHeaders } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
 import * as XLSX from 'xlsx';
+import SamtaleHistorikkSidebar from '@/components/chat/SamtaleHistorikkSidebar';
+import { genererRapportØktId } from '@/lib/chatØkt';
 
 export interface FilterConfig {
   table: string;
@@ -77,6 +79,10 @@ interface AIChatProps {
   harSamtalehistorikk?: boolean;
   /** Seed meldinger fra historikk ved opplasting av eksisterende samtale */
   initialMessages?: { role: string; content: string }[];
+  /** Ekstern øktId-overstyring (fra ChatWidget — brukes kun i widget-modus) */
+  aktivØktId?: string | null;
+  /** Vis samtalehistorikk-sidebar inne i AIChat (rapport-modus) */
+  visSidebar?: boolean;
   getVisualsData?: () => Promise<Record<string, string>>;
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
@@ -101,6 +107,7 @@ export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
+  aktivØktId, visSidebar = false,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
@@ -122,6 +129,11 @@ export default function AIChat({
     stemmNavn: 'nb-NO-PernilleNeural',
     hastighet: 1.0,
   });
+  // Intern øktId-styring — brukes i rapport-modus (visSidebar=true)
+  const [internØktId, setInternØktId] = useState<string | null>(null);
+  // Effektiv øktId: intern overstyrer (rapport-modus), deretter ekstern prop (widget-modus)
+  const effektivØktId = internØktId ?? øktId ?? undefined;
+
   const bottomRef    = useRef<HTMLDivElement>(null);
   const inputRef     = useRef<HTMLTextAreaElement>(null);
   const abortRef     = useRef<AbortController | null>(null);
@@ -169,6 +181,58 @@ export default function AIChat({
   // Registrer entraObjectId i Azure Speech service for auth-header
   useEffect(() => {
     settEntraObjectId(entraObjectId);
+  }, [entraObjectId]);
+
+  // STEG 2 — Initialiser internØktId: deterministisk per rapport, eller fra ekstern aktivØktId-prop
+  useEffect(() => {
+    if (aktivØktId !== undefined) {
+      setInternØktId(aktivØktId ?? null);
+      return;
+    }
+    if (rapportId && entraObjectId && harSamtalehistorikk) {
+      setInternØktId(genererRapportØktId(entraObjectId, rapportId));
+    }
+  }, [aktivØktId, rapportId, entraObjectId, harSamtalehistorikk]);
+
+  // STEG 3 — Last meldinger fra API når internØktId endres (kun rapport-/sidebar-modus)
+  useEffect(() => {
+    if (!visSidebar || !harSamtalehistorikk || !internØktId || !entraObjectId) return;
+
+    conversationHistoryRef.current = [];
+    setMessages([]);
+    setDisplay([]);
+
+    const headers: Record<string, string> = { 'x-entra-object-id': entraObjectId, ...apiHeaders() };
+    apiFetch(`/api/chat/samtaler/${encodeURIComponent(internØktId)}`, { headers })
+      .then(res => res.ok ? res.json() : [])
+      .then((meldinger: Array<{ rolle: string; innhold: string }>) => {
+        const chatMsgs: ChatMessage[] = meldinger
+          .filter(m => m.rolle === 'user' || m.rolle === 'assistant')
+          .map(m => ({ role: m.rolle as 'user' | 'assistant', content: m.innhold }));
+        const displayMsgs: DisplayMessage[] = chatMsgs.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content ?? '',
+        }));
+        conversationHistoryRef.current = chatMsgs;
+        setMessages(chatMsgs);
+        setDisplay(displayMsgs);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [internØktId, visSidebar, harSamtalehistorikk]);
+
+  // Intern sidebar-handler: velg eksisterende samtale
+  const velgSamtaleintern = useCallback((øktId: string) => {
+    setInternØktId(øktId);
+    // STEG 3 useEffect tar seg av lasting
+  }, []);
+
+  // Intern sidebar-handler: start ny samtale (tilfeldig øktId, ikke deterministisk)
+  const nySamtaleintern = useCallback(() => {
+    if (!entraObjectId) return;
+    const nyId = `${entraObjectId}-${new Date().toISOString()}`;
+    setInternØktId(nyId);
+    // STEG 3 useEffect tømmer display og finner ingen meldinger for ny øktId
   }, [entraObjectId]);
 
   // Hent velkomstmelding første gang entraObjectId er tilgjengelig — kun på dashboard
@@ -419,8 +483,11 @@ export default function AIChat({
       aktivSide, visualData,
       grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
-      // Send øktId kun når samtalehistorikk er aktivert for brukeren
-      ...(øktId && harSamtalehistorikk ? { øktId } : {}),
+      // Send øktId + chatRapportId kun når samtalehistorikk er aktivert
+      ...(harSamtalehistorikk && effektivØktId ? {
+        øktId: effektivØktId,
+        chatRapportId: rapportId ?? null,
+      } : {}),
     };
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));
@@ -581,7 +648,7 @@ export default function AIChat({
       {/* Chat panel */}
       {(standaloneMode || open) && (
         <div
-          className={standaloneMode ? 'flex flex-col overflow-hidden relative flex-1 w-full' : 'w-[360px] h-[520px] rounded-2xl flex flex-col overflow-hidden relative'}
+          className={standaloneMode ? 'flex overflow-hidden flex-1 w-full' : 'w-[360px] h-[520px] rounded-2xl flex overflow-hidden'}
           style={{
             background: 'rgba(15,25,45,0.92)',
             backdropFilter: 'blur(8px)',
@@ -590,6 +657,19 @@ export default function AIChat({
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           }}
         >
+          {/* Sidebar — kun i rapport-modus */}
+          {visSidebar && harSamtalehistorikk && entraObjectId && (
+            <SamtaleHistorikkSidebar
+              entraObjectId={entraObjectId}
+              aktivtØktId={internØktId}
+              onVelgSamtale={velgSamtaleintern}
+              onNySamtale={nySamtaleintern}
+              rapportId={rapportId}
+              kompaktMode
+            />
+          )}
+          {/* Innhold-kolonne: header + meldinger + input */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, position: 'relative' }}>
           {/* Header */}
           {!hideHeader && <div
             className="flex items-center justify-between px-4 py-3 shrink-0"
@@ -1142,6 +1222,8 @@ export default function AIChat({
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
+          </div>
+          {/* /innhold-kolonne */}
           </div>
         </div>
       )}

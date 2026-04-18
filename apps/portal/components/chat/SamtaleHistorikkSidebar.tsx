@@ -17,6 +17,8 @@ interface Props {
   onNySamtale: () => void;
   /** Kompakt layout for bruk inne i widget (smalere bredde, mindre padding) */
   kompaktMode?: boolean;
+  /** Filtrer samtaler på denne rapportId (rapport-modus). Utelatt = alle samtaler. */
+  rapportId?: string;
 }
 
 function formaterDato(iso: string): string {
@@ -37,6 +39,7 @@ export default function SamtaleHistorikkSidebar({
   onVelgSamtale,
   onNySamtale,
   kompaktMode = false,
+  rapportId,
 }: Props) {
   const [samtaler, setSamtaler] = useState<Samtale[]>([]);
   const [kollapset, setKollapset] = useState(false);
@@ -46,7 +49,10 @@ export default function SamtaleHistorikkSidebar({
 
   const hentSamtaler = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/chat/samtaler', {
+      const url = rapportId
+        ? `/api/chat/samtaler?rapportId=${encodeURIComponent(rapportId)}`
+        : '/api/chat/samtaler';
+      const res = await apiFetch(url, {
         headers: { 'x-entra-object-id': entraObjectId, ...apiHeaders() },
       });
       if (res.ok) {
@@ -58,7 +64,7 @@ export default function SamtaleHistorikkSidebar({
     } finally {
       setLaster(false);
     }
-  }, [entraObjectId]);
+  }, [entraObjectId, rapportId]);
 
   useEffect(() => {
     hentSamtaler();

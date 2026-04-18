@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import type { FilterConfig, SlicerConfig } from '@/components/AIChat';
 import LagRapportModal from '@/components/LagRapportModal';
 import { useLisens } from '@/components/LisensProvider';
+import { harBetaTilgang } from '@/lib/featureFlags';
 
 const PowerBIReport = dynamic(() => import('@/components/PowerBIReport'), { ssr: false });
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
@@ -46,6 +47,7 @@ export default function RapportPage() {
   const [error,             setError]             = useState<string | null>(null);
   const [brukerChatAktivert, setBrukerChatAktivert] = useState<boolean | null>(null);
   const lisens = useLisens();
+  const harSamtalehistorikkRapport = harBetaTilgang(entraObjectId);
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
@@ -173,6 +175,8 @@ export default function RapportPage() {
           activeSlicerState={activeSlicerState}
           availableTables={availableTables}
           aktivSide={aktivSide}
+          harSamtalehistorikk={harSamtalehistorikkRapport}
+          visSidebar={harSamtalehistorikkRapport}
           onSetFilter={setFilterConfig}
           onSetSlicer={setSlicerConfig}
           onClearSlicer={setClearSlicerTitle}
