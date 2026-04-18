@@ -147,6 +147,8 @@ export default function AIChat({
   });
   // Sporer om historikk-lasting er ferdig (for å unngå flash av velkomst under lasting)
   const [harLastetHistorikk, setHarLastetHistorikk] = useState(!visSidebar);
+  // Counter som bumpes etter at AI har svart — trigger re-fetch i sidebar
+  const [sidebarRefetchTrigger, setSidebarRefetchTrigger] = useState(0);
   // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
   const [sidebarSynligIntern, setSidebarSynligIntern] = useState(!visSidebar);
   // Effektiv synlighet: ekstern prop overstyrer intern (RapportPage styrer via localStorage)
@@ -640,6 +642,8 @@ export default function AIChat({
             if (autoOpplesing && assistantText) {
               lesOppTekst(assistantText);
             }
+            // Trigger sidebar re-fetch så tittel og sortering oppdateres
+            if (visSidebar) setSidebarRefetchTrigger(prev => prev + 1);
           } else if (chunk.type === 'conversation_history' && chunk.messages) {
             historyReceived = true;
             conversationHistoryRef.current = chunk.messages;
@@ -734,6 +738,7 @@ export default function AIChat({
               onNySamtale={nySamtaleintern}
               rapportId={rapportId}
               kompaktMode
+              refetchTrigger={sidebarRefetchTrigger}
             />
           )}
           {/* Innhold-kolonne: header + meldinger + input */}

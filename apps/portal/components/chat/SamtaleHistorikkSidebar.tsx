@@ -19,6 +19,8 @@ interface Props {
   kompaktMode?: boolean;
   /** Filtrer samtaler på denne rapportId (rapport-modus). Utelatt = alle samtaler. */
   rapportId?: string;
+  /** Bump for å trigge re-fetch — øk med 1 etter at en melding er ferdig */
+  refetchTrigger?: number;
 }
 
 function formaterDato(iso: string): string {
@@ -40,6 +42,7 @@ export default function SamtaleHistorikkSidebar({
   onNySamtale,
   kompaktMode = false,
   rapportId,
+  refetchTrigger,
 }: Props) {
   const [samtaler, setSamtaler] = useState<Samtale[]>([]);
   const [kollapset, setKollapset] = useState(false);
@@ -68,7 +71,7 @@ export default function SamtaleHistorikkSidebar({
 
   useEffect(() => {
     hentSamtaler();
-  }, [hentSamtaler, aktivtØktId]);
+  }, [hentSamtaler, aktivtØktId, refetchTrigger]);
 
   async function slettSamtale(øktId: string, e: React.MouseEvent) {
     e.stopPropagation();
