@@ -693,6 +693,9 @@ export default function AIChat({
                   ? 'min(420px, calc(100vw - 48px))'
                   : '360px',
               height: '520px',
+              maxHeight: visSidebar
+                ? 'calc(100vh - 150px - 24px)'
+                : 'calc(100vh - 48px)',
               transition: 'width 0.2s ease',
             }),
             background: 'rgba(15,25,45,0.92)',
