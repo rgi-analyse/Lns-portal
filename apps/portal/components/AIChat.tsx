@@ -693,6 +693,37 @@ export default function AIChat({
             }}
           >
             <div className="flex items-center gap-2.5">
+              {/* Sidebar-toggle i rapport-modus */}
+              {visSidebar && harSamtalehistorikk && (
+                <button
+                  onClick={() => setSidebarSynligIntern(v => !v)}
+                  title={sidebarSynligIntern ? 'Skjul samtaler' : 'Vis samtaler'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: sidebarSynligIntern
+                      ? 'rgba(245,166,35,0.15)'
+                      : 'rgba(255,255,255,0.06)',
+                    border: sidebarSynligIntern
+                      ? '1px solid rgba(245,166,35,0.4)'
+                      : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '6px',
+                    color: sidebarSynligIntern ? '#f5a623' : 'rgba(255,255,255,0.65)',
+                    cursor: 'pointer',
+                    padding: '5px 9px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <span>Samtaler</span>
+                </button>
+              )}
               <div
                 className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
                 style={{

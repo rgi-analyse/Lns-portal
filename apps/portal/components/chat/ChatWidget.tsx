@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageCircle, Minus, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { MessageCircle, Minus, X } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { harBetaTilgang } from '@/lib/featureFlags';
 import { useLisens } from '@/components/LisensProvider';
@@ -26,7 +26,12 @@ export default function ChatWidget() {
   console.log('[ChatWidget] entraObjectId:', entraObjectId, '| type:', typeof entraObjectId, '| betaBruker:', betaBruker, '| harSamtalehistorikk:', harSamtalehistorikk);
 
   const [åpen, setÅpen] = useState(false);
-  const [sidebarSynlig, setSidebarSynlig] = useState(true);
+  const [sidebarSynlig, setSidebarSynlig] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const lagret = localStorage.getItem('chat-sidebar-synlig');
+    if (lagret !== null) return lagret === 'true';
+    return window.innerWidth >= 1100;
+  });
   const [chatKey, setChatKey] = useState(0);
   const [initialMessages, setInitialMessages] = useState<{ role: string; content: string }[] | undefined>(undefined);
 
@@ -71,16 +76,10 @@ export default function ChatWidget() {
     setChatKey(k => k + 1);
   }, [entraObjectId]);
 
-  // Auto-skjul sidebar på små skjermer (< 1100px) — må ligge FØR conditional returns
+  // Persist sidebar-valg til localStorage
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1100) setSidebarSynlig(false);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    localStorage.setItem('chat-sidebar-synlig', String(sidebarSynlig));
+  }, [sidebarSynlig]);
 
   // Ikke vis widget hvis ikke innlogget eller chat deaktivert
   if (!entraObjectId || !lisens.chatAktivert) return null;
@@ -166,21 +165,31 @@ export default function ChatWidget() {
           {harSamtalehistorikk && (
             <button
               onClick={() => setSidebarSynlig(v => !v)}
-              title={sidebarSynlig ? 'Skjul samtalehistorikk' : 'Vis samtalehistorikk'}
+              title={sidebarSynlig ? 'Skjul samtaler' : 'Vis samtaler'}
               style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-muted, rgba(255,255,255,0.4))',
-                padding: '2px 4px',
-                borderRadius: 4,
                 display: 'flex',
                 alignItems: 'center',
+                gap: '6px',
+                background: sidebarSynlig
+                  ? 'rgba(245,166,35,0.15)'
+                  : 'rgba(255,255,255,0.06)',
+                border: sidebarSynlig
+                  ? '1px solid rgba(245,166,35,0.4)'
+                  : '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px',
+                color: sidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
+                cursor: 'pointer',
+                padding: '5px 9px',
+                fontSize: '12px',
+                fontWeight: 500,
+                transition: 'all 0.15s ease',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)'}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))'}
             >
-              {sidebarSynlig ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Samtaler</span>
             </button>
           )}
           <div
