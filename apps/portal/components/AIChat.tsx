@@ -1326,10 +1326,10 @@ export default function AIChat({
         </div>
       )}
 
-      {/* Toggle button — vises kun i widget-modus */}
-      {!standaloneMode && (
+      {/* Toggle button — vises kun i widget-modus når panelet er lukket */}
+      {!standaloneMode && !open && (
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(true)}
           className="w-12 h-12 rounded-full shadow-lg transition-all flex items-center justify-center"
           style={{
             background: 'var(--gold)',
@@ -1347,7 +1347,7 @@ export default function AIChat({
           }}
           aria-label="Åpne AI-assistent"
         >
-          {open ? <X className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+          <MessageCircle className="w-5 h-5" />
         </button>
       )}
     </div>
