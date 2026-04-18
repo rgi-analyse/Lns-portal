@@ -9,6 +9,7 @@ interface Samtale {
   tittel: string | null;
   tidspunkt: string;
   rapportNavn?: string | null;
+  førsteMelding?: string | null;
 }
 
 interface Props {
@@ -279,7 +280,12 @@ export default function SamtaleHistorikkSidebar({
                         fontWeight: erAktiv ? 600 : 400,
                       }}
                     >
-                      {samtale.tittel ?? 'Ny samtale'}
+                      {samtale.tittel
+                        ?? (samtale.førsteMelding
+                            ? (samtale.førsteMelding.trim().length > 50
+                               ? samtale.førsteMelding.trim().slice(0, 50) + '…'
+                               : samtale.førsteMelding.trim())
+                            : 'Ny samtale')}
                     </div>
                     {samtale.rapportNavn && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>

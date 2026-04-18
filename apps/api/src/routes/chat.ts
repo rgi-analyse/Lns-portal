@@ -524,52 +524,82 @@ function rensConversationHistory(messages: ChatMessage[]): ChatMessage[] {
   return pass2;
 }
 
-async function genererOgLagreTittel(
+async function sikreTittelGenerert(
   userId: string,
   øktId: string,
   tenantSlug: string,
-  brukerMelding: string,
-  aiMelding: string,
 ): Promise<void> {
   try {
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) return;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Lag en kort tittel (maks 6 ord) som oppsummerer samtalen. Svar kun med tittelen, ingen forklaring.',
-          },
-          {
-            role: 'user',
-            content: `Bruker: ${brukerMelding.slice(0, 300)}\nAI: ${aiMelding.slice(0, 300)}`,
-          },
-        ],
-        max_tokens: 30,
-        temperature: 0.3,
-      }),
+    // Skip hvis tittel allerede er satt
+    const eksisterende = await prisma.chatHistorikk.findFirst({
+      where: { userId, øktId, tenantSlug, tittel: { not: null } },
+      select: { tittel: true },
     });
+    if (eksisterende?.tittel) {
+      console.log('[tittel] allerede satt for øktId:', øktId, '→', eksisterende.tittel);
+      return;
+    }
 
-    if (!response.ok) return;
-    const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const tittel = json.choices?.[0]?.message?.content?.trim().slice(0, 200);
-    if (!tittel) return;
+    // Hent første brukermelding
+    const førsteUser = await prisma.chatHistorikk.findFirst({
+      where: { userId, øktId, tenantSlug, rolle: 'user' },
+      orderBy: { tidspunkt: 'asc' },
+      select: { innhold: true },
+    });
+    if (!førsteUser?.innhold) {
+      console.warn('[tittel] ingen brukermelding funnet for øktId:', øktId);
+      return;
+    }
 
-    // Oppdater alle rader i denne økten med tittelen
+    const fallbackTittel = førsteUser.innhold.trim().slice(0, 50);
+    let nyTittel: string = fallbackTittel;
+
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (openaiApiKey) {
+      try {
+        console.log('[tittel] kaller gpt-4o-mini for øktId:', øktId);
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'Lag en kort tittel (maks 6 ord) som oppsummerer meldingen. Svar kun med tittelen, ingen forklaring, ingen anførselstegn.' },
+              { role: 'user', content: førsteUser.innhold.slice(0, 300) },
+            ],
+            max_tokens: 30,
+            temperature: 0.3,
+          }),
+        });
+        if (response.ok) {
+          const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          const fraAPI = json.choices?.[0]?.message?.content?.trim().replace(/[".]/g, '').slice(0, 100);
+          if (fraAPI) {
+            nyTittel = fraAPI;
+            console.log('[tittel] gpt-4o-mini svarte:', nyTittel);
+          } else {
+            console.warn('[tittel] gpt-4o-mini returnerte tom respons, bruker fallback');
+          }
+        } else {
+          console.warn('[tittel] gpt-4o-mini HTTP', response.status, '— bruker fallback');
+        }
+      } catch (err) {
+        console.error('[tittel] gpt-4o-mini kall feilet:', err, '— bruker fallback');
+      }
+    } else {
+      console.warn('[tittel] OPENAI_API_KEY mangler — bruker fallback');
+    }
+
     await prisma.$executeRawUnsafe(
       `UPDATE [ChatHistorikk] SET [tittel] = @P1 WHERE [userId] = @P2 AND [øktId] = @P3 AND [tenantSlug] = @P4`,
-      tittel,
+      nyTittel,
       userId,
       øktId,
       tenantSlug,
     );
-  } catch {
-    // Ikke kritisk — logg stille
+    console.log('[tittel] lagret tittel for øktId:', øktId, '→', nyTittel);
+  } catch (err) {
+    console.error('[tittel] uventet feil:', err);
   }
 }
 
@@ -1008,12 +1038,8 @@ Tilgjengelige visualiseringstyper:
         if (entraObjectId && fullAiTekst) {
           prisma.chatHistorikk.create({
             data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
-          }).then(async () => {
-            // Auto-tittel etter første utveksling (1 user + 1 assistant = 2 rader)
-            const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdGlobal, tenantSlug } });
-            if (antallIØkt === 2) {
-              genererOgLagreTittel(entraObjectId!, øktIdGlobal, tenantSlug, String(sisteBrukermelding), fullAiTekst);
-            }
+          }).then(() => {
+            sikreTittelGenerert(entraObjectId!, øktIdGlobal, tenantSlug);
           }).catch(() => {});
         }
         return;
@@ -1268,12 +1294,8 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       if (entraObjectId && fullAiTekstRapport) {
         prisma.chatHistorikk.create({
           data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
-        }).then(async () => {
-          // Auto-tittel etter første utveksling (1 user + 1 assistant = 2 rader)
-          const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdRapport, tenantSlug } });
-          if (antallIØkt === 2) {
-            genererOgLagreTittel(entraObjectId!, øktIdRapport, tenantSlug, String(sisteBrukermelding), fullAiTekstRapport);
-          }
+        }).then(() => {
+          sikreTittelGenerert(entraObjectId!, øktIdRapport, tenantSlug);
         }).catch(() => {});
       }
     },
@@ -1331,9 +1353,24 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         for (const r of rapporter) rapportMap[r.id] = r.navn;
       }
 
+      // Hent første brukermelding per øktId (brukes som fallback-tittel i UI)
+      const øktIds = samtaler.map(s => s.øktId);
+      const førsteMeldingRader = øktIds.length > 0
+        ? await prisma.chatHistorikk.findMany({
+            where: { userId: entraObjectId, tenantSlug, øktId: { in: øktIds }, rolle: 'user' },
+            orderBy: { tidspunkt: 'asc' },
+            select: { øktId: true, innhold: true },
+          })
+        : [];
+      const førsteMeldingMap: Record<string, string> = {};
+      for (const rad of førsteMeldingRader) {
+        if (!førsteMeldingMap[rad.øktId]) førsteMeldingMap[rad.øktId] = rad.innhold;
+      }
+
       return reply.send(samtaler.map(s => ({
         ...s,
         rapportNavn: s.rapportId ? (rapportMap[s.rapportId] ?? null) : null,
+        førsteMelding: førsteMeldingMap[s.øktId] ?? null,
       })));
     },
   );
