@@ -71,6 +71,17 @@ export default function ChatWidget() {
     setChatKey(k => k + 1);
   }, [entraObjectId]);
 
+  // Auto-skjul sidebar på små skjermer (< 1100px) — må ligge FØR conditional returns
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1100) setSidebarSynlig(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Ikke vis widget hvis ikke innlogget eller chat deaktivert
   if (!entraObjectId || !lisens.chatAktivert) return null;
 
@@ -112,17 +123,6 @@ export default function ChatWidget() {
       </button>
     );
   }
-
-  // Auto-skjul sidebar på små skjermer (< 1100px)
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1100) setSidebarSynlig(false);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── Widget-panel (åpent) ─────────────────────────────────────────────────
   const panelBredd = harSamtalehistorikk && sidebarSynlig
