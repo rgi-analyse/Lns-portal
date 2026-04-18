@@ -94,6 +94,8 @@ interface AIChatProps {
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
   onClearSlicer?: (slicerTitle: string) => void;
+  /** Kalles når AI-svar er ferdig — brukes av ChatWidget til å trigge sidebar-refetch */
+  onResponseComplete?: () => void;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -115,7 +117,7 @@ export default function AIChat({
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
   aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar, brukerNavn,
-  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
+  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer, onResponseComplete,
 }: AIChatProps) {
   const router = useRouter();
   const { organisasjonNavn } = useTema();
@@ -650,6 +652,7 @@ export default function AIChat({
             }
             // Trigger sidebar re-fetch så tittel og sortering oppdateres
             if (visSidebar) setSidebarRefetchTrigger(prev => prev + 1);
+            onResponseComplete?.();
           } else if (chunk.type === 'conversation_history' && chunk.messages) {
             historyReceived = true;
             conversationHistoryRef.current = chunk.messages;

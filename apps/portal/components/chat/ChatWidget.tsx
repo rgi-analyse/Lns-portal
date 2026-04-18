@@ -42,19 +42,19 @@ export default function ChatWidget() {
   const [chatKey, setChatKey] = useState(0);
   const [initialMessages, setInitialMessages] = useState<{ role: string; content: string }[] | undefined>(undefined);
   const [aktivSamtaleMeta, setAktivSamtaleMeta] = useState<AktivSamtaleMeta | null>(null);
+  const [sidebarRefetchTrigger, setSidebarRefetchTrigger] = useState(0);
 
-  const iDagDato = new Date().toISOString().slice(0, 10);
   const [aktivtØktId, setAktivtØktId] = useState<string | null>(
-    entraObjectId ? `${entraObjectId}-${iDagDato}` : null,
+    () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : null,
   );
 
-  // Oppdater øktId når entraObjectId lastes
+  // Sørg for at vi alltid har en UUID-øktId etter mount
   useEffect(() => {
-    if (entraObjectId && !aktivtØktId) {
-      setAktivtØktId(`${entraObjectId}-${iDagDato}`);
+    if (!aktivtØktId) {
+      setAktivtØktId(crypto.randomUUID());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entraObjectId]);
+  }, []);
 
   const velgSamtale = useCallback(async (øktId: string) => {
     if (!entraObjectId) return;
@@ -80,7 +80,7 @@ export default function ChatWidget() {
 
   const nySamtale = useCallback(() => {
     if (!entraObjectId) return;
-    const nyId = `${entraObjectId}-${new Date().toISOString()}`;
+    const nyId = crypto.randomUUID();
     setAktivtØktId(nyId);
     setInitialMessages(undefined);
     setAktivSamtaleMeta(null);
@@ -284,6 +284,7 @@ export default function ChatWidget() {
             onVelgSamtale={velgSamtale}
             onNySamtale={nySamtale}
             kompaktMode
+            refetchTrigger={sidebarRefetchTrigger}
           />
         )}
         <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -328,6 +329,7 @@ export default function ChatWidget() {
               standaloneMode
               hideHeader
               initialMessages={initialMessages}
+              onResponseComplete={() => setSidebarRefetchTrigger(prev => prev + 1)}
             />
           </div>
         </div>

@@ -1009,9 +1009,9 @@ Tilgjengelige visualiseringstyper:
           prisma.chatHistorikk.create({
             data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
           }).then(async () => {
-            // Auto-tittel etter 2. utveksling (bruker+assistant × 2 = 4 rader)
+            // Auto-tittel etter første utveksling (1 user + 1 assistant = 2 rader)
             const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdGlobal, tenantSlug } });
-            if (antallIØkt === 4) {
+            if (antallIØkt === 2) {
               genererOgLagreTittel(entraObjectId!, øktIdGlobal, tenantSlug, String(sisteBrukermelding), fullAiTekst);
             }
           }).catch(() => {});
@@ -1269,9 +1269,9 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         prisma.chatHistorikk.create({
           data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
         }).then(async () => {
-          // Auto-tittel etter 2. utveksling (bruker+assistant × 2 = 4 rader)
+          // Auto-tittel etter første utveksling (1 user + 1 assistant = 2 rader)
           const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdRapport, tenantSlug } });
-          if (antallIØkt === 4) {
+          if (antallIØkt === 2) {
             genererOgLagreTittel(entraObjectId!, øktIdRapport, tenantSlug, String(sisteBrukermelding), fullAiTekstRapport);
           }
         }).catch(() => {});
