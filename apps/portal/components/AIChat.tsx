@@ -83,6 +83,10 @@ interface AIChatProps {
   aktivØktId?: string | null;
   /** Vis samtalehistorikk-sidebar inne i AIChat (rapport-modus) */
   visSidebar?: boolean;
+  /** Kontrollert sidebar-synlighet fra foreldre (rapport-modus) */
+  sidebarSynlig?: boolean;
+  /** Callback når sidebar toggles — brukes til å lagre preferansen i foreldre */
+  onToggleSidebar?: (nyVerdi: boolean) => void;
   getVisualsData?: () => Promise<Record<string, string>>;
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
@@ -107,7 +111,7 @@ export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
-  aktivØktId, visSidebar = false,
+  aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
@@ -131,8 +135,19 @@ export default function AIChat({
   });
   // Intern øktId-styring — brukes i rapport-modus (visSidebar=true)
   const [internØktId, setInternØktId] = useState<string | null>(null);
-  // Synlighet av sidebar i rapport-modus — skjules automatisk på små skjermer
-  const [sidebarSynligIntern, setSidebarSynligIntern] = useState(true);
+  // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
+  const [sidebarSynligIntern, setSidebarSynligIntern] = useState(!visSidebar);
+  // Effektiv synlighet: ekstern prop overstyrer intern (RapportPage styrer via localStorage)
+  const effektivSidebarSynlig = sidebarSynligProp ?? sidebarSynligIntern;
+
+  const toggleSidebar = () => {
+    const ny = !effektivSidebarSynlig;
+    if (onToggleSidebar) {
+      onToggleSidebar(ny);
+    } else {
+      setSidebarSynligIntern(ny);
+    }
+  };
   // Effektiv øktId: intern overstyrer (rapport-modus), deretter ekstern prop (widget-modus)
   const effektivØktId = internØktId ?? øktId ?? undefined;
 
@@ -185,11 +200,11 @@ export default function AIChat({
     settEntraObjectId(entraObjectId);
   }, [entraObjectId]);
 
-  // Auto-skjul sidebar på små skjermer i rapport-modus
+  // Auto-skjul sidebar på veldig små skjermer (< 900px) i rapport-modus
   useEffect(() => {
-    if (!visSidebar) return;
+    if (!visSidebar || onToggleSidebar) return; // ikke overstyr kontrollert modus
     const handleResize = () => {
-      if (window.innerWidth < 1100) setSidebarSynligIntern(false);
+      if (window.innerWidth < 900) setSidebarSynligIntern(false);
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -662,8 +677,17 @@ export default function AIChat({
       {/* Chat panel */}
       {(standaloneMode || open) && (
         <div
-          className={standaloneMode ? 'flex overflow-hidden flex-1 w-full' : 'w-[360px] h-[520px] rounded-2xl flex overflow-hidden'}
+          className={standaloneMode ? 'flex overflow-hidden flex-1 w-full' : 'rounded-2xl flex overflow-hidden'}
           style={{
+            ...(standaloneMode ? {} : {
+              width: visSidebar && effektivSidebarSynlig
+                ? 'min(640px, calc(100vw - 48px))'
+                : visSidebar
+                  ? 'min(420px, calc(100vw - 48px))'
+                  : '360px',
+              height: '520px',
+              transition: 'width 0.2s ease',
+            }),
             background: 'rgba(15,25,45,0.92)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
@@ -671,8 +695,8 @@ export default function AIChat({
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Sidebar — kun i rapport-modus, og kun når skjermen er bred nok */}
-          {visSidebar && harSamtalehistorikk && sidebarSynligIntern && entraObjectId && (
+          {/* Sidebar — kun i rapport-modus og når synlig */}
+          {visSidebar && harSamtalehistorikk && effektivSidebarSynlig && entraObjectId && (
             <SamtaleHistorikkSidebar
               entraObjectId={entraObjectId}
               aktivtØktId={internØktId}
@@ -696,20 +720,20 @@ export default function AIChat({
               {/* Sidebar-toggle i rapport-modus */}
               {visSidebar && harSamtalehistorikk && (
                 <button
-                  onClick={() => setSidebarSynligIntern(v => !v)}
-                  title={sidebarSynligIntern ? 'Skjul samtaler' : 'Vis samtaler'}
+                  onClick={toggleSidebar}
+                  title={effektivSidebarSynlig ? 'Skjul samtaler' : 'Vis samtaler'}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: sidebarSynligIntern
+                    background: effektivSidebarSynlig
                       ? 'rgba(245,166,35,0.15)'
                       : 'rgba(255,255,255,0.06)',
-                    border: sidebarSynligIntern
+                    border: effektivSidebarSynlig
                       ? '1px solid rgba(245,166,35,0.4)'
                       : '1px solid rgba(255,255,255,0.12)',
                     borderRadius: '6px',
-                    color: sidebarSynligIntern ? '#f5a623' : 'rgba(255,255,255,0.65)',
+                    color: effektivSidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
                     cursor: 'pointer',
                     padding: '5px 9px',
                     fontSize: '12px',

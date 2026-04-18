@@ -48,6 +48,13 @@ export default function RapportPage() {
   const [brukerChatAktivert, setBrukerChatAktivert] = useState<boolean | null>(null);
   const lisens = useLisens();
   const harSamtalehistorikkRapport = harBetaTilgang(entraObjectId);
+
+  // Sidebar-synlighet for AIChat i rapportkontekst — lagres i localStorage, default skjult
+  const [sidebarSynligIChat, setSidebarSynligIChat] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const lagret = localStorage.getItem('rapport-chat-sidebar-synlig');
+    return lagret === 'true'; // default false (ikke vist)
+  });
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
@@ -177,6 +184,11 @@ export default function RapportPage() {
           aktivSide={aktivSide}
           harSamtalehistorikk={harSamtalehistorikkRapport}
           visSidebar={harSamtalehistorikkRapport}
+          sidebarSynlig={harSamtalehistorikkRapport ? sidebarSynligIChat : undefined}
+          onToggleSidebar={harSamtalehistorikkRapport ? (v) => {
+            setSidebarSynligIChat(v);
+            localStorage.setItem('rapport-chat-sidebar-synlig', String(v));
+          } : undefined}
           onSetFilter={setFilterConfig}
           onSetSlicer={setSlicerConfig}
           onClearSlicer={setClearSlicerTitle}
