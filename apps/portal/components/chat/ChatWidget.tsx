@@ -8,6 +8,7 @@ import { harBetaTilgang } from '@/lib/featureFlags';
 import { useLisens } from '@/components/LisensProvider';
 import SamtaleHistorikkSidebar from './SamtaleHistorikkSidebar';
 import { apiFetch, apiHeaders } from '@/lib/apiClient';
+import { useRouter } from 'next/navigation';
 
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
 
@@ -16,9 +17,15 @@ interface ChatMelding {
   innhold: string;
 }
 
+interface AktivSamtaleMeta {
+  rapportId: string;
+  rapportNavn: string | null;
+}
+
 export default function ChatWidget() {
   const { entraObjectId, grupper } = usePortalAuth();
   const lisens = useLisens();
+  const router = useRouter();
   const betaBruker = harBetaTilgang(entraObjectId);
 
   const harSamtalehistorikk = betaBruker;
@@ -34,6 +41,7 @@ export default function ChatWidget() {
   });
   const [chatKey, setChatKey] = useState(0);
   const [initialMessages, setInitialMessages] = useState<{ role: string; content: string }[] | undefined>(undefined);
+  const [aktivSamtaleMeta, setAktivSamtaleMeta] = useState<AktivSamtaleMeta | null>(null);
 
   const iDagDato = new Date().toISOString().slice(0, 10);
   const [aktivtØktId, setAktivtØktId] = useState<string | null>(
@@ -55,14 +63,16 @@ export default function ChatWidget() {
         headers: { 'x-entra-object-id': entraObjectId, ...apiHeaders() },
       });
       if (res.ok) {
-        const meldinger = (await res.json()) as ChatMelding[];
-        const mapped = meldinger
+        const data = (await res.json()) as { meldinger: ChatMelding[]; rapportId: string | null; rapportNavn: string | null };
+        const mapped = (data.meldinger ?? [])
           .filter(m => m.rolle === 'user' || m.rolle === 'assistant')
           .map(m => ({ role: m.rolle, content: m.innhold }));
         setInitialMessages(mapped);
+        setAktivSamtaleMeta(data.rapportId ? { rapportId: data.rapportId, rapportNavn: data.rapportNavn } : null);
       }
     } catch {
       setInitialMessages(undefined);
+      setAktivSamtaleMeta(null);
     }
     setAktivtØktId(øktId);
     setChatKey(k => k + 1);
@@ -73,8 +83,16 @@ export default function ChatWidget() {
     const nyId = `${entraObjectId}-${new Date().toISOString()}`;
     setAktivtØktId(nyId);
     setInitialMessages(undefined);
+    setAktivSamtaleMeta(null);
     setChatKey(k => k + 1);
   }, [entraObjectId]);
+
+  const åpneRapport = useCallback((rapportId: string, øktId: string | null) => {
+    // Persister aktiv økt slik at rapport-AIChat laster riktig samtale
+    if (øktId) localStorage.setItem(`aktiv-okt-rapport-${rapportId}`, øktId);
+    setÅpen(false);
+    router.push(`/dashboard/rapport/${rapportId}`);
+  }, [router]);
 
   // Persist sidebar-valg til localStorage
   useEffect(() => {
@@ -268,17 +286,50 @@ export default function ChatWidget() {
             kompaktMode
           />
         )}
-        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-          <AIChat
-            key={chatKey}
-            entraObjectId={entraObjectId}
-            grupper={grupper}
-            øktId={aktivtØktId ?? undefined}
-            harSamtalehistorikk={harSamtalehistorikk}
-            standaloneMode
-            hideHeader
-            initialMessages={initialMessages}
-          />
+        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* Rapport-banner — vises når aktiv samtale tilhører en rapport */}
+          {aktivSamtaleMeta?.rapportId && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 12px', flexShrink: 0,
+              background: 'rgba(245,166,35,0.08)',
+              borderBottom: '1px solid rgba(245,166,35,0.2)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="#f5a623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="9" y1="21" x2="9" y2="9"/>
+                </svg>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {aktivSamtaleMeta.rapportNavn ?? 'Rapport'}
+                </span>
+              </div>
+              <button
+                onClick={() => åpneRapport(aktivSamtaleMeta.rapportId, aktivtØktId)}
+                style={{
+                  background: 'rgba(245,166,35,0.9)', color: '#0a1628',
+                  border: 'none', borderRadius: 5, padding: '4px 10px',
+                  fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginLeft: 8,
+                }}
+              >
+                Åpne rapport →
+              </button>
+            </div>
+          )}
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+            <AIChat
+              key={chatKey}
+              entraObjectId={entraObjectId}
+              grupper={grupper}
+              øktId={aktivtØktId ?? undefined}
+              harSamtalehistorikk={harSamtalehistorikk}
+              standaloneMode
+              hideHeader
+              initialMessages={initialMessages}
+            />
+          </div>
         </div>
       </div>
     </div>

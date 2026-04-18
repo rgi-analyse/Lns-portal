@@ -8,6 +8,7 @@ interface Samtale {
   øktId: string;
   tittel: string | null;
   tidspunkt: string;
+  rapportNavn?: string | null;
 }
 
 interface Props {
@@ -280,6 +281,19 @@ export default function SamtaleHistorikkSidebar({
                     >
                       {samtale.tittel ?? 'Ny samtale'}
                     </div>
+                    {samtale.rapportNavn && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none"
+                          stroke="#f5a623" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <rect x="3" y="3" width="18" height="18" rx="2"/>
+                          <line x1="3" y1="9" x2="21" y2="9"/>
+                          <line x1="9" y1="21" x2="9" y2="9"/>
+                        </svg>
+                        <span style={{ fontSize: 10, color: '#f5a623', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {samtale.rapportNavn}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
                       {formaterDato(samtale.tidspunkt)}
                     </div>

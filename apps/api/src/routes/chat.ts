@@ -1319,7 +1319,22 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         }
       }
 
-      return reply.send(samtaler);
+      // Hent rapportnavn for samtaler med rapportId
+      const db = (request as TenantRequest).tenantPrisma;
+      const rapportIds = [...new Set(samtaler.map(s => s.rapportId).filter((id): id is string => !!id))];
+      const rapportMap: Record<string, string> = {};
+      if (rapportIds.length > 0) {
+        const rapporter = await db.rapport.findMany({
+          where: { id: { in: rapportIds } },
+          select: { id: true, navn: true },
+        });
+        for (const r of rapporter) rapportMap[r.id] = r.navn;
+      }
+
+      return reply.send(samtaler.map(s => ({
+        ...s,
+        rapportNavn: s.rapportId ? (rapportMap[s.rapportId] ?? null) : null,
+      })));
     },
   );
 
@@ -1339,7 +1354,16 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         select: { rolle: true, innhold: true, tidspunkt: true, rapportId: true },
       });
 
-      return reply.send(meldinger);
+      // Hent rapportnavn for første rad med rapportId
+      const rapportId = meldinger.find(m => m.rapportId)?.rapportId ?? null;
+      let rapportNavn: string | null = null;
+      if (rapportId) {
+        const db = (request as TenantRequest).tenantPrisma;
+        const rapport = await db.rapport.findUnique({ where: { id: rapportId }, select: { navn: true } });
+        rapportNavn = rapport?.navn ?? null;
+      }
+
+      return reply.send({ øktId, rapportId, rapportNavn, meldinger });
     },
   );
 
