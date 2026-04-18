@@ -165,6 +165,10 @@ export default function AIChat({
   // Effektiv øktId: intern overstyrer (rapport-modus), deretter ekstern prop (widget-modus)
   const effektivØktId = internØktId ?? øktId ?? undefined;
 
+  // Ref som alltid holder siste effektivØktId — forhindrer stale closure i send()
+  const øktIdRef = useRef(effektivØktId);
+  useEffect(() => { øktIdRef.current = effektivØktId; }, [effektivØktId]);
+
   const bottomRef    = useRef<HTMLDivElement>(null);
   const inputRef     = useRef<HTMLTextAreaElement>(null);
   const abortRef     = useRef<AbortController | null>(null);
@@ -542,11 +546,13 @@ export default function AIChat({
       grupper: grupper ?? [],
       ...(kanLageRapport ? { kanLageRapport: true } : {}),
       // Send øktId + chatRapportId kun når samtalehistorikk er aktivert
-      ...(harSamtalehistorikk && effektivØktId ? {
-        øktId: effektivØktId,
+      // Bruk øktIdRef.current for å unngå stale closure
+      ...(harSamtalehistorikk && øktIdRef.current ? {
+        øktId: øktIdRef.current,
         chatRapportId: rapportId ?? null,
       } : {}),
     };
+    console.log('[AIChat] sender melding med øktId:', øktIdRef.current, '| rapportId (chatRapportId):', rapportId ?? null);
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
     console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));
     console.log('[AIChat] sender body activeSlicerState:', JSON.stringify(requestBody.activeSlicerState));

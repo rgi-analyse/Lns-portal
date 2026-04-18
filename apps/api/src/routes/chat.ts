@@ -634,6 +634,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
             visualData:        { type: 'object', additionalProperties: { type: 'string' } },
             kanLageRapport:    { type: 'boolean' },
             grupper:           { type: 'array', items: { type: 'string' } },
+            øktId:             { type: 'string' },
+            chatRapportId:     { type: 'string' },
           },
           additionalProperties: false,
         },
@@ -967,6 +969,17 @@ Tilgjengelige visualiseringstyper:
 - card — KPI-kort (enkeltverdi/nøkkeltall)`;
         }
 
+        // Bestem øktId og lagre brukermelding FØR AI-stream starter
+        const iDagDatoGlobal = new Date().toISOString().slice(0, 10);
+        const øktIdGlobal = request.body.øktId ?? `${entraObjectId}-${iDagDatoGlobal}`;
+        const chatRapportIdGlobal = request.body.chatRapportId ?? null;
+        console.log('[Chat] global stream | øktId:', øktIdGlobal, '| chatRapportId:', chatRapportIdGlobal);
+        if (entraObjectId && String(sisteBrukermelding).trim()) {
+          await prisma.chatHistorikk.create({
+            data: { userId: entraObjectId, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
+          }).catch(() => {});
+        }
+
         reply.raw.setHeader('Content-Type', 'text/event-stream');
         reply.raw.setHeader('Cache-Control', 'no-cache');
         reply.raw.setHeader('Connection', 'keep-alive');
@@ -991,21 +1004,15 @@ Tilgjengelige visualiseringstyper:
         } finally {
           reply.raw.end();
         }
-        // Lagre samtale i historikk (fire-and-forget)
-        if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekst) {
-          const iDagDato = new Date().toISOString().slice(0, 10);
-          const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
-          const chatRapportId = request.body.chatRapportId ?? null;
-          prisma.chatHistorikk.createMany({
-            data: [
-              { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug, rapportId: chatRapportId },
-              { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000),                øktId, tenantSlug, rapportId: chatRapportId },
-            ],
+        // Lagre assistant-melding etter AI ferdig (fire-and-forget)
+        if (entraObjectId && fullAiTekst) {
+          prisma.chatHistorikk.create({
+            data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
           }).then(async () => {
-            // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
-            const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId, tenantSlug } });
+            // Auto-tittel etter 2. utveksling (bruker+assistant × 2 = 4 rader)
+            const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdGlobal, tenantSlug } });
             if (antallIØkt === 4) {
-              genererOgLagreTittel(entraObjectId!, øktId, tenantSlug, String(sisteBrukermelding), fullAiTekst);
+              genererOgLagreTittel(entraObjectId!, øktIdGlobal, tenantSlug, String(sisteBrukermelding), fullAiTekst);
             }
           }).catch(() => {});
         }
@@ -1219,6 +1226,18 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         console.log('[Chat] kolonne-seksjon (første 400 tegn):', rapportKontekst.slice(start, start + 400));
       }
 
+      // Bestem øktId og lagre brukermelding FØR AI-stream starter
+      const iDagDatoRapport = new Date().toISOString().slice(0, 10);
+      const øktIdRapport = request.body.øktId ?? `${entraObjectId}-${iDagDatoRapport}`;
+      // Kun chatRapportId (portal UUID) — IKKE fallback til rapportId (PBI GUID)
+      const chatRapportIdRapport = request.body.chatRapportId ?? null;
+      console.log('[Chat] rapport stream | øktId:', øktIdRapport, '| chatRapportId:', chatRapportIdRapport);
+      if (entraObjectId && String(sisteBrukermelding).trim()) {
+        await prisma.chatHistorikk.create({
+          data: { userId: entraObjectId, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
+        }).catch(() => {});
+      }
+
       reply.raw.setHeader('Content-Type', 'text/event-stream');
       reply.raw.setHeader('Cache-Control', 'no-cache');
       reply.raw.setHeader('Connection', 'keep-alive');
@@ -1245,22 +1264,15 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       } finally {
         reply.raw.end();
       }
-      // Lagre samtale i historikk (fire-and-forget)
-      if (entraObjectId && String(sisteBrukermelding).trim() && fullAiTekstRapport) {
-        const iDagDato = new Date().toISOString().slice(0, 10);
-        const øktId = request.body.øktId ?? `${entraObjectId}-${iDagDato}`;
-        // rapportId fra body (chatRapportId) — fallback til rapportId (rapport-siden setter begge)
-        const chatRapportId = request.body.chatRapportId ?? request.body.rapportId ?? null;
-        prisma.chatHistorikk.createMany({
-          data: [
-            { userId: entraObjectId, rolle: 'user',      innhold: String(sisteBrukermelding).slice(0, 4000), øktId, tenantSlug, rapportId: chatRapportId },
-            { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000),         øktId, tenantSlug, rapportId: chatRapportId },
-          ],
+      // Lagre assistant-melding etter AI ferdig (fire-and-forget)
+      if (entraObjectId && fullAiTekstRapport) {
+        prisma.chatHistorikk.create({
+          data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
         }).then(async () => {
-          // Auto-tittel etter 2. melding (2 par = 4 rader i DB)
-          const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId, tenantSlug } });
+          // Auto-tittel etter 2. utveksling (bruker+assistant × 2 = 4 rader)
+          const antallIØkt = await prisma.chatHistorikk.count({ where: { userId: entraObjectId!, øktId: øktIdRapport, tenantSlug } });
           if (antallIØkt === 4) {
-            genererOgLagreTittel(entraObjectId!, øktId, tenantSlug, String(sisteBrukermelding), fullAiTekstRapport);
+            genererOgLagreTittel(entraObjectId!, øktIdRapport, tenantSlug, String(sisteBrukermelding), fullAiTekstRapport);
           }
         }).catch(() => {});
       }
