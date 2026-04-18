@@ -42,6 +42,7 @@ export default function RapportPage() {
   const { isAuthenticated, authHeaders, grupper,
           entraObjectId }                            = usePortalAuth();
   const [brukerRolleState, setBrukerRolleState]      = useState<string>('');
+  const [brukerDisplayName, setBrukerDisplayName]    = useState<string | null>(null);
 
   const [rapport,           setRapport]           = useState<Rapport | null>(null);
   const [error,             setError]             = useState<string | null>(null);
@@ -106,12 +107,13 @@ export default function RapportPage() {
         try {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
-            const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean };
+            const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean; displayName?: string | null };
             console.log('[RapportPage] meg.rolle:', meg?.rolle);
             const r = meg.rolle ?? '';
             setBrukerRolleState(r);
             setKanLageRapport(['admin', 'tenantadmin'].includes(r) || r === 'redaktør');
             setBrukerChatAktivert(meg.chatAktivert !== false);
+            if (meg.displayName) setBrukerDisplayName(meg.displayName);
           }
         } catch { /* ikke kritisk */ }
       }
@@ -184,6 +186,7 @@ export default function RapportPage() {
           aktivSide={aktivSide}
           harSamtalehistorikk={harSamtalehistorikkRapport}
           visSidebar={harSamtalehistorikkRapport}
+          brukerNavn={brukerDisplayName}
           sidebarSynlig={harSamtalehistorikkRapport ? sidebarSynligIChat : undefined}
           onToggleSidebar={harSamtalehistorikkRapport ? (v) => {
             setSidebarSynligIChat(v);

@@ -10,6 +10,7 @@ import { useTema } from '@/components/ThemeProvider';
 import * as XLSX from 'xlsx';
 import SamtaleHistorikkSidebar from '@/components/chat/SamtaleHistorikkSidebar';
 import { genererRapportØktId } from '@/lib/chatØkt';
+import { byggRapportVelkomst } from '@/lib/hilsen';
 
 export interface FilterConfig {
   table: string;
@@ -83,6 +84,8 @@ interface AIChatProps {
   aktivØktId?: string | null;
   /** Vis samtalehistorikk-sidebar inne i AIChat (rapport-modus) */
   visSidebar?: boolean;
+  /** Brukerens fulle navn — brukes i velkomstmelding */
+  brukerNavn?: string | null;
   /** Kontrollert sidebar-synlighet fra foreldre (rapport-modus) */
   sidebarSynlig?: boolean;
   /** Callback når sidebar toggles — brukes til å lagre preferansen i foreldre */
@@ -111,7 +114,7 @@ export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
-  aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar,
+  aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar, brukerNavn,
   getVisualsData, onSetFilter, onSetSlicer, onClearSlicer,
 }: AIChatProps) {
   const router = useRouter();
@@ -135,6 +138,8 @@ export default function AIChat({
   });
   // Intern øktId-styring — brukes i rapport-modus (visSidebar=true)
   const [internØktId, setInternØktId] = useState<string | null>(null);
+  // Sporer om historikk-lasting er ferdig (for å unngå flash av velkomst under lasting)
+  const [harLastetHistorikk, setHarLastetHistorikk] = useState(!visSidebar);
   // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
   const [sidebarSynligIntern, setSidebarSynligIntern] = useState(!visSidebar);
   // Effektiv synlighet: ekstern prop overstyrer intern (RapportPage styrer via localStorage)
@@ -227,6 +232,7 @@ export default function AIChat({
   useEffect(() => {
     if (!visSidebar || !harSamtalehistorikk || !internØktId || !entraObjectId) return;
 
+    setHarLastetHistorikk(false);
     conversationHistoryRef.current = [];
     setMessages([]);
     setDisplay([]);
@@ -246,7 +252,8 @@ export default function AIChat({
         setMessages(chatMsgs);
         setDisplay(displayMsgs);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setHarLastetHistorikk(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [internØktId, visSidebar, harSamtalehistorikk]);
 
@@ -925,7 +932,29 @@ export default function AIChat({
                 Ingen rapport er åpen. Spør meg hvilke rapporter som finnes, eller åpne en rapport fra sidemenyen.
               </div>
             )}
-            {display.length === 0 && (
+            {/* Personalisert velkomst — kun ved tom samtale i rapportkontekst */}
+            {harLastetHistorikk && rapportId && rapportNavn && display.length === 0 && (
+              <div style={{
+                padding: '14px 16px',
+                background: 'rgba(245,166,35,0.06)',
+                border: '1px solid rgba(245,166,35,0.2)',
+                borderRadius: 10,
+                margin: '8px 4px',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                lineHeight: 1.55,
+              }}>
+                {byggRapportVelkomst(brukerNavn, rapportNavn)
+                  .split('**')
+                  .map((del, i) =>
+                    i % 2 === 1
+                      ? <strong key={i} style={{ color: '#f5a623' }}>{del}</strong>
+                      : <span key={i}>{del}</span>,
+                  )}
+              </div>
+            )}
+            {/* Generisk tom-tilstand — vises bare utenfor rapportkontekst */}
+            {display.length === 0 && !rapportId && (
               <p className="text-xs text-center mt-4" style={{ color: 'var(--text-muted)' }}>
                 Spør meg om rapportdata eller be om å filtrere rapporten.
               </p>
