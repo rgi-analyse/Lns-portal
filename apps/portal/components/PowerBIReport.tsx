@@ -34,7 +34,8 @@ interface PowerBIReportProps {
   pbiDatasetId?: string;        // Power BI Dataset ID
   pbiWorkspaceId?: string;      // Power BI Workspace ID (Fabric)
   filterConfig?: FilterConfig;  // AI-drevet filter
-  slicerConfig?: SlicerConfig;  // AI-drevet slicer
+  slicerQueue?: SlicerConfig[];  // AI-drevet slicer-kø (støtter flere samtidige endringer)
+  onSlicerQueueProcessed?: () => void;
   onSlicersLoaded?: (slicers: string[]) => void;
   onSlicerValuesLoaded?: (values: Record<string, Record<string, string[]>>) => void;
   onActiveStateChange?: (state: Record<string, unknown>) => void;
@@ -47,7 +48,7 @@ interface PowerBIReportProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerConfig, clearSlicerTitle, onSlicersLoaded, onSlicerValuesLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
+export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerQueue, onSlicerQueueProcessed, clearSlicerTitle, onSlicersLoaded, onSlicerValuesLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
   const { entraObjectId } = usePortalAuth();
 
   // Workspace-spesifikk nøkkel for bookmark-lagring
@@ -121,11 +122,26 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   }, [filterConfig, report]);
 
   useEffect(() => {
-    if (!slicerConfig || !reportRef.current) return;
-    console.log('[PBI] slicerConfig endret, kaller setSlicerValue:', slicerConfig);
-    setSlicerValue(slicerConfig.slicerTitle, slicerConfig.values, slicerConfig.år)
-      .then(() => getActiveSlicerState().then(onActiveStateChange));
-  }, [slicerConfig]);
+    if (!slicerQueue || slicerQueue.length === 0 || !reportRef.current) return;
+    let avbrutt = false;
+    (async () => {
+      for (const config of slicerQueue) {
+        if (avbrutt) return;
+        try {
+          console.log('[PBI] slicer-kø prosesserer:', config.slicerTitle, config.values);
+          await setSlicerValue(config.slicerTitle, config.values, config.år);
+          console.log('[PBI] slicer prosessert:', config.slicerTitle);
+        } catch (err) {
+          console.error('[PBI] slicer feilet:', config.slicerTitle, err);
+        }
+      }
+      if (!avbrutt) {
+        await getActiveSlicerState().then(onActiveStateChange);
+        onSlicerQueueProcessed?.();
+      }
+    })();
+    return () => { avbrutt = true; };
+  }, [slicerQueue, onSlicerQueueProcessed]);
 
   useEffect(() => {
     if (!clearSlicerTitle || !reportRef.current) return;

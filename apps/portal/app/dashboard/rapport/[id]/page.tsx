@@ -59,7 +59,7 @@ export default function RapportPage() {
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
-  const [slicerConfig,  setSlicerConfig]  = useState<SlicerConfig | undefined>(undefined);
+  const [slicerQueue,   setSlicerQueue]   = useState<SlicerConfig[]>([]);
   const [slicers,       setSlicers]       = useState<string[]>([]);
   const [slicerValues,      setSlicerValues]      = useState<Record<string, Record<string, string[]>>>({});
   const [clearSlicerTitle,  setClearSlicerTitle]  = useState<string | undefined>(undefined);
@@ -163,7 +163,8 @@ export default function RapportPage() {
         pbiDatasetId={rapport.pbiDatasetId}
         pbiWorkspaceId={rapport.pbiWorkspaceId}
         filterConfig={filterConfig}
-        slicerConfig={slicerConfig}
+        slicerQueue={slicerQueue}
+        onSlicerQueueProcessed={() => setSlicerQueue([])}
         clearSlicerTitle={clearSlicerTitle}
         onSlicersLoaded={setSlicers}
         onSlicerValuesLoaded={setSlicerValues}
@@ -193,7 +194,7 @@ export default function RapportPage() {
             localStorage.setItem('rapport-chat-sidebar-synlig', String(v));
           } : undefined}
           onSetFilter={setFilterConfig}
-          onSetSlicer={setSlicerConfig}
+          onSetSlicer={(config) => setSlicerQueue(prev => [...prev, config])}
           onClearSlicer={setClearSlicerTitle}
           getVisualsData={() => getVisualsDataRef.current?.() ?? Promise.resolve({})}
         />
