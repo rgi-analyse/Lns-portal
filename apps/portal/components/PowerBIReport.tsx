@@ -482,14 +482,24 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         // Standard basic slicer — bygg filter fra targets, uavhengig av om filters er tom
         const target = (beforeState as unknown as { targets?: { table: string; column: string }[] })?.targets?.[0];
         if (!target) { console.warn(`[PBI] Slicer "${slicerTitle}" har ingen target`); return; }
-        console.log(`[PBI] Basic slicer "${slicerTitle}" - target:`, target, 'verdier:', values);
+
+        // Konverter innkommende verdier til samme type som eksisterende slicer-verdier
+        const currentValues = (firstFilter?.['values'] as unknown[]) ?? [];
+        const forventetType = currentValues.length > 0 ? typeof currentValues[0] : 'string';
+        const konverterteVerdier = values.map((v) => {
+          if (forventetType === 'number') return typeof v === 'string' ? Number(v) : v;
+          if (forventetType === 'string') return typeof v === 'number' ? String(v) : v;
+          return v;
+        });
+        console.log(`[PBI] Basic slicer "${slicerTitle}" - target:`, target, 'innkommende:', values, 'forventet type:', forventetType, 'konvertert:', konverterteVerdier);
+
         await slicer.setSlicerState({
           filters: [{
             $schema: 'http://powerbi.com/product/schema#basic',
             target: { table: target.table, column: target.column },
             filterType: models.FilterType.Basic,
             operator: 'In',
-            values,
+            values: konverterteVerdier,
           }] as unknown as models.ISlicerFilter[],
         });
       }
