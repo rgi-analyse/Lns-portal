@@ -890,17 +890,20 @@ export async function chat(
           if (!context?.kanLageRapport) {
             result = { error: 'Du har ikke tilgang til å opprette KPI-er.' };
           } else {
-            const viewNavn_    = String(args['view_navn'] ?? '');
-            const navn_        = String(args['navn'] ?? '');
+            const viewNavn_     = String(args['view_navn'] ?? '');
+            const navn_         = String(args['navn'] ?? '');
             const visningsnavn_ = String(args['visningsnavn'] ?? '');
             const sql_uttrykk_ = String(args['sql_uttrykk'] ?? '');
-            const format_      = String(args['format'] ?? '');
-            const beskrivelse_ = args['beskrivelse'] ? String(args['beskrivelse']) : '';
+            const format_       = String(args['format'] ?? '');
+            const beskrivelse_  = args['beskrivelse'] ? String(args['beskrivelse']) : '';
 
-            console.log('[opprett_kpi] input:', JSON.stringify({ view_navn: viewNavn_, navn: navn_, visningsnavn: visningsnavn_, format: format_ }));
+            console.log('[KPI-debug] tool_call args:', JSON.stringify(args, null, 2));
+            console.log('[KPI-debug] entraObjectId:', context?.entraObjectId ?? '(ingen)');
+            console.log('[KPI-debug] sql_uttrykk length:', sql_uttrykk_.length);
 
             if (!viewNavn_ || !navn_ || !visningsnavn_ || !sql_uttrykk_ || !format_) {
-              result = { error: 'Mangler påkrevde felter: view_navn, navn, visningsnavn, sql_uttrykk, format.' };
+              console.error('[KPI-debug] MANGLER PÅKREVDE FELTER — view_navn:', !!viewNavn_, '| navn:', !!navn_, '| visningsnavn:', !!visningsnavn_, '| sql_uttrykk:', !!sql_uttrykk_, '| format:', !!format_);
+              result = { error: 'Mangler påkrevde felter: view_navn, navn, visningsnavn, sql_uttrykk, format. Tool-kallet ble avbrutt.' };
             } else {
               // Støtt både "ai_gold.vw_Foo" og bare "vw_Foo" (default schema ai_gold)
               const parts      = viewNavn_.includes('.') ? viewNavn_.split('.') : ['ai_gold', viewNavn_];
@@ -912,7 +915,7 @@ export async function chat(
               const safeFmt    = format_.replace(/'/g, "''");
               const safeBesk   = beskrivelse_.replace(/'/g, "''");
 
-              console.log('[opprett_kpi] slår opp view:', safeSchema, safeView);
+              console.log('[KPI-debug] slår opp view:', safeSchema, safeView);
 
               // Slå opp view_id fra view-navn
               const viewRader = await queryAzureSQL(`
@@ -920,13 +923,13 @@ export async function chat(
                 WHERE schema_name = '${safeSchema}' AND view_name = '${safeView}' AND er_aktiv = 1
               `, 1);
 
-              console.log('[opprett_kpi] view lookup resultat:', viewRader.length, 'rader');
+              console.log('[KPI-debug] view lookup resultat:', viewRader.length, 'rader', viewRader.length > 0 ? '| id: ' + String(viewRader[0]['id']) : '');
 
               if (!viewRader.length) {
                 result = { error: `View '${safeSchema}.${safeView}' er ikke registrert i metadata. Administrator må registrere viewet først.` };
               } else {
                 const viewId = String(viewRader[0]['id']);
-                console.log('[opprett_kpi] view_id:', viewId, '— sjekker duplikat');
+                console.log('[KPI-debug] view_id:', viewId, '— sjekker duplikat for navn:', safeNavn);
 
                 // Sjekk om KPI med samme navn allerede eksisterer
                 const eksisterende = await queryAzureSQL(`
@@ -936,36 +939,46 @@ export async function chat(
                 `, 1);
 
                 if (eksisterende.length > 0) {
-                  console.log('[opprett_kpi] KPI finnes allerede:', safeNavn);
+                  console.log('[KPI-debug] DUPLIKAT funnet — KPI finnes allerede:', safeNavn, '| id:', String(eksisterende[0]['id']));
                   result = {
-                    success: true,
+                    success: false,
+                    duplikat: true,
                     kpi: eksisterende[0],
-                    melding: `KPI "${visningsnavn_}" finnes allerede og kan brukes direkte.`,
+                    error: `KPI "${visningsnavn_}" finnes allerede (id: ${String(eksisterende[0]['id'])}). Ingen ny KPI ble opprettet.`,
                   };
                 } else {
-                console.log('[opprett_kpi] starter INSERT');
-                const rows = await queryAzureSQL(`
-                  INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
-                  OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
-                         INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
-                  VALUES (
-                    '${viewId}', '${safeNavn}', '${safeVns}',
-                    '${safeSql}', '${safeFmt}',
-                    ${safeBesk ? `'${safeBesk}'` : 'NULL'}
-                  )
-                `, 1);
-                console.log('[opprett_kpi] INSERT OK, kpi:', JSON.stringify(rows[0]));
-                // Logg for admin-oversikt (ikke kritisk — tabellen kan mangle)
-                queryAzureSQL(`
-                  INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
-                  VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
-                `).catch(logErr => console.warn('[opprett_kpi] logg-insert feilet (tabell mangler?):', (logErr as Error).message));
-                result = {
-                  success: true,
-                  kpi: rows[0],
-                  melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
-                };
-                } // end else (ikke duplikat)
+                  console.log('[KPI-debug] starter INSERT — view_id:', viewId, '| navn:', safeNavn, '| sql_uttrykk (50 tegn):', safeSql.slice(0, 50));
+                  try {
+                    const rows = await queryAzureSQL(`
+                      INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
+                      OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+                             INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+                      VALUES (
+                        '${viewId}', '${safeNavn}', '${safeVns}',
+                        '${safeSql}', '${safeFmt}',
+                        ${safeBesk ? `'${safeBesk}'` : 'NULL'}
+                      )
+                    `, 1);
+                    console.log('[KPI-debug] SUKSESS — INSERT OK, opprettet id:', String(rows[0]?.['id'] ?? '(ukjent)'), '| navn:', String(rows[0]?.['navn'] ?? ''));
+                    // Logg for admin-oversikt (ikke kritisk — tabellen kan mangle)
+                    queryAzureSQL(`
+                      INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
+                      VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
+                    `).catch(logErr => console.warn('[KPI-debug] logg-insert feilet (tabell mangler?):', (logErr as Error).message));
+                    result = {
+                      success: true,
+                      kpi: rows[0],
+                      melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
+                    };
+                  } catch (insertErr) {
+                    const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+                    console.error('[KPI-debug] FEILET — INSERT kastet exception:', insertMsg);
+                    result = {
+                      success: false,
+                      error: `KPI-insert feilet: ${insertMsg}. Ingen KPI ble opprettet.`,
+                    };
+                  }
+                }
               }
             }
           }
