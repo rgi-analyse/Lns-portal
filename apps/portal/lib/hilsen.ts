@@ -1,9 +1,10 @@
 export function hentHilsen(): string {
   const t = new Date().getHours();
   if (t >= 5 && t < 10) return 'God morgen';
-  if (t >= 10 && t < 16) return 'Hei';
-  if (t >= 16 && t < 22) return 'God kveld';
-  return 'Hei';
+  if (t >= 10 && t < 15) return 'Hei';
+  if (t >= 15 && t < 18) return 'God ettermiddag';
+  if (t >= 18 && t < 22) return 'God kveld';
+  return 'Hei'; // natt (22-05)
 }
 
 export function hentFornavn(fulltNavn: string | undefined | null): string {
