@@ -30,8 +30,6 @@ export default function ChatWidget() {
 
   const harSamtalehistorikk = betaBruker;
 
-  console.log('[ChatWidget] entraObjectId:', entraObjectId, '| type:', typeof entraObjectId, '| betaBruker:', betaBruker, '| harSamtalehistorikk:', harSamtalehistorikk);
-
   const [åpen, setÅpen] = useState(false);
   const [sidebarSynlig, setSidebarSynlig] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
