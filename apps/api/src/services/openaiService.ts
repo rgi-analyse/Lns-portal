@@ -670,6 +670,7 @@ export async function chat(
           const slicerTitle = args['slicerTitle'] as string;
           const values      = args['values'] as string[];
           const år          = args['år'] as number | undefined;
+          console.log('[backend] sending slicer SSE event:', slicerTitle, values);
           onChunk({ type: 'slicer', slicerTitle, values, år });
           result = { success: true, message: `Slicer "${slicerTitle}" satt til: ${values.join(', ')}${år ? ` (år: ${år})` : ''}` };
         } else if (tc.name === 'clear_report_slicer') {
