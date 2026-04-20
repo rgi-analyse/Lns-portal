@@ -149,6 +149,30 @@ IKKE FORESLÅ KPI når spørsmålet:
    Eksempel: "per kunde" → KPI-kandidat
 3. Er en enkel aggregering på én kolonne uten ratio-beregning
 
+## KPI-BRUK VED RAPPORT-OPPRETTING
+
+VIKTIG: Når rapporten involverer en KPI som allerede finnes i KPI-listen
+ovenfor, MÅ du bruke kpi_referanser-parameteren i create_report.
+
+Riktig fremgangsmåte:
+1. I sql-parameteren: ta KUN med dimensjonskolonner + FROM/WHERE/GROUP BY
+   (ikke beregn KPI-verdier i SQL — det håndterer backend automatisk)
+2. I kpi_referanser: oppgi eksakte tekniske navn fra KPI-listen ovenfor
+3. I yAkse: bruk teknisk KPI-navn eksakt (f.eks. "Lønnsandel")
+
+Eksempel — rapport på lønnsandel per måned:
+  create_report({
+    tittel: "Lønnsandel per måned 2025",
+    sql: "SELECT TOP 200 [månedsnavn], [måned] FROM ai_gold.vw_Fact_Regnskap WHERE [år] = 2025 GROUP BY [månedsnavn], [måned] ORDER BY [måned]",
+    visualType: "line",
+    xAkse: "månedsnavn",
+    yAkse: "Lønnsandel",
+    kpi_referanser: ["Lønnsandel"]
+  })
+
+IKKE regenerer SQL-uttrykket til en KPI i sql-parameteren.
+Backend injiserer det validerte uttrykket fra databasen.
+
 ## RAPPORT-OPPRETTING
 
 Velg visualType basert på spørsmålet:

@@ -325,6 +325,16 @@ const createReportTool: OpenAI.Chat.ChatCompletionTool = {
             'Konsistens mellom SQL-alias og yAkse er kritisk.',
         },
         grupperPaa:  { type: 'string', description: 'Kolonnenavn å farge/gruppere dataserier på (valgfritt)' },
+        kpi_referanser: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Tekniske navn på KPIer som skal inngå som mål-kolonner (teknisk navn fra "Teknisk navn"-feltet i KPI-listen i systempromptet). ' +
+            'BRUK ALLTID dette feltet når rapporten involverer en KPI som er definert i ai_metadata_kpi — aldri regenerer SQL-uttrykket selv. ' +
+            'Backend henter og injiserer korrekt SQL-uttrykk basert på navnene. ' +
+            'Eksempel: ["Lønnsandel", "OverheadProsent"]. ' +
+            'I sql-parameteren: ta kun med dimensjons-kolonner (månedsnavn, år osv.) + FROM/WHERE/GROUP BY — IKKE beregn KPI-kolonner der.',
+        },
         foreslåSlicere: { type: 'array', items: { type: 'string' }, description: 'Filtre/dimensjoner brukeren kan interagere med' },
         referanseLinje: {
           type: 'object',
@@ -695,7 +705,67 @@ export async function chat(
             result = { error: 'Du har ikke tilgang til å opprette rapporter.' };
           } else {
             const rawSQL   = args['sql'] as string;
-            const sqlQuery = sanitizeSQL(rawSQL);
+            let sqlQuery   = sanitizeSQL(rawSQL);
+
+            // ── KPI-injeksjon ─────────────────────────────────────────────
+            // Når kpi_referanser er satt, henter vi SQL-uttrykk fra ai_metadata_kpi
+            // og injiserer dem i SELECT FØR vi kjører spørringen og validerer yAkse.
+            const kpiReferanser = args['kpi_referanser'] as string[] | undefined;
+            if (kpiReferanser && kpiReferanser.length > 0) {
+              // Ekstraher view-navn fra SQL for å slå opp riktig KPI-sett
+              const kpiViewMatch  = sqlQuery.match(/\bFROM\s+([\w]+\.[\w]+)/i);
+              const kpiViewFull   = kpiViewMatch?.[1] ?? null;
+              const kpiSchema     = kpiViewFull?.split('.')[0] ?? 'ai_gold';
+              const kpiViewNavn   = kpiViewFull?.split('.')[1] ?? null;
+              console.log('[create_report] kpi_referanser:', kpiReferanser, '| view:', kpiViewFull);
+
+              if (!kpiViewNavn) {
+                result = { error: 'kpi_referanser krever at sql-parameteren inneholder en gyldig FROM ai_gold.<view>-klausul.' };
+                onChunk({ type: 'tool_call', tool: tc.name, result });
+                history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+                continue;
+              }
+
+              try {
+                const navnListe = kpiReferanser.map(n => `'${n.replace(/'/g, "''")}'`).join(', ');
+                const kpiRader = await queryAzureSQL(`
+                  SELECT k.navn, k.sql_uttrykk, k.visningsnavn
+                  FROM ai_metadata_kpi k
+                  JOIN ai_metadata_views v ON k.view_id = v.id
+                  WHERE v.schema_name = '${kpiSchema.replace(/'/g, "''")}' AND v.view_name = '${kpiViewNavn.replace(/'/g, "''")}'
+                    AND k.navn IN (${navnListe}) AND k.er_aktiv = 1
+                `);
+                console.log('[create_report] KPI-rader funnet:', kpiRader.length, 'av', kpiReferanser.length, 'forespurte');
+
+                const funnet    = new Set(kpiRader.map(r => String(r['navn'])));
+                const manglende = kpiReferanser.filter(n => !funnet.has(n));
+                if (manglende.length > 0) {
+                  result = { error: `KPI-er ikke funnet i ai_metadata_kpi: ${manglende.join(', ')}. Sjekk at teknisk navn stemmer eksakt med KPI-listen i systempromptet.` };
+                  onChunk({ type: 'tool_call', tool: tc.name, result });
+                  history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+                  continue;
+                }
+
+                // Bygg KPI SELECT-fragmenter og injiser FØR FROM-klausulen
+                const kpiCols = kpiRader
+                  .map(r => `${String(r['sql_uttrykk'])} AS [${String(r['navn'])}]`)
+                  .join(', ');
+                const fromPos = sqlQuery.search(/\bFROM\b/i);
+                if (fromPos > 0) {
+                  sqlQuery = `${sqlQuery.slice(0, fromPos).trimEnd()}, ${kpiCols} ${sqlQuery.slice(fromPos)}`;
+                  console.log('[create_report] SQL etter KPI-injeksjon:', sqlQuery.slice(0, 200));
+                }
+              } catch (kpiLookupErr) {
+                const msg = kpiLookupErr instanceof Error ? kpiLookupErr.message : String(kpiLookupErr);
+                console.error('[create_report] KPI-oppslag feilet:', msg);
+                result = { error: `Kunne ikke hente KPI-SQL fra databasen: ${msg}` };
+                onChunk({ type: 'tool_call', tool: tc.name, result });
+                history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+                continue;
+              }
+            }
+            // ── Slutt KPI-injeksjon ───────────────────────────────────────
+
             console.log('[OpenAI] create_report SQL:', sqlQuery);
 
             // Pre-validering: sjekk yAkse mot SQL-aliaser FØR DB-kall
@@ -707,9 +777,9 @@ export async function chat(
               if (sqlAliaser.length > 0 && !sqlAliaser.some(a => a.toLowerCase() === yAkseInput.toLowerCase())) {
                 console.warn(`[OpenAI] create_report yAkse "${yAkseInput}" matcher ikke SQL-aliaser: ${sqlAliaser.join(', ')}`);
                 result = {
-                  error: `yAkse "${yAkseInput}" finnes ikke i SQL-aliaset. ` +
+                  error: `yAkse "${yAkseInput}" finnes ikke som alias i SQL. ` +
                     `Tilgjengelige aliaser: ${sqlAliaser.join(', ')}. ` +
-                    `Alias MÅ matche originalnavnet fra viewet — bruk f.eks. SUM([${sqlAliaser[0] ?? 'Antall'}]) AS [${sqlAliaser[0] ?? 'Antall'}].`,
+                    `Bruk et av disse eksakt som yAkse. For KPI-kolonner: oppgi teknisk KPI-navn i kpi_referanser i stedet for å legge det i yAkse.`,
                 };
                 onChunk({ type: 'tool_call', tool: tc.name, result });
                 history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
