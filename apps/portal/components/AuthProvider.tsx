@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { MsalProvider, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
-import { msalConfig } from '@/lib/authConfig';
+import { msalConfig, loginRequest } from '@/lib/authConfig';
+import { SessionGuard } from '@/lib/sessionGuard';
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -29,10 +30,28 @@ function InnloggingsRegistrerer() {
   return null;
 }
 
+function SessionGuardSetup() {
+  const { instance } = useMsal();
+
+  useEffect(() => {
+    const guard = new SessionGuard(instance as PublicClientApplication, loginRequest.scopes as string[]);
+
+    // Sjekk ved oppstart — fanger "første gang på dagen"-tilstanden
+    guard.sjekkVedOppstart().catch(() => {});
+
+    // Start kontinuerlig overvåkning (inaktivitet + tab-fokus)
+    guard.start();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <MsalProvider instance={msalInstance}>
       <InnloggingsRegistrerer />
+      <SessionGuardSetup />
       {children}
     </MsalProvider>
   );

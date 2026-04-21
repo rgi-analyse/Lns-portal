@@ -22,8 +22,8 @@ export const msalConfig: Configuration = {
     redirectUri,
   },
   cache: {
-    cacheLocation: 'sessionStorage',
-    storeAuthStateInCookie: false,
+    cacheLocation: 'localStorage',       // persist gjennom tab-close og neste dag
+    storeAuthStateInCookie: true,        // Edge-kompatibilitet
   },
 };
 
