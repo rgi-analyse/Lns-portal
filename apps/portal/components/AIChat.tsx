@@ -194,6 +194,8 @@ export default function AIChat({
   });
   // Sporer om historikk-lasting er ferdig (for å unngå flash av velkomst under lasting)
   const [harLastetHistorikk, setHarLastetHistorikk] = useState(!visSidebar);
+  // Flagg: true når vi vil ha instant scroll (historikk-last), false for smooth (streaming)
+  const scrollInstantRef = useRef(false);
   // Counter som bumpes etter at AI har svart — trigger re-fetch i sidebar
   const [sidebarRefetchTrigger, setSidebarRefetchTrigger] = useState(0);
   // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
@@ -234,8 +236,20 @@ export default function AIChat({
   const lagreTimerRef          = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const instant = scrollInstantRef.current;
+    scrollInstantRef.current = false;
+    bottomRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' });
   }, [display]);
+
+  // Scroll til bunn når panelet åpnes — historikk kan ha lastet mens panelet var skjult
+  // (rapport-modus: open=false ved mount, history loads, deretter FAB-klikk åpner panelet)
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -256,6 +270,7 @@ export default function AIChat({
     }));
     conversationHistoryRef.current = chatMsgs;
     setMessages(chatMsgs);
+    scrollInstantRef.current = true; // instant scroll ved initial historikk-lasting
     setDisplay(displayMsgs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -336,6 +351,7 @@ export default function AIChat({
           });
         conversationHistoryRef.current = chatMsgs;
         setMessages(chatMsgs);
+        scrollInstantRef.current = true; // instant scroll ved historikk-lasting
         setDisplay(displayMsgs);
       })
       .catch(() => {})
