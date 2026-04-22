@@ -19,10 +19,20 @@ export class SessionGuard {
   }
 
   start() {
+    if (this.erLoginSide()) {
+      console.log('[SessionGuard] På login-side — guard deaktivert');
+      return;
+    }
     this.registrerAktivitet();
     this.startInaktivitetsTimer();
     this.lyttPaaBrukerAktivitet();
     this.lyttPaaTabFokus();
+  }
+
+  private erLoginSide(): boolean {
+    if (typeof window === 'undefined') return true;
+    const path = window.location.pathname;
+    return path === '/' || path === '/login' || path.startsWith('/auth');
   }
 
   private registrerAktivitet = () => {
@@ -99,11 +109,18 @@ export class SessionGuard {
   };
 
   private triggerReLogin = () => {
+    if (this.erLoginSide()) {
+      // Allerede på login-side — ikke redirect igjen
+      console.log('[SessionGuard] Er allerede på login-side, ingen redirect');
+      return;
+    }
+
     localStorage.removeItem(STORAGE_KEY);
 
-    // Rut til felles login-side som håndterer både Entra og lokal auth
-    const currentPath = window.location.pathname + window.location.search;
-    const loginUrl = `/?expired=true&returnTo=${encodeURIComponent(currentPath)}`;
+    // Kun pathname (ikke search) som returnTo — unngår eksponentiell URL-vekst
+    const currentPath = window.location.pathname;
+    const safeReturnTo = currentPath.startsWith('/dashboard') ? currentPath : '/dashboard';
+    const loginUrl = `/?expired=true&returnTo=${encodeURIComponent(safeReturnTo)}`;
 
     console.log('[SessionGuard] Timeout — sender til login:', loginUrl);
     window.location.href = loginUrl;
@@ -111,6 +128,7 @@ export class SessionGuard {
 
   /** Kalles ved første sidelasting — fanger "første gang på dagen"-tilstanden */
   async sjekkVedOppstart() {
+    if (this.erLoginSide()) return;
     await this.sjekkSession();
   }
 }
