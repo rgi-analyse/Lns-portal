@@ -739,8 +739,9 @@ export async function chatRoutes(fastify: FastifyInstance) {
 
       // Hent views brukeren har tilgang til via workspace-kjede:
       // Bruker → Workspace-tilgang → Rapport → ai_rapport_view_kobling → View
+      // Admin-shortcut: tillatteViewIds = null = ingen restriksjon (konsistent med UI-tilgang)
       let tillatteViewIds: string[] | null = null;
-      if (entraObjectId) {
+      if (entraObjectId && !chatContext.isAdmin) {
         try {
           const db = (request as TenantRequest).tenantPrisma;
           const grupper: string[] = request.body.grupper ?? [];
@@ -770,6 +771,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
         } catch (err) {
           console.warn('[Chat] workspace-view tilgang feil — fortsetter uten begrensning:', err instanceof Error ? err.message : err);
         }
+      } else if (chatContext.isAdmin) {
+        console.log('[Chat] admin-bruker — ingen view-tilgangsbegrensning');
       }
 
       // Hent view-navn for tilgangskontroll i query_database (brukes i openaiService)
