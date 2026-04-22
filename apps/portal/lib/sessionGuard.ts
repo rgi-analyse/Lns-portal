@@ -100,9 +100,13 @@ export class SessionGuard {
 
   private triggerReLogin = () => {
     localStorage.removeItem(STORAGE_KEY);
-    this.msalInstance.loginRedirect({ scopes: this.loginScopes }).catch(err => {
-      console.error('[SessionGuard] loginRedirect feilet:', err);
-    });
+
+    // Rut til felles login-side som håndterer både Entra og lokal auth
+    const currentPath = window.location.pathname + window.location.search;
+    const loginUrl = `/?expired=true&returnTo=${encodeURIComponent(currentPath)}`;
+
+    console.log('[SessionGuard] Timeout — sender til login:', loginUrl);
+    window.location.href = loginUrl;
   };
 
   /** Kalles ved første sidelasting — fanger "første gang på dagen"-tilstanden */

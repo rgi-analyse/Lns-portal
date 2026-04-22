@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
 import { getLocalSession, setLocalSession } from '@/lib/localAuth';
@@ -16,6 +16,10 @@ export default function LoginPage() {
   const isAuthenticated = useIsAuthenticated();
   const { instance }    = useMsal();
   const router          = useRouter();
+  const searchParams    = useSearchParams();
+
+  const sessionUtlopt = searchParams.get('expired') === 'true';
+  const returnTo      = searchParams.get('returnTo') ?? '/dashboard';
 
   const [step,          setStep]          = useState<Step>('email');
   const [email,         setEmail]         = useState('');
@@ -30,9 +34,9 @@ export default function LoginPage() {
   // Allerede innlogget via MSAL eller lokal sesjon
   useEffect(() => {
     if (isAuthenticated || getLocalSession()) {
-      router.replace('/dashboard');
+      router.replace(returnTo);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, returnTo]);
 
   // ── Steg 1: sjekk e-post ──────────────────────────────────────────────────
   const sjekkEpost = async (e: React.FormEvent) => {
@@ -103,7 +107,7 @@ export default function LoginPage() {
         email:         data.email ?? null,
         rolle:         data.rolle ?? 'bruker',
       });
-      router.replace('/dashboard');
+      router.replace(returnTo);
     } catch {
       setFeil('Kunne ikke nå serveren. Prøv igjen.');
     } finally {
@@ -152,7 +156,7 @@ export default function LoginPage() {
           email:         loginData.email ?? null,
           rolle:         loginData.rolle ?? 'bruker',
         });
-        router.replace('/dashboard');
+        router.replace(returnTo);
       }
     } catch {
       setFeil('Kunne ikke nå serveren. Prøv igjen.');
@@ -186,6 +190,20 @@ export default function LoginPage() {
           backdropFilter: 'blur(8px)',
         }}
       >
+        {/* Session utløpt-melding */}
+        {sessionUtlopt && (
+          <div
+            className="w-full px-4 py-3 rounded-lg text-xs text-center"
+            style={{
+              background: 'rgba(251,191,36,0.10)',
+              border:     '1px solid rgba(251,191,36,0.25)',
+              color:      'rgba(251,191,36,0.90)',
+            }}
+          >
+            Din session er utløpt. Logg inn på nytt for å fortsette.
+          </div>
+        )}
+
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
           <img
