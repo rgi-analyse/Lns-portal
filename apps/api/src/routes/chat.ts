@@ -696,7 +696,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { messages: rawMessages, rapportId, pbiReportId, slicers, slicerValues, activeSlicerState, aktivSide } = request.body;
+      const { messages: rawMessages, rapportId, pbiReportId, slicers, slicerValues, activeSlicerState, aktivSide, visualData } = request.body;
 
       // Logg mottatt history
       console.log('[Chat] history mottatt:', rawMessages?.map((m) => ({
@@ -1147,6 +1147,29 @@ Tilgjengelige visualiseringstyper:
       console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
       console.log('[systemPrompt] lengde:', basisPrompt.length);
 
+      // Formater PBI visual-data (CSV fra exportData) til lesbar tekst for AI-kontekst
+      // Sjekk om prompten har minst ett reelt SQL-view (format: "   View: schema.navn")
+      const harKobletView = basisPrompt.includes('   View: ');
+      const formaterteVisualData = (() => {
+        if (!visualData || Object.keys(visualData).length === 0) return null;
+        const deler: string[] = [];
+        for (const [visueltNavn, csv] of Object.entries(visualData)) {
+          if (!csv?.trim()) continue;
+          const linjer = csv.trim().split('\n').filter(Boolean);
+          if (linjer.length === 0) continue;
+          const [header, ...rader] = linjer;
+          const MAX_RADER = 50;
+          const avkortet = rader.length > MAX_RADER;
+          const visRader = rader.slice(0, MAX_RADER);
+          let seksjon = `### ${visueltNavn}\n${header}\n${visRader.join('\n')}`;
+          if (avkortet) seksjon += `\n(viser ${MAX_RADER} av ${rader.length} rader totalt)`;
+          deler.push(seksjon);
+        }
+        return deler.length > 0 ? deler.join('\n\n') : null;
+      })();
+      console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
+      console.log('[Chat] harKobletView:', harKobletView);
+
       // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
       const slicerValuesSummary = slicerValues
         ? Object.fromEntries(
@@ -1212,11 +1235,22 @@ SPESIELT FOR TID-SLICER (hierarchy):
 - Format: "9 (23.02.26-01.03.26)"
 - Match "uke 9" → finn verdien som starter med "9 "
 - Bruk set_report_slicer med slicerTitle, values og år
+${formaterteVisualData ? `
+VISUAL DATA — INNHOLD PÅ SKJERMEN AKKURAT NÅ:
+Dette er CSV-eksport av det brukeren ser i Power BI-rapporten (med aktive slicer-valg):
 
+${formaterteVisualData}
+
+Bruk denne visual-dataen til å svare på spørsmål om hva brukeren ser på skjermen.
+` : ''}
 DATAHENTING - KRITISKE REGLER:
-- Når brukeren spør om data: ALLTID kall query_database umiddelbart. Ikke spør om du skal gjøre det.
+${formaterteVisualData && !harKobletView ? `- Denne rapporten har IKKE koblet SQL-view. Svar basert på VISUAL DATA ovenfor — ikke kall query_database.
+- Beregn summer, gjennomsnitt og filtreringer direkte fra CSV-dataene ovenfor.
+` : `- Når brukeren spør om data: ALLTID kall query_database umiddelbart. Ikke spør om du skal gjøre det.
 - Ikke si at du ikke har tilgang til data. Du har ALLTID tilgang via query_database.
 - Ikke avvis spørsmål fordi data ikke finnes i rapporten — søk i databasen først.
+`}${formaterteVisualData && harKobletView ? `- Visual data ovenfor viser hva som er synlig på skjermen nå. Bruk query_database for dypere analyse eller data utenfor visual-utvalget.
+` : ''}
 
 PRIORITERING FOR PRODUKSJONSRAPPORTER:
 1. Velg riktig view basert på spørsmålet
