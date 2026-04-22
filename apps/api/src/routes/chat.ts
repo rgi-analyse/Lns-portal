@@ -696,7 +696,35 @@ export async function chatRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const t0 = Date.now();
       const { messages: rawMessages, rapportId, pbiReportId, slicers, slicerValues, activeSlicerState, aktivSide, visualData } = request.body;
+
+      // Timing-state — oppdateres underveis og logges ved stream-slutt
+      let t1 = 0; // etter tilgang-sjekk (bruker-rolle + workspace-view-kjede)
+      let t2 = 0; // rett før OpenAI-kall (etter systemPrompt-bygging)
+      let t3 = 0; // første token fra OpenAI (første text-chunk)
+      let t4 = 0; // første tool-call ferdig (første tool_call-chunk)
+      let t5 = 0; // siste tool-call ferdig (siste tool_call-chunk)
+      let antallToolCalls = 0;
+      let antallQueryResults = 0;
+
+      const loggTiming = (mode: 'global' | 'rapport') => {
+        const tSlutt = Date.now();
+        const entraId = (request.headers['x-entra-object-id'] as string | undefined)?.trim() ?? '';
+        console.log('[chat-timing]', JSON.stringify({
+          mode,
+          entraObjectId: entraId.length > 6 ? '***' + entraId.slice(-6) : entraId,
+          rapportId: rapportId ?? null,
+          tilgangSjekk_ms: t1 > 0 ? t1 - t0 : null,
+          preOpenAI_ms:    t2 > 0 ? t2 - t0 : null,
+          forsteToken_ms:  t3 > 0 ? t3 - t0 : null,
+          forsteToolCall_ms: t4 > 0 ? t4 - t0 : null,
+          sisteToolCall_ms:  t5 > 0 ? t5 - t0 : null,
+          antallToolCalls,
+          antallQueryResults,
+          total_ms: tSlutt - t0,
+        }));
+      };
 
       // Logg mottatt history
       console.log('[Chat] history mottatt:', rawMessages?.map((m) => ({
@@ -789,6 +817,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
           console.warn('[Chat] view-navn fetch feil:', err instanceof Error ? err.message : err);
         }
       }
+
+      t1 = Date.now(); // T1: tilgang-sjekk (bruker-rolle + workspace-view-kjede) ferdig
 
       // Hent brukerens profildata tidlig — brukes i rankViews-boost og velkomst
       let profilViews: string[] = [];
@@ -1052,7 +1082,16 @@ Tilgjengelige visualiseringstyper:
         const writeOgCapture = (chunk: unknown) => {
           write(chunk);
           const c = chunk as Record<string, unknown>;
-          if (c.type === 'text' && typeof c.content === 'string') fullAiTekst += c.content;
+          if (c.type === 'text' && typeof c.content === 'string') {
+            fullAiTekst += c.content;
+            if (t3 === 0) t3 = Date.now(); // T3: første token fra OpenAI
+          }
+          if (c.type === 'tool_call') {
+            if (t4 === 0) t4 = Date.now(); // approx T4: første tool-call sett i gang
+            t5 = Date.now();               // T5: siste tool-call ferdig
+            antallToolCalls++;
+          }
+          if (c.type === 'query_result') antallQueryResults++;
           if (c.type === 'rapport_forslag' && c.forslag) {
             // Lagre forslag uten data[] (kan være store rådatasett)
             const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
@@ -1060,11 +1099,13 @@ Tilgjengelige visualiseringstyper:
           }
         };
 
+        t2 = Date.now(); // T2: rett før OpenAI-kall
         try {
           await chat(messages, ingenRapportPrompt, writeOgCapture, chatContext);
         } catch (err) {
           write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
         } finally {
+          loggTiming('global');
           reply.raw.end();
         }
         // Lagre assistant-melding etter AI ferdig (fire-and-forget)
@@ -1352,7 +1393,16 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const writeOgCapture = (chunk: unknown) => {
         write(chunk);
         const c = chunk as Record<string, unknown>;
-        if (c.type === 'text' && typeof c.content === 'string') fullAiTekstRapport += c.content;
+        if (c.type === 'text' && typeof c.content === 'string') {
+          fullAiTekstRapport += c.content;
+          if (t3 === 0) t3 = Date.now(); // T3: første token fra OpenAI
+        }
+        if (c.type === 'tool_call') {
+          if (t4 === 0) t4 = Date.now(); // T4: første tool-call ferdig
+          t5 = Date.now();               // T5: siste tool-call ferdig (oppdateres per call)
+          antallToolCalls++;
+        }
+        if (c.type === 'query_result') antallQueryResults++;
         if (c.type === 'rapport_forslag' && c.forslag) {
           // Lagre forslag uten data[] (kan være store rådatasett)
           const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
@@ -1360,12 +1410,14 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         }
       };
 
+      t2 = Date.now(); // T2: rett før OpenAI-kall
       try {
         await chat(messages, rapportKontekst, writeOgCapture, chatContext);
       } catch (err) {
         console.error('[chat] feil:', err);
         write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
       } finally {
+        loggTiming('rapport');
         reply.raw.end();
       }
       // Lagre assistant-melding etter AI ferdig (fire-and-forget)
