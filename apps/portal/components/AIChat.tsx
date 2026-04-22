@@ -32,6 +32,12 @@ interface ChatMessage {
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
 }
 
+interface MeldingMetadata {
+  type: 'rapport_forslag';
+  versjon: number;
+  forslag: Omit<RapportForslag, 'data'>;
+}
+
 interface RapportForslag {
   tittel: string;
   beskrivelse?: string;
@@ -264,16 +270,24 @@ export default function AIChat({
     const headers: Record<string, string> = { 'x-entra-object-id': entraObjectId, ...apiHeaders() };
     apiFetch(`/api/chat/samtaler/${encodeURIComponent(internØktId)}`, { headers })
       .then(res => res.ok ? res.json() : null)
-      .then((data: { meldinger?: Array<{ rolle: string; innhold: string }> } | Array<{ rolle: string; innhold: string }> | null) => {
+      .then((data: {
+        meldinger?: Array<{ rolle: string; innhold: string; metadata?: MeldingMetadata | null }>;
+      } | Array<{ rolle: string; innhold: string }> | null) => {
         // Støtt både gammelt format (array) og nytt format ({ meldinger: [...] })
         const meldingerRaw = Array.isArray(data) ? data : (data?.meldinger ?? []);
         const chatMsgs: ChatMessage[] = meldingerRaw
           .filter(m => m.rolle === 'user' || m.rolle === 'assistant')
           .map(m => ({ role: m.rolle as 'user' | 'assistant', content: m.innhold }));
-        const displayMsgs: DisplayMessage[] = chatMsgs.map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content ?? '',
-        }));
+        const displayMsgs: DisplayMessage[] = meldingerRaw
+          .filter(m => m.rolle === 'user' || m.rolle === 'assistant')
+          .flatMap(m => {
+            const msgs: DisplayMessage[] = [{ role: m.rolle as 'user' | 'assistant', content: m.innhold }];
+            const meta = (m as { rolle: string; innhold: string; metadata?: MeldingMetadata | null }).metadata;
+            if (meta?.type === 'rapport_forslag') {
+              msgs.push({ role: 'rapport_forslag', content: '', rapportForslag: { ...meta.forslag, data: [] } });
+            }
+            return msgs;
+          });
         conversationHistoryRef.current = chatMsgs;
         setMessages(chatMsgs);
         setDisplay(displayMsgs);
@@ -489,6 +503,17 @@ export default function AIChat({
   function eksporterRapport(forslag: RapportForslag) {
     if (!forslag.data?.length) return;
     exportToExcel(forslag.data, forslag.tittel || 'rapport');
+  }
+
+  function åpneRapportFraHistorikk(forslag: Omit<RapportForslag, 'data'>) {
+    // Lagre uten data[] — rapport-interaktiv auto-fetcher friske data
+    const forslagMedTomData: RapportForslag = { ...forslag, data: [] };
+    try {
+      sessionStorage.setItem('rapport_forslag', JSON.stringify(forslagMedTomData));
+    } catch (e) {
+      console.warn('[Historikk] sessionStorage feil:', e);
+    }
+    router.push('/dashboard/rapport-interaktiv');
   }
 
   const LAG_RAPPORT_TRIGGERS = [
@@ -1097,6 +1122,7 @@ export default function AIChat({
                 );
               })();
 
+              const erFraHistorikk = !f.data?.length;
               return (
                 <div key={i} className="flex justify-start">
                   <div
@@ -1116,9 +1142,10 @@ export default function AIChat({
                     )}
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                       {visTypeLabel[f.visualType] ?? f.visualType}
+                      {f.viewNavn ? ` · ${f.viewNavn}` : ''}
                       {f.xAkse ? ` · X: ${f.xAkse}` : ''}
                       {f.yAkse ? ` · Y: ${f.yAkse}` : ''}
-                      {f.data?.length ? ` · ${f.data.length} rader` : ''}
+                      {!erFraHistorikk ? ` · ${f.data.length} rader` : ''}
                     </div>
                     {miniChart && (
                       <div style={{ marginBottom: 8, borderRadius: 6, overflow: 'hidden', background: 'rgba(0,0,0,0.25)' }}>
@@ -1128,7 +1155,11 @@ export default function AIChat({
                     <div className="flex gap-2 mt-2">
                       <button
                         type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); visRapportFullskjerm(f); }}
+                        onClick={(e) => {
+                          e.preventDefault(); e.stopPropagation();
+                          if (erFraHistorikk) åpneRapportFraHistorikk(f);
+                          else visRapportFullskjerm(f);
+                        }}
                         className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                         style={{
                           background: 'var(--glass-gold-border)',
@@ -1139,8 +1170,9 @@ export default function AIChat({
                         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
                         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-border)'; }}
                       >
-                        Vis fullskjerm
+                        {erFraHistorikk ? 'Åpne rapport' : 'Vis fullskjerm'}
                       </button>
+                      {!erFraHistorikk && (
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); eksporterRapport(f); }}
@@ -1156,6 +1188,7 @@ export default function AIChat({
                       >
                         Eksporter
                       </button>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDisplay((prev) => prev.filter((_, idx) => idx !== i)); }}

@@ -128,15 +128,16 @@ model UserEvent {
 }
 
 model ChatHistorikk {
-  id         String   @id @default(uuid())
-  userId     String
-  rolle      String
-  innhold    String   @db.NVarChar(Max)
-  tidspunkt  DateTime @default(now())
-  øktId      String   @db.NVarChar(500)
-  tenantSlug String   @default("lns")
-  tittel     String?  @db.NVarChar(200)
-  rapportId  String?  @db.NVarChar(500)
+  id               String   @id @default(uuid())
+  userId           String
+  rolle            String
+  innhold          String   @db.NVarChar(Max)
+  tidspunkt        DateTime @default(now())
+  øktId            String   @db.NVarChar(500)
+  tenantSlug       String   @default("lns")
+  tittel           String?  @db.NVarChar(200)
+  rapportId        String?  @db.NVarChar(500)
+  melding_metadata String?  @db.NVarChar(Max)
 
   @@index([userId, rapportId])
 }

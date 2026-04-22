@@ -1045,10 +1045,16 @@ Tilgjengelige visualiseringstyper:
           reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
         };
         let fullAiTekst = '';
+        let fangstMetadataGlobal: string | null = null;
         const writeOgCapture = (chunk: unknown) => {
           write(chunk);
           const c = chunk as Record<string, unknown>;
           if (c.type === 'text' && typeof c.content === 'string') fullAiTekst += c.content;
+          if (c.type === 'rapport_forslag' && c.forslag) {
+            // Lagre forslag uten data[] (kan være store rådatasett)
+            const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
+            fangstMetadataGlobal = JSON.stringify({ type: 'rapport_forslag', versjon: 1, forslag: forslagUtenData });
+          }
         };
 
         try {
@@ -1059,9 +1065,14 @@ Tilgjengelige visualiseringstyper:
           reply.raw.end();
         }
         // Lagre assistant-melding etter AI ferdig (fire-and-forget)
-        if (entraObjectId && fullAiTekst) {
+        if (entraObjectId && (fullAiTekst || fangstMetadataGlobal)) {
           prisma.chatHistorikk.create({
-            data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekst.slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
+            data: {
+              userId: entraObjectId, rolle: 'assistant',
+              innhold: fullAiTekst.slice(0, 4000),
+              øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal,
+              ...(fangstMetadataGlobal ? { melding_metadata: fangstMetadataGlobal } : {}),
+            },
           }).then(() => {
             sikreTittelGenerert(entraObjectId!, øktIdGlobal, tenantSlug);
           }).catch(() => {});
@@ -1300,10 +1311,16 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       };
       let fullAiTekstRapport = '';
+      let fangstMetadataRapport: string | null = null;
       const writeOgCapture = (chunk: unknown) => {
         write(chunk);
         const c = chunk as Record<string, unknown>;
         if (c.type === 'text' && typeof c.content === 'string') fullAiTekstRapport += c.content;
+        if (c.type === 'rapport_forslag' && c.forslag) {
+          // Lagre forslag uten data[] (kan være store rådatasett)
+          const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
+          fangstMetadataRapport = JSON.stringify({ type: 'rapport_forslag', versjon: 1, forslag: forslagUtenData });
+        }
       };
 
       try {
@@ -1315,9 +1332,14 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         reply.raw.end();
       }
       // Lagre assistant-melding etter AI ferdig (fire-and-forget)
-      if (entraObjectId && fullAiTekstRapport) {
+      if (entraObjectId && (fullAiTekstRapport || fangstMetadataRapport)) {
         prisma.chatHistorikk.create({
-          data: { userId: entraObjectId, rolle: 'assistant', innhold: fullAiTekstRapport.slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
+          data: {
+            userId: entraObjectId, rolle: 'assistant',
+            innhold: fullAiTekstRapport.slice(0, 4000),
+            øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport,
+            ...(fangstMetadataRapport ? { melding_metadata: fangstMetadataRapport } : {}),
+          },
         }).then(() => {
           sikreTittelGenerert(entraObjectId!, øktIdRapport, tenantSlug);
         }).catch(() => {});
@@ -1412,7 +1434,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const meldinger = await prisma.chatHistorikk.findMany({
         where: { userId: entraObjectId, øktId, tenantSlug },
         orderBy: { tidspunkt: 'asc' },
-        select: { rolle: true, innhold: true, tidspunkt: true, rapportId: true },
+        select: { rolle: true, innhold: true, tidspunkt: true, rapportId: true, melding_metadata: true },
       });
 
       // Hent rapportnavn for første rad med rapportId
@@ -1424,7 +1446,18 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         rapportNavn = rapport?.navn ?? null;
       }
 
-      return reply.send({ øktId, rapportId, rapportNavn, meldinger });
+      return reply.send({
+        øktId, rapportId, rapportNavn,
+        meldinger: meldinger.map(m => ({
+          rolle:    m.rolle,
+          innhold:  m.innhold,
+          tidspunkt: m.tidspunkt,
+          rapportId: m.rapportId,
+          metadata: m.melding_metadata
+            ? (() => { try { return JSON.parse(m.melding_metadata!); } catch { return null; } })()
+            : null,
+        })),
+      });
     },
   );
 
