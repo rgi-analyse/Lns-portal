@@ -1284,7 +1284,7 @@ For å se hvilke rapporter som finnes eller åpne en annen rapport:
 REGLER:
 - Svar alltid på norsk
 - For data-spørsmål: kall query_database automatisk uten å spørre brukeren
-- Når du presenterer data fra en spørring, ikke legg til oppfordring om nedlasting — det finnes en knapp i grensesnittet
+- Ikke legg til oppfordring om nedlasting av data — brukeren har Excel-eksport tilgjengelig direkte i grensesnittet
 
 Svar alltid på norsk. Vær konkret.`;
 

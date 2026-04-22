@@ -118,6 +118,45 @@ function exportToExcel(data: Record<string, unknown>[], filename: string) {
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
+/** Parser første markdown-tabell i en AI-tekst til strukturerte rader for Excel-eksport. */
+function parseMarkdownTable(text: string): Record<string, unknown>[] | null {
+  const lines = text.split('\n');
+  const startIdx = lines.findIndex(l => l.trim().startsWith('|') && l.includes('|', 1));
+  if (startIdx === -1) return null;
+
+  const tableLines: string[] = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l.startsWith('|')) break;
+    tableLines.push(l);
+  }
+  if (tableLines.length < 3) return null;
+
+  const isSeparator = (l: string) => /^\|[\s\-:|]+\|/.test(l);
+  if (!isSeparator(tableLines[1])) return null;
+
+  const splitCells = (l: string) =>
+    l.split('|').slice(1, -1).map(c => c.trim());
+
+  const headers = splitCells(tableLines[0]);
+  if (headers.length === 0) return null;
+
+  const rows = tableLines.slice(2).map(line => {
+    const cells = splitCells(line);
+    const row: Record<string, unknown> = {};
+    headers.forEach((h, idx) => {
+      const raw = cells[idx] ?? '';
+      // Prøv norsk tallformat: "1 234,56" → 1234.56
+      const numStr = raw.replace(/\s/g, '').replace(',', '.');
+      const num = Number(numStr);
+      row[h] = raw !== '' && !isNaN(num) ? num : raw;
+    });
+    return row;
+  }).filter(row => Object.values(row).some(v => v !== ''));
+
+  return rows.length > 0 ? rows : null;
+}
+
 export default function AIChat({
   entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
@@ -285,6 +324,13 @@ export default function AIChat({
             const meta = (m as { rolle: string; innhold: string; metadata?: MeldingMetadata | null }).metadata;
             if (meta?.type === 'rapport_forslag') {
               msgs.push({ role: 'rapport_forslag', content: '', rapportForslag: { ...meta.forslag, data: [] } });
+            }
+            // Gjenopprett Excel-knapp for historiske assistant-meldinger med markdown-tabeller
+            if (m.rolle === 'assistant') {
+              const tabellData = parseMarkdownTable(m.innhold);
+              if (tabellData && tabellData.length > 0) {
+                msgs.push({ role: 'actions', content: '', queryData: tabellData });
+              }
             }
             return msgs;
           });
@@ -671,6 +717,12 @@ export default function AIChat({
             if (pendingQueryRef.current) {
               addDisplay({ role: 'actions', content: '', queryData: pendingQueryRef.current.data, querySql: pendingQueryRef.current.sql });
               pendingQueryRef.current = null;
+            } else if (assistantText) {
+              // AI svarte med markdown-tabell (ingen query_result mottatt) — tilby Excel-eksport
+              const tabellData = parseMarkdownTable(assistantText);
+              if (tabellData && tabellData.length > 0) {
+                addDisplay({ role: 'actions', content: '', queryData: tabellData });
+              }
             }
             // STEG 4 – Auto-opplesing av ferdig AI-svar
             if (autoOpplesing && assistantText) {
