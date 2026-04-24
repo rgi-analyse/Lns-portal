@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, TrendingUp, Loader2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
 
 interface Bestilling {
   id:             string;
@@ -223,10 +224,9 @@ export default function AnalyseListePage() {
                     border:       '1px solid var(--glass-gold-border)',
                     borderRadius: 10,
                     color:        'var(--gold)',
-                    fontSize:     18,
                   }}
                 >
-                  {b.analyseType.ikon ?? <TrendingUp className="w-5 h-5" />}
+                  <AnalyseIkon navn={b.analyseType.ikon} className="w-5 h-5" />
                 </div>
 
                 {/* Midt */}

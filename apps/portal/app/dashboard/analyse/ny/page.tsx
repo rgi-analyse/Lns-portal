@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, TrendingUp, Loader2 } from 'lucide-react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
 
 // ── JSON Schema-typer (støttet subsett) ────────────────────────────────────
 interface SchemaProperty {
@@ -252,10 +253,9 @@ export default function NyAnalysePage() {
                         border:       '1px solid var(--glass-gold-border)',
                         borderRadius: 10,
                         color:        'var(--gold)',
-                        fontSize:     18,
                       }}
                     >
-                      {t.ikon ?? <TrendingUp className="w-5 h-5" />}
+                      <AnalyseIkon navn={t.ikon} className="w-5 h-5" />
                     </div>
                     <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>
                       {t.navn}

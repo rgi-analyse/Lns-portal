@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Download, Loader2, TrendingUp, XCircle, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
+import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
 
 interface Bestilling {
   id:             string;
@@ -211,10 +212,9 @@ export default function AnalyseDetaljPage() {
               border:       '1px solid var(--glass-gold-border)',
               borderRadius: 12,
               color:        'var(--gold)',
-              fontSize:     24,
             }}
           >
-            {bestilling.analyseType.ikon ?? <TrendingUp className="w-7 h-7" />}
+            <AnalyseIkon navn={bestilling.analyseType.ikon} className="w-7 h-7" />
           </div>
           <div className="flex-1 min-w-0">
             <h1
