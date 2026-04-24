@@ -4,6 +4,18 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Deployment slot'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  DEPLOY_SLOT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.slot || 'production' }}
 
 jobs:
   deploy-api:
@@ -60,6 +72,7 @@ jobs:
 
       - name: Verifiser deploy-pakke
         run: |
+          echo "=== Deployer til slot: ${{ env.DEPLOY_SLOT }} ==="
           echo "=== Innhold ===" && ls /tmp/api-deploy/
           echo "=== package.json scripts ===" && node -e "console.log(JSON.stringify(require('/tmp/api-deploy/package.json').scripts,null,2))"
           echo "=== package.json @synapse/db-referanse ===" && node -e "console.log(require('/tmp/api-deploy/package.json').dependencies['@synapse/db'])"
@@ -73,7 +86,8 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-api
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
+          slot-name: ${{ env.DEPLOY_SLOT }}
+          publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_API_STAGING || secrets.AZURE_PUBLISH_PROFILE_API }}
           package: /tmp/api-deploy
 
   deploy-portal:
@@ -105,5 +119,6 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-portal
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
+          slot-name: ${{ env.DEPLOY_SLOT }}
+          publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_PORTAL_STAGING || secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
           package: apps/portal
