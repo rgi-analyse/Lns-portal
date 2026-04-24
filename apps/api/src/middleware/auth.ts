@@ -68,6 +68,27 @@ export function erAdmin(rolle: string | undefined): boolean {
 }
 
 /**
+ * Krever at pålogget bruker har harAnalyseTilgang=true på UserProfile.
+ * Må brukes etter requireBruker. Returnerer 403 hvis ikke tilgang.
+ */
+export async function requireAnalyseTilgang(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const bruker = (request as AuthRequest).bruker;
+  if (!bruker) {
+    return reply.status(401).send({ error: 'Ikke innlogget.' });
+  }
+  const profil = await prisma.userProfile.findUnique({
+    where: { userId: bruker.id },
+    select: { harAnalyseTilgang: true },
+  });
+  if (!profil?.harAnalyseTilgang) {
+    return reply.status(403).send({ error: 'Krever analyse-tilgang.' });
+  }
+}
+
+/**
  * Hjelpe-funksjon: slår opp Bruker fra header uten å returnere feil.
  * Brukes for ruter som er offentlige men oppfører seg annerledes for admins.
  */
