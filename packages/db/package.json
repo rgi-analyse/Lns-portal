@@ -1,0 +1,30 @@
+{
+  "name": "@synapse/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "db:seed": "npx prisma db seed",
+    "build": "prisma generate && tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.4.2"
+  },
+  "devDependencies": {
+    "@prisma/adapter-mssql": "^7.4.2",
+    "@types/mssql": "^9.1.9",
+    "@types/node": "^20.12.12",
+    "dotenv": "^16.4.5",
+    "mssql": "^12.2.0",
+    "prisma": "^7.4.2",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
