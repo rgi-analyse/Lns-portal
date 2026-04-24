@@ -4,7 +4,7 @@ import { queryAzureSQL } from '../src/services/azureSqlService';
 // Finn en admin-bruker for testing
 async function main() {
   // Hent admin-bruker fra Prisma-databasen (egen DB)
-  const { PrismaClient } = await import('../src/generated/prisma/index.js');
+  const { PrismaClient } = await import('@synapse/db');
   const prisma = new PrismaClient();
 
   const admin = await prisma.bruker.findFirst({

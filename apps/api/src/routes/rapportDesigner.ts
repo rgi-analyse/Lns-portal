@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
-import type { PrismaClient } from '../generated/prisma/client';
+import type { PrismaClient } from '@synapse/db';
 import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
 
 function safeId(id: string): string {
