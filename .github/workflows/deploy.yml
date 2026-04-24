@@ -107,7 +107,15 @@ jobs:
       - name: Installer avhengigheter (workspaces)
         run: npm ci
 
-      - name: Bygg Portal
+      - name: Bygg @synapse/db
+        run: npm run build --workspace=@synapse/db
+        env:
+          DATABASE_URL: "sqlserver://localhost:1433;database=ci;user=ci;password=ci;trustServerCertificate=true"
+
+      - name: Bygg @synapse/shared
+        run: npm run build --workspace=@synapse/shared
+
+      - name: Bygg Portal (standalone)
         run: npm run build
         working-directory: apps/portal
         env:
@@ -117,10 +125,36 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NODE_OPTIONS: '--max-old-space-size=4096'
 
+      - name: Lag standalone deploy-pakke
+        run: |
+          rm -rf /tmp/portal-deploy
+          mkdir -p /tmp/portal-deploy
+
+          # Kopier standalone-bundelen (inneholder server.js + minimal node_modules)
+          cp -r apps/portal/.next/standalone/. /tmp/portal-deploy/
+
+          # Kopier public/ (ikke inkludert i standalone)
+          cp -r apps/portal/public /tmp/portal-deploy/apps/portal/public
+
+          # Kopier .next/static (ikke inkludert i standalone)
+          mkdir -p /tmp/portal-deploy/apps/portal/.next
+          cp -r apps/portal/.next/static /tmp/portal-deploy/apps/portal/.next/static
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Deployer til slot: ${{ env.DEPLOY_SLOT }} ==="
+          echo "=== Rot-innhold ===" && ls /tmp/portal-deploy/
+          echo "=== apps/portal-innhold ===" && ls /tmp/portal-deploy/apps/portal/
+          echo "=== server.js finnes ===" && test -f /tmp/portal-deploy/apps/portal/server.js && echo "JA" || echo "NEI"
+          echo "=== public/ finnes ===" && test -d /tmp/portal-deploy/apps/portal/public && echo "JA" || echo "NEI"
+          echo "=== .next/static finnes ===" && test -d /tmp/portal-deploy/apps/portal/.next/static && echo "JA" || echo "NEI"
+          echo "=== node_modules/ finnes ===" && test -d /tmp/portal-deploy/node_modules && echo "JA" || echo "NEI"
+
       - name: Deploy Portal til Azure
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-portal
           slot-name: ${{ env.DEPLOY_SLOT }}
           publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_PORTAL_STAGING || secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
-          package: apps/portal
+          package: /tmp/portal-deploy
+          startup-command: 'node apps/portal/server.js'
