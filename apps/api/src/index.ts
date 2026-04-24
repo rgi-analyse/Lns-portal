@@ -48,6 +48,7 @@ import { tenantRoutes } from './routes/tenants';
 import { aktivitetRoutes } from './routes/aktivitet';
 import { userEventRoutes } from './routes/userEvents';
 import { lisensRoutes } from './routes/lisens';
+import { analyseRoutes } from './routes/analyse';
 
 // Azure App Service håndterer TLS ved sin reverse-proxy – appen kjører alltid plain HTTP.
 const server = Fastify({
@@ -123,6 +124,7 @@ async function start() {
   await server.register(aktivitetRoutes);
   await server.register(userEventRoutes);
   await server.register(lisensRoutes);
+  await server.register(analyseRoutes);
 
   try {
     await server.listen({ port: PORT, host: HOST });
