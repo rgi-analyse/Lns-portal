@@ -5,6 +5,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
+    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:pull": "prisma db pull",
     "db:seed": "npx prisma db seed",
