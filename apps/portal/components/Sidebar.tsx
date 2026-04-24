@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, LayoutDashboard, Building2, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutDashboard, Building2, TrendingUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +44,17 @@ export default function Sidebar() {
   const [expandedWs, setExpandedWs] = useState<Record<string, boolean>>({});
   const [rapporter, setRapporter] = useState<Record<string, Rapport[]>>({});
   const [loadingRapporter, setLoadingRapporter] = useState<Record<string, boolean>>({});
+  const [harAnalyseTilgang, setHarAnalyseTilgang] = useState(false);
+
+  useEffect(() => {
+    if (!authHeaders['X-Entra-Object-Id']) return;
+    apiFetch('/api/meg', { headers: authHeaders, cache: 'no-store' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { harAnalyseTilgang?: boolean } | null) => {
+        setHarAnalyseTilgang(!!data?.harAnalyseTilgang);
+      })
+      .catch(() => { /* ikke kritisk */ });
+  }, [authHeaders]);
 
   useEffect(() => {
     if (!authHeaders['X-Entra-Object-Id']) { setLoadingWorkspaces(false); return; }
@@ -173,6 +184,42 @@ export default function Sidebar() {
           <LayoutDashboard className="w-4 h-4 shrink-0" />
           {!collapsed && <span className="font-medium">Dashboard</span>}
         </Link>
+
+        {/* Analyser — kun synlig for brukere med harAnalyseTilgang */}
+        {harAnalyseTilgang && (() => {
+          const analyseAktiv = pathname === '/dashboard/analyse' || pathname.startsWith('/dashboard/analyse/');
+          return (
+            <Link
+              href="/dashboard/analyse"
+              className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all relative', collapsed && 'justify-center')}
+              style={analyseAktiv ? {
+                background: 'var(--glass-gold-bg)',
+                border: '1px solid var(--glass-gold-border)',
+                color: 'var(--text-primary)',
+                borderLeft: '2px solid var(--gold)',
+                paddingLeft: collapsed ? undefined : '10px',
+              } : {
+                color: 'var(--text-secondary)',
+              }}
+              onMouseEnter={(e) => {
+                if (!analyseAktiv) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg)';
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!analyseAktiv) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)';
+                }
+              }}
+              title={collapsed ? 'Analyser' : undefined}
+            >
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              {!collapsed && <span className="font-medium">Analyser</span>}
+            </Link>
+          );
+        })()}
 
         {/* Workspaces heading */}
         {!collapsed && (
