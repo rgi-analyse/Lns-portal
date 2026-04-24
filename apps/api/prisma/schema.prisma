@@ -114,6 +114,54 @@ model UserProfile {
   lastActivity          DateTime?
   aiKontekst            String?   @db.NVarChar(Max)
   oppdatert             DateTime  @updatedAt
+  harAnalyseTilgang     Boolean   @default(false)
+
+  analyseBestillinger   AnalyseBestilling[]
+}
+
+model AnalyseType {
+  id              String   @id @db.NVarChar(100)
+  navn            String   @db.NVarChar(200)
+  beskrivelse     String?  @db.NVarChar(Max)
+  ikon            String?  @db.NVarChar(100)
+  erAktiv         Boolean  @default(true)
+  parametreSchema String   @db.NVarChar(Max)
+  minRolle        String   @default("analytiker") @db.NVarChar(50)
+  sortOrder       Int      @default(0)
+  opprettet       DateTime @default(now())
+  oppdatert       DateTime @updatedAt
+
+  bestillinger    AnalyseBestilling[]
+
+  @@map("ai_analyse_type")
+}
+
+model AnalyseBestilling {
+  id            String    @id @db.NVarChar(36)
+  brukerId      String    @db.NVarChar(36)
+  tenantSlug    String    @db.NVarChar(100)
+  analyseTypeId String    @db.NVarChar(100)
+  parametre     String    @db.NVarChar(Max)
+  status        String    @default("BESTILT") @db.NVarChar(20)
+  bestiltDato   DateTime  @default(now())
+  startetDato   DateTime?
+  ferdigDato    DateTime?
+  tittel        String?   @db.NVarChar(500)
+  sammendrag    String?   @db.NVarChar(Max)
+  dokumentUrl   String?   @db.NVarChar(2000)
+  dokumentNavn  String?   @db.NVarChar(500)
+  feilmelding   String?   @db.NVarChar(Max)
+  forsokAntall  Int       @default(0)
+  tokenForbruk  Int?
+  modellBrukt   String?   @db.NVarChar(100)
+
+  bruker      UserProfile @relation(fields: [brukerId], references: [userId], onDelete: NoAction, onUpdate: NoAction)
+  analyseType AnalyseType @relation(fields: [analyseTypeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([brukerId, tenantSlug])
+  @@index([tenantSlug, status])
+  @@index([bestiltDato(sort: Desc)])
+  @@map("ai_analyse_bestilling")
 }
 
 model UserEvent {
