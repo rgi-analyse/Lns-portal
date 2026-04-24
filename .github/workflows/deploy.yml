@@ -49,6 +49,7 @@ jobs:
 
           # Kopier @synapse/db sine runtime-artefakter (dist inneholder bygget Prisma-klient)
           cp -r packages/db/dist /tmp/api-deploy/packages/db/
+          cp -r packages/db/prisma /tmp/api-deploy/packages/db/
           cp packages/db/package.json /tmp/api-deploy/packages/db/
 
           # Syntetisert package.json: api sine deps + @synapse/db via file:-protokoll
@@ -81,6 +82,7 @@ jobs:
           echo "=== packages/db innhold ===" && ls /tmp/api-deploy/packages/db/
           echo "=== packages/db/dist innhold ===" && ls /tmp/api-deploy/packages/db/dist/
           echo "=== Generert Prisma-klient ===" && test -f /tmp/api-deploy/packages/db/dist/generated/prisma/client.js && echo "JA" || echo "NEI"
+          echo "=== packages/db/prisma schema finnes ===" && test -f /tmp/api-deploy/packages/db/prisma/schema.prisma && echo "JA" || echo "NEI"
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
