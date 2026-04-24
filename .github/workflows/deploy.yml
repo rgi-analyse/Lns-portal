@@ -107,14 +107,6 @@ jobs:
       - name: Installer avhengigheter (workspaces)
         run: npm ci
 
-      - name: Bygg @synapse/db
-        run: npm run build --workspace=@synapse/db
-        env:
-          DATABASE_URL: "sqlserver://localhost:1433;database=ci;user=ci;password=ci;trustServerCertificate=true"
-
-      - name: Bygg @synapse/shared
-        run: npm run build --workspace=@synapse/shared
-
       - name: Bygg Portal (standalone)
         run: npm run build
         working-directory: apps/portal
