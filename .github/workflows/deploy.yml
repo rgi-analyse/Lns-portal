@@ -149,4 +149,3 @@ jobs:
           slot-name: ${{ env.DEPLOY_SLOT }}
           publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_PORTAL_STAGING || secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
           package: /tmp/portal-deploy
-          startup-command: 'node apps/portal/server.js'
