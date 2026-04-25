@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, FileBarChart2, RefreshCw, Star } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
@@ -17,10 +18,24 @@ interface Workspace {
   _count?: { rapporter: number; tilgang: number };
 }
 
+interface RapportRef {
+  id: string | null;
+  navn: string | null;
+  dato: string;
+  erDesignerRapport?: boolean;
+}
+
 interface Aktivitet {
   sistInnlogget: string | null;
-  sistAapnetRapport: { navn: string | null; dato: string } | null;
-  sistOppdatertRapport: { navn: string | null; dato: string } | null;
+  sistAapnetRapport: RapportRef | null;
+  sistOppdatertRapport: RapportRef | null;
+}
+
+function rapportHref(r: RapportRef): string | null {
+  if (!r.id) return null;
+  return r.erDesignerRapport
+    ? `/dashboard/rapport-interaktiv?rapportId=${r.id}&fraLagret=true`
+    : `/dashboard/rapport/${r.id}`;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -195,105 +210,27 @@ export default function DashboardPage() {
           </div>
 
           {/* Kort 2: Siste åpnet rapport */}
-          <div
-            className="flex items-center gap-4"
-            style={{
-              background: 'var(--glass-bg)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid var(--glass-bg-hover)',
-              borderRadius: 14,
-              padding: '20px 24px',
-            }}
-          >
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)' }}
-            >
-              <FileBarChart2 className="w-6 h-6" style={{ color: 'var(--gold)' }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-widest font-semibold"
-                style={{ color: 'var(--text-muted)' }}>
-                Siste åpnet rapport
-              </p>
-              {aktivitet === null ? (
-                <span className="inline-block w-32 h-5 rounded animate-pulse mt-1"
-                  style={{ background: 'var(--glass-bg-hover)' }} />
-              ) : aktivitet.sistAapnetRapport ? (
-                <>
-                  <p className="truncate" style={{
-                    fontFamily: 'Barlow Condensed, sans-serif',
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: 'var(--text-primary)',
-                    marginTop: 4,
-                  }}>
-                    {aktivitet.sistAapnetRapport.navn ?? '—'}
-                  </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {formaterDato(aktivitet.sistAapnetRapport.dato)}
-                  </p>
-                </>
-              ) : (
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Ingen åpnet ennå
-                </p>
-              )}
-            </div>
-          </div>
+          <RapportKort
+            label="Siste åpnet rapport"
+            ikon={<FileBarChart2 className="w-6 h-6" style={{ color: 'var(--gold)' }} />}
+            ikonStyle={{ background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)' }}
+            laster={aktivitet === null}
+            rapport={aktivitet?.sistAapnetRapport ?? null}
+            tomTekst="Ingen åpnet ennå"
+          />
 
           {/* Kort 3: Sist oppdatert rapport */}
-          <div
-            className="flex items-center gap-4"
-            style={{
-              background: 'var(--glass-bg)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              border: '1px solid var(--glass-bg-hover)',
-              borderRadius: 14,
-              padding: '20px 24px',
+          <RapportKort
+            label="Sist oppdatert rapport"
+            ikon={<RefreshCw className="w-6 h-6" style={{ color: 'rgba(110,231,183,0.9)' }} />}
+            ikonStyle={{
+              background: 'rgba(16,185,129,0.10)',
+              border: '1px solid rgba(16,185,129,0.20)',
             }}
-          >
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
-              style={{
-                background: 'rgba(16,185,129,0.10)',
-                border: '1px solid rgba(16,185,129,0.20)',
-              }}
-            >
-              <RefreshCw className="w-6 h-6" style={{ color: 'rgba(110,231,183,0.9)' }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-widest font-semibold"
-                style={{ color: 'var(--text-muted)' }}>
-                Sist oppdatert rapport
-              </p>
-              {aktivitet === null ? (
-                <span className="inline-block w-32 h-5 rounded animate-pulse mt-1"
-                  style={{ background: 'var(--glass-bg-hover)' }} />
-              ) : aktivitet.sistOppdatertRapport ? (
-                <>
-                  <p className="truncate" style={{
-                    fontFamily: 'Barlow Condensed, sans-serif',
-                    fontWeight: 700,
-                    fontSize: 16,
-                    color: 'var(--text-primary)',
-                    marginTop: 4,
-                  }}>
-                    {aktivitet.sistOppdatertRapport.navn}
-                  </p>
-                  <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {formaterDato(aktivitet.sistOppdatertRapport.dato)}
-                  </p>
-                </>
-              ) : (
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Ingen rapporter ennå
-                </p>
-              )}
-            </div>
-          </div>
+            laster={aktivitet === null}
+            rapport={aktivitet?.sistOppdatertRapport ?? null}
+            tomTekst="Ingen rapporter ennå"
+          />
 
         </div>
 
@@ -474,6 +411,99 @@ export default function DashboardPage() {
       </div>
       {/* Chat-widget leveres globalt fra dashboard/layout.tsx */}
     </>
+  );
+}
+
+function RapportKort({
+  label,
+  ikon,
+  ikonStyle,
+  laster,
+  rapport,
+  tomTekst,
+}: {
+  label: string;
+  ikon: React.ReactNode;
+  ikonStyle: React.CSSProperties;
+  laster: boolean;
+  rapport: RapportRef | null;
+  tomTekst: string;
+}) {
+  const href = rapport ? rapportHref(rapport) : null;
+
+  const kortStyle: React.CSSProperties = {
+    background: 'var(--glass-bg)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid var(--glass-bg-hover)',
+    borderRadius: 14,
+    padding: '20px 24px',
+    transition: 'background 0.2s ease, border-color 0.2s ease',
+    textDecoration: 'none',
+    color: 'inherit',
+    cursor: href ? 'pointer' : 'default',
+  };
+
+  const innhold = (
+    <>
+      <div
+        className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0"
+        style={ikonStyle}
+      >
+        {ikon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-widest font-semibold"
+          style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </p>
+        {laster ? (
+          <span className="inline-block w-32 h-5 rounded animate-pulse mt-1"
+            style={{ background: 'var(--glass-bg-hover)' }} />
+        ) : rapport ? (
+          <>
+            <p className="truncate" style={{
+              fontFamily: 'Barlow Condensed, sans-serif',
+              fontWeight: 700,
+              fontSize: 16,
+              color: 'var(--text-primary)',
+              marginTop: 4,
+            }}>
+              {rapport.navn ?? '—'}
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+              {formaterDato(rapport.dato)}
+            </p>
+          </>
+        ) : (
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            {tomTekst}
+          </p>
+        )}
+      </div>
+    </>
+  );
+
+  if (!href) {
+    return <div className="flex items-center gap-4" style={kortStyle}>{innhold}</div>;
+  }
+
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-4"
+      style={kortStyle}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--glass-bg-hover)';
+        e.currentTarget.style.borderColor = 'var(--glass-gold-border)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'var(--glass-bg)';
+        e.currentTarget.style.borderColor = 'var(--glass-bg-hover)';
+      }}
+    >
+      {innhold}
+    </Link>
   );
 }
 

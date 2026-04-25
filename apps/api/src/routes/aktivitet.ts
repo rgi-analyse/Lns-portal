@@ -2,6 +2,19 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { queryAzureSQL } from '../services/azureSqlService';
+
+async function hentErDesignerRapport(id: string | null | undefined): Promise<boolean> {
+  if (!id) return false;
+  const safeId = id.replace(/[^a-zA-Z0-9\-]/g, '');
+  if (!safeId) return false;
+  try {
+    const rows = await queryAzureSQL(`SELECT erDesignerRapport FROM Rapport WHERE id = '${safeId}'`);
+    return Boolean((rows[0] as { erDesignerRapport?: unknown } | undefined)?.erDesignerRapport);
+  } catch {
+    return false;
+  }
+}
 
 export async function aktivitetRoutes(fastify: FastifyInstance) {
   fastify.get(
@@ -15,7 +28,7 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
         .findFirst({
           where: { userId: bruker.id, hendelsesType: 'åpnet_rapport' },
           orderBy: { tidspunkt: 'desc' },
-          select: { referanseNavn: true, tidspunkt: true },
+          select: { referanseId: true, referanseNavn: true, tidspunkt: true },
         })
         .catch(() => null);
 
@@ -25,17 +38,32 @@ export async function aktivitetRoutes(fastify: FastifyInstance) {
         .findFirst({
           where: { erAktiv: true },
           orderBy: { oppdatert: 'desc' },
-          select: { navn: true, oppdatert: true },
+          select: { id: true, navn: true, oppdatert: true },
         })
         .catch(() => null);
+
+      const [aapnetErDesigner, oppdatertErDesigner] = await Promise.all([
+        hentErDesignerRapport(sistAapnet?.referanseId ?? null),
+        hentErDesignerRapport(sistOppdatert?.id ?? null),
+      ]);
 
       return reply.send({
         sistInnlogget: bruker.forrigeInnlogget ?? null,
         sistAapnetRapport: sistAapnet
-          ? { navn: sistAapnet.referanseNavn, dato: sistAapnet.tidspunkt }
+          ? {
+              id: sistAapnet.referanseId,
+              navn: sistAapnet.referanseNavn,
+              dato: sistAapnet.tidspunkt,
+              erDesignerRapport: aapnetErDesigner,
+            }
           : null,
         sistOppdatertRapport: sistOppdatert
-          ? { navn: sistOppdatert.navn, dato: sistOppdatert.oppdatert }
+          ? {
+              id: sistOppdatert.id,
+              navn: sistOppdatert.navn,
+              dato: sistOppdatert.oppdatert,
+              erDesignerRapport: oppdatertErDesigner,
+            }
           : null,
       });
     },
