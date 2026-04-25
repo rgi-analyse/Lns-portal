@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "build": "echo \"No build step required (transpiled by consumers)\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

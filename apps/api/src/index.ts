@@ -69,6 +69,7 @@ async function start() {
         'https://localhost:3000',
         'https://10.0.1.132:3000',
         'https://lns-dataportal-portal.azurewebsites.net',
+        'https://lns-dataportal-portal-staging.azurewebsites.net',
         process.env.CORS_ORIGIN,
       ].filter(Boolean) as string[];
 

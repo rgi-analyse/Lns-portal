@@ -4,6 +4,18 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      slot:
+        description: 'Deployment slot'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  DEPLOY_SLOT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.slot || 'production' }}
 
 jobs:
   deploy-api:
@@ -21,22 +33,26 @@ jobs:
       - name: Installer avhengigheter (workspaces)
         run: npm ci
 
-      - name: Generer Prisma-klient
-        run: npx prisma generate
-        working-directory: apps/api
+      - name: Bygg @synapse/db (prisma generate + tsc)
+        run: npm run build --workspace=@synapse/db
         env:
           DATABASE_URL: "sqlserver://localhost:1433;database=ci;user=ci;password=ci;trustServerCertificate=true"
 
       - name: Bygg API
-        run: npm run build
-        working-directory: apps/api
+        run: npm run build --workspace=@synapse/api
 
       - name: Lag deploy-pakke (uten node_modules)
         run: |
           rm -rf /tmp/api-deploy
-          mkdir /tmp/api-deploy
+          mkdir -p /tmp/api-deploy/packages/db
           cp -r apps/api/dist /tmp/api-deploy/
-          # Lag forenklet package.json: kun start-script + dependencies (ingen build/dev)
+
+          # Kopier @synapse/db sine runtime-artefakter (dist inneholder bygget Prisma-klient)
+          cp -r packages/db/dist /tmp/api-deploy/packages/db/
+          cp -r packages/db/prisma /tmp/api-deploy/packages/db/
+          cp packages/db/package.json /tmp/api-deploy/packages/db/
+
+          # Syntetisert package.json: api sine deps + @synapse/db via file:-protokoll
           node -e "
             const pkg = require('./apps/api/package.json');
             const deploy = {
@@ -45,7 +61,10 @@ jobs:
               main: 'dist/index.js',
               scripts: { start: 'node dist/index.js' },
               engines: pkg.engines,
-              dependencies: pkg.dependencies
+              dependencies: {
+                ...pkg.dependencies,
+                '@synapse/db': 'file:./packages/db',
+              },
             };
             require('fs').writeFileSync('/tmp/api-deploy/package.json', JSON.stringify(deploy, null, 2));
           "
@@ -54,16 +73,23 @@ jobs:
 
       - name: Verifiser deploy-pakke
         run: |
+          echo "=== Deployer til slot: ${{ env.DEPLOY_SLOT }} ==="
           echo "=== Innhold ===" && ls /tmp/api-deploy/
           echo "=== package.json scripts ===" && node -e "console.log(JSON.stringify(require('/tmp/api-deploy/package.json').scripts,null,2))"
+          echo "=== package.json @synapse/db-referanse ===" && node -e "console.log(require('/tmp/api-deploy/package.json').dependencies['@synapse/db'])"
           echo "=== package-lock.json finnes ===" && test -f /tmp/api-deploy/package-lock.json && echo "JA" || echo "NEI"
           echo "=== dist/index.js (første 3 linjer) ===" && head -3 /tmp/api-deploy/dist/index.js
+          echo "=== packages/db innhold ===" && ls /tmp/api-deploy/packages/db/
+          echo "=== packages/db/dist innhold ===" && ls /tmp/api-deploy/packages/db/dist/
+          echo "=== Generert Prisma-klient ===" && test -f /tmp/api-deploy/packages/db/dist/generated/prisma/client.js && echo "JA" || echo "NEI"
+          echo "=== packages/db/prisma schema finnes ===" && test -f /tmp/api-deploy/packages/db/prisma/schema.prisma && echo "JA" || echo "NEI"
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-api
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_API }}
+          slot-name: ${{ env.DEPLOY_SLOT }}
+          publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_API_STAGING || secrets.AZURE_PUBLISH_PROFILE_API }}
           package: /tmp/api-deploy
 
   deploy-portal:
@@ -81,7 +107,7 @@ jobs:
       - name: Installer avhengigheter (workspaces)
         run: npm ci
 
-      - name: Bygg Portal
+      - name: Bygg Portal (standalone)
         run: npm run build
         working-directory: apps/portal
         env:
@@ -91,9 +117,35 @@ jobs:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NODE_OPTIONS: '--max-old-space-size=4096'
 
+      - name: Lag standalone deploy-pakke
+        run: |
+          rm -rf /tmp/portal-deploy
+          mkdir -p /tmp/portal-deploy
+
+          # Kopier standalone-bundelen (inneholder server.js + minimal node_modules)
+          cp -r apps/portal/.next/standalone/. /tmp/portal-deploy/
+
+          # Kopier public/ (ikke inkludert i standalone)
+          cp -r apps/portal/public /tmp/portal-deploy/apps/portal/public
+
+          # Kopier .next/static (ikke inkludert i standalone)
+          mkdir -p /tmp/portal-deploy/apps/portal/.next
+          cp -r apps/portal/.next/static /tmp/portal-deploy/apps/portal/.next/static
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Deployer til slot: ${{ env.DEPLOY_SLOT }} ==="
+          echo "=== Rot-innhold ===" && ls /tmp/portal-deploy/
+          echo "=== apps/portal-innhold ===" && ls /tmp/portal-deploy/apps/portal/
+          echo "=== server.js finnes ===" && test -f /tmp/portal-deploy/apps/portal/server.js && echo "JA" || echo "NEI"
+          echo "=== public/ finnes ===" && test -d /tmp/portal-deploy/apps/portal/public && echo "JA" || echo "NEI"
+          echo "=== .next/static finnes ===" && test -d /tmp/portal-deploy/apps/portal/.next/static && echo "JA" || echo "NEI"
+          echo "=== node_modules/ finnes ===" && test -d /tmp/portal-deploy/node_modules && echo "JA" || echo "NEI"
+
       - name: Deploy Portal til Azure
         uses: azure/webapps-deploy@v3
         with:
           app-name: lns-dataportal-portal
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
-          package: apps/portal
+          slot-name: ${{ env.DEPLOY_SLOT }}
+          publish-profile: ${{ env.DEPLOY_SLOT == 'staging' && secrets.AZURE_PUBLISH_PROFILE_PORTAL_STAGING || secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
+          package: /tmp/portal-deploy

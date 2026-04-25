@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../lib/prisma';
-import type { Bruker } from '../generated/prisma/client';
+import type { Bruker } from '@synapse/db';
 
 // Extend FastifyRequest with optional bruker field (set by requireBruker)
 export type AuthRequest = FastifyRequest & { bruker: Bruker };
