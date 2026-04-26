@@ -1,6 +1,4 @@
-// Delte typer og utilities mellom portal, api og kommende worker
-
-export * from './format';
+// Delte typer mellom portal og api
 
 export interface User {
   id: string;

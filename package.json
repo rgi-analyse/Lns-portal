@@ -10,9 +10,7 @@
     "dev": "npm run dev --workspace=apps/portal & npm run dev --workspace=apps/api",
     "dev:portal": "npm run dev --workspace=apps/portal",
     "dev:api": "npm run dev --workspace=apps/api",
-    "build": "npm run build --workspace=@synapse/db && npm run build --workspace=@synapse/api && npm run build --workspace=@synapse/portal",
-    "db:generate": "npm run db:generate --workspace=@synapse/db",
-    "db:seed": "npm run db:seed --workspace=@synapse/db",
+    "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },

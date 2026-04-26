@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { getPrismaForTenant } from '../lib/tenantPrisma';
-import type { PrismaClient } from '@synapse/db';
+import type { PrismaClient } from '../generated/prisma/client';
 
 export type TenantRequest = FastifyRequest & { tenantPrisma: PrismaClient };
 

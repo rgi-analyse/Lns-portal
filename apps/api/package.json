@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "db:seed": "npm run db:seed --workspace=@synapse/db"
+    "db:seed": "npx prisma db seed"
   },
   "dependencies": {
     "@azure/identity": "^4.13.0",
@@ -16,12 +16,16 @@
     "@fastify/cors": "^10.0.0",
     "@fastify/env": "^5.0.0",
     "@prisma/adapter-mssql": "^7.4.2",
-    "@synapse/db": "*",
+    "@prisma/client": "^7.4.2",
     "ajv": "^8.17.1",
     "dotenv": "^16.4.5",
     "fastify": "^5.7.4",
     "mssql": "^12.2.0",
-    "openai": "^6.25.0"
+    "openai": "^6.25.0",
+    "prisma": "^7.4.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@synapse/db';
+import { PrismaClient } from '../generated/prisma/client';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 import type { config as MssqlConfig } from 'mssql';
 
