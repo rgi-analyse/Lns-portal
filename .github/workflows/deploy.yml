@@ -77,13 +77,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Installer dependencies
+      - name: Installer alle workspace dependencies (fra rot)
         run: npm install
-        working-directory: apps/portal
 
       - name: Bygg Portal
-        run: npm run build
-        working-directory: apps/portal
+        run: npm run build --workspace=apps/portal
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
           NEXT_PUBLIC_AZURE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_AZURE_CLIENT_ID }}
@@ -97,12 +95,13 @@ jobs:
           mkdir -p /tmp/portal-deploy
           cp -r apps/portal/.next /tmp/portal-deploy/.next
           cp -r apps/portal/public /tmp/portal-deploy/public 2>/dev/null || mkdir /tmp/portal-deploy/public
-          cp -r apps/portal/node_modules /tmp/portal-deploy/node_modules
           cp apps/portal/package.json /tmp/portal-deploy/package.json
-          cp apps/portal/package-lock.json /tmp/portal-deploy/package-lock.json 2>/dev/null || true
           cp apps/portal/next.config.mjs /tmp/portal-deploy/next.config.mjs
           cp apps/portal/tailwind.config.ts /tmp/portal-deploy/tailwind.config.ts 2>/dev/null || true
           cp apps/portal/postcss.config.js /tmp/portal-deploy/postcss.config.js 2>/dev/null || true
+          # KRITISK: Kopier node_modules fra ROT (workspaces hoister hit)
+          cp -r node_modules /tmp/portal-deploy/node_modules
+          cp package-lock.json /tmp/portal-deploy/package-lock.json 2>/dev/null || true
 
       - name: Verifiser deploy-pakke
         run: |
@@ -110,6 +109,8 @@ jobs:
           echo "=== .next finnes ===" && test -d /tmp/portal-deploy/.next && echo "JA" || echo "NEI"
           echo "=== node_modules finnes ===" && test -d /tmp/portal-deploy/node_modules && echo "JA" || echo "NEI"
           echo "=== node_modules/next finnes ===" && test -d /tmp/portal-deploy/node_modules/next && echo "JA" || echo "NEI"
+          echo "=== node_modules/jspdf finnes ===" && test -d /tmp/portal-deploy/node_modules/jspdf && echo "JA" || echo "NEI"
+          echo "=== node_modules/html2canvas finnes ===" && test -d /tmp/portal-deploy/node_modules/html2canvas && echo "JA" || echo "NEI"
           echo "=== Total størrelse ===" && du -sh /tmp/portal-deploy/
 
       - name: Deploy Portal til Azure
