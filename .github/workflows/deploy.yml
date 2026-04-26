@@ -52,10 +52,6 @@ jobs:
           cp -r packages/db/prisma /tmp/api-deploy/packages/db/
           cp packages/db/package.json /tmp/api-deploy/packages/db/
 
-          # Bake @synapse/db inn i node_modules direkte slik at Node finner den uten install-steg
-          mkdir -p /tmp/api-deploy/node_modules/@synapse
-          cp -r packages/db /tmp/api-deploy/node_modules/@synapse/db
-
           # Syntetisert package.json: api sine deps + @synapse/db via file:-protokoll
           node -e "
             const pkg = require('./apps/api/package.json');
@@ -87,8 +83,6 @@ jobs:
           echo "=== packages/db/dist innhold ===" && ls /tmp/api-deploy/packages/db/dist/
           echo "=== Generert Prisma-klient ===" && test -f /tmp/api-deploy/packages/db/dist/generated/prisma/client.js && echo "JA" || echo "NEI"
           echo "=== packages/db/prisma schema finnes ===" && test -f /tmp/api-deploy/packages/db/prisma/schema.prisma && echo "JA" || echo "NEI"
-          echo "=== node_modules/@synapse/db finnes ===" && test -d /tmp/api-deploy/node_modules/@synapse/db && echo "JA" || echo "NEI"
-          echo "=== node_modules/@synapse/db/dist finnes ===" && test -d /tmp/api-deploy/node_modules/@synapse/db/dist && echo "JA" || echo "NEI"
 
       - name: Deploy API til Azure
         uses: azure/webapps-deploy@v3
