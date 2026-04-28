@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 export function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
@@ -16,16 +17,19 @@ export function TableBody({ className, ...props }: React.HTMLAttributes<HTMLTabl
   return <tbody className={cn('[&_tr:last-child]:border-0', className)} {...props} />;
 }
 
-export function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return (
-    <tr
-      className={cn('border-b border-gray-100 transition-colors', className)}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--gold-dim)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ''; }}
-      {...props}
-    />
-  );
-}
+export const TableRow = forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
+  function TableRow({ className, ...props }, ref) {
+    return (
+      <tr
+        ref={ref}
+        className={cn('border-b border-gray-100 transition-colors', className)}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'var(--gold-dim)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ''; }}
+        {...props}
+      />
+    );
+  },
+);
 
 export function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (

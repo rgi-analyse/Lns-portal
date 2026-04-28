@@ -14,6 +14,7 @@ model Workspace {
   opprettetAv      String
   opprettetDato    DateTime           @default(now())
   oppdatert        DateTime           @updatedAt
+  sortOrder        Int                @default(0)
   rapporter        WorkspaceRapport[]
   tilgang          Tilgang[]
 

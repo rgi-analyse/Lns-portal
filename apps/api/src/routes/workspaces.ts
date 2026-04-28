@@ -91,6 +91,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
               opprettetAv: true,
               opprettetDato: true,
               oppdatert: true,
+              sortOrder: true,
               kontekstType: true,
               kontekstKolonne: true,
               kontekstVerdi: true,
@@ -105,7 +106,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
                 orderBy: { rekkefølge: 'asc' },
               },
             },
-            orderBy: { opprettetDato: 'desc' },
+            orderBy: [{ sortOrder: 'asc' }, { navn: 'asc' }],
           });
           const merged = await slåSammenErPersonlig(workspaces);
           // Personlige mapper er alltid private — admin ser kun sitt eget
@@ -129,6 +130,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           opprettetAv: true,
           opprettetDato: true,
           oppdatert: true,
+          sortOrder: true,
           kontekstType: true,
           kontekstKolonne: true,
           kontekstVerdi: true,
@@ -150,10 +152,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           },
         } as const;
 
+        const ordreByAdmin = [{ sortOrder: 'asc' as const }, { navn: 'asc' as const }];
+
         const direkteWorkspacesRaw = await db.workspace.findMany({
           where: { tilgang: { some: { entraId: { in: identities } } } },
           select: workspaceSelect,
-          orderBy: { opprettetDato: 'desc' },
+          orderBy: ordreByAdmin,
         });
 
         const direkteIds = new Set(direkteWorkspacesRaw.map((w) => w.id));
@@ -171,7 +175,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             },
           },
           select: workspaceSelect,
-          orderBy: { opprettetDato: 'desc' },
+          orderBy: ordreByAdmin,
         });
 
         const direkteWorkspaces = direkteWorkspacesRaw.map((ws) => ({
@@ -192,13 +196,74 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
 
         const allWorkspaces = [...direkteWorkspaces, ...rapportWorkspaces];
         const merged = await slåSammenErPersonlig(allWorkspaces);
-        merged.sort((a, b) => (b.erPersonlig ? 1 : 0) - (a.erPersonlig ? 1 : 0));
+        merged.sort((a, b) => {
+          const personligDiff = (b.erPersonlig ? 1 : 0) - (a.erPersonlig ? 1 : 0);
+          if (personligDiff !== 0) return personligDiff;
+          const ordreDiff = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+          if (ordreDiff !== 0) return ordreDiff;
+          return a.navn.localeCompare(b.navn, 'nb');
+        });
         return reply.send(merged);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
         console.error('[workspaces] GET /api/workspaces:', error);
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke hente workspaces.', detail });
+      }
+    },
+  );
+
+  // PATCH /api/workspaces/rekkefolge
+  // Tar imot { rekkefolge: [{ id, sortOrder }] } og oppdaterer alle i én transaksjon.
+  // Krever admin-rolle.
+  fastify.patch<{ Body: { rekkefolge: Array<{ id: string; sortOrder: number }> } }>(
+    '/api/workspaces/rekkefolge',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['rekkefolge'],
+          properties: {
+            rekkefolge: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['id', 'sortOrder'],
+                properties: {
+                  id:        { type: 'string', minLength: 1 },
+                  sortOrder: { type: 'integer', minimum: 0 },
+                },
+                additionalProperties: false,
+              },
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request, reply) => {
+      const bruker = await resolveBruker(request);
+      if (!bruker) return reply.status(401).send({ error: 'Ikke innlogget.' });
+      if (!erAdmin(bruker.rolle)) return reply.status(403).send({ error: 'Krever admin-tilgang.' });
+
+      const db = (request as TenantRequest).tenantPrisma;
+      const { rekkefolge } = request.body;
+      if (rekkefolge.length === 0) return reply.send({ oppdatert: 0 });
+
+      try {
+        await db.$transaction(
+          rekkefolge.map((w) =>
+            db.workspace.update({
+              where: { id: w.id },
+              data: { sortOrder: w.sortOrder },
+            }),
+          ),
+        );
+        return reply.send({ oppdatert: rekkefolge.length });
+      } catch (error) {
+        if (isNotFound(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+        fastify.log.error(error);
+        return reply.status(500).send({ error: 'Kunne ikke oppdatere rekkefølgen.' });
       }
     },
   );
