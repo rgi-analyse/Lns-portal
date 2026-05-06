@@ -51,27 +51,18 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
         );
 
         if (res.status === 202) {
-          // Diagnostikk: PBI dokumenterer Location-header for både basic og enhanced
-          // refresh, men i praksis er den bare garantert for enhanced refresh
-          // (når body inneholder f.eks. `type`). Logg alt midlertidig så vi ser hva
-          // PBI faktisk returnerer.
-          const headersDump = Object.fromEntries(res.headers.entries());
-          console.log('[refresh] PBI respons status:', res.status);
-          console.log('[refresh] PBI respons headers:', headersDump);
-
-          // 1) Forsøk Location-header (siste path-segment).
+          // PBI returnerer Location-header pålitelig kun for enhanced refresh.
+          // For basic refresh (kun notifyOption) faller vi tilbake på RequestId-
+          // headeren og deretter siste entry i refresh-historikken.
           const location = res.headers.get('location') ?? '';
           let refreshId: string | null = location
             ? (location.split('/').filter(Boolean).pop() ?? null)
             : null;
 
-          // 2) Fallback: enkelte tenants/proxier returnerer i RequestId-header i stedet.
           if (!refreshId) {
             refreshId = res.headers.get('requestid') ?? null;
           }
 
-          // 3) Siste utvei: hent siste refresh fra history-listen og bruk dens requestId.
-          //    History-endepunktet er sortert i descending startTime, så index 0 er nyeste.
           if (!refreshId) {
             try {
               const histRes = await fetch(
@@ -82,22 +73,14 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
                 const histData = await histRes.json() as RefreshHistoryResponse;
                 const siste = histData.value?.[0];
                 refreshId = siste?.requestId ?? siste?.id ?? null;
-                console.log('[refresh] history-fallback siste refresh:', siste);
-              } else {
-                console.warn('[refresh] history-fallback svarte', histRes.status);
               }
             } catch (e) {
-              console.warn('[refresh] history-fallback feilet:', e);
+              fastify.log.warn(e, '[pbiRefresh] history-fallback feilet');
             }
           }
 
-          console.log('[refresh] Parsed refreshId:', refreshId);
-
           if (!refreshId) {
-            return reply.status(500).send({
-              error: 'Klarte ikke å lese refreshId fra PBI-respons',
-              detail: { status: res.status, headers: headersDump },
-            });
+            return reply.status(500).send({ error: 'Klarte ikke å lese refreshId fra PBI-respons' });
           }
           return reply.status(202).send({ ok: true, refreshId });
         }
