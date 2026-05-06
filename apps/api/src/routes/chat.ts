@@ -1209,19 +1209,21 @@ Tilgjengelige visualiseringstyper:
       console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
       console.log('[Chat] harKobletView:', harKobletView);
 
-      // Bygg kompakt slicer-oversikt for prompten. Begrenser verdier per slicer for å spare tokens.
+      // Bygg kompakt slicer-oversikt for prompten. Begrenser verdier per slicer for å spare tokens
+      // — men 50 er nok til å dekke 52 uker per år eller ~30+ prosjekter per Hovedprosjekt.
+      const SLICER_VERDIER_GRENSE = 50;
       const slicereSummary = (slicere ?? []).map((s) => {
         if (s.type === 'basic') {
           return {
             tittel:      s.tittel,
             type:        'basic' as const,
             kolonneType: s.kolonneType,
-            verdier:     s.verdier.slice(0, 20),
+            verdier:     s.verdier.slice(0, SLICER_VERDIER_GRENSE),
           };
         }
         const barnTrunkert: Record<string, string[]> = {};
         for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
-          barnTrunkert[forelder] = barn.slice(0, 20);
+          barnTrunkert[forelder] = barn.slice(0, SLICER_VERDIER_GRENSE);
         }
         return {
           tittel:          s.tittel,
@@ -1280,13 +1282,36 @@ REGLER FOR Å SETTE SLICER:
 7. Hvis ingen match: si ifra og list tilgjengelige verdier
 
 HIERARCHY-PAYLOAD (for type="hierarchy"):
-- Topp-nivå-verdier finnes i toppNivåVerdier (f.eks. årstall)
-- Barn under hver topp-verdi finnes i barnPerForelder (f.eks. uker eller måneder)
-- "Hele 2026":         nivåer=[{ verdi: 2026 }]
-- "Uke 9 i 2026":      nivåer=[{ verdi: 2026, barn: [{ verdi: "9 (24.02.26-01.03.26)" }] }]
-- "Januar+februar 26": nivåer=[{ verdi: 2026, barn: [{ verdi: "januar" }, { verdi: "februar" }] }]
-- "2025 og 2026":      nivåer=[{ verdi: 2025 }, { verdi: 2026 }]
-Hvis "barn" er udefinert eller tom, betyr det at hele nivået under er valgt.
+- Topp-nivå-verdier finnes i toppNivåVerdier
+- Barn under hver topp-verdi finnes i barnPerForelder (forelder → liste av barn)
+- Hvis "barn" er udefinert eller tom, betyr det at hele nivået under er valgt.
+
+ALGORITME for hierarchy-slicer når brukeren oppgir kun barn-verdier (uten å si forelder):
+1. For HVERT barn brukeren nevner: slå opp i barnPerForelder for å finne hvilken forelder som inneholder akkurat det barnet.
+2. Grupper barna per forelder de tilhører.
+3. Lag én nivå-node per unik forelder, hver med "barn" som inneholder kun de barna som hører til DEN forelderen.
+4. Aldri putt et barn under feil forelder. Hvis du er usikker, slå opp i barnPerForelder før du svarer.
+
+Eksempler:
+
+  // Topp-nivå direkte: "Hele 2026"
+  nivåer: [{ verdi: 2026 }]
+
+  // Ett barn under én forelder: "Uke 9 i 2026"
+  nivåer: [{ verdi: 2026, barn: [{ verdi: "9 (24.02.26-01.03.26)" }] }]
+
+  // Flere barn under SAMME forelder: "Januar og februar 2026"
+  nivåer: [{ verdi: 2026, barn: [{ verdi: "januar" }, { verdi: "februar" }] }]
+
+  // Flere barn under FORSKJELLIGE foreldre: "Vis prosjekt 4200 og 4600"
+  // (forutsetter barnPerForelder = { '200 - Tunnel': ['4600 - …'], '250 - Gruvedrift': ['4200 - Nussir'] })
+  nivåer: [
+    { verdi: '200 - Tunnel',     barn: [{ verdi: '4600 - ikke spesifisert' }] },
+    { verdi: '250 - Gruvedrift', barn: [{ verdi: '4200 - Nussir' }] }
+  ]
+
+  // Flere topp-nivåer hele: "2025 og 2026"
+  nivåer: [{ verdi: 2025 }, { verdi: 2026 }]
 ${formaterteVisualData ? `
 VISUAL DATA — INNHOLD PÅ SKJERMEN AKKURAT NÅ:
 Dette er CSV-eksport av det brukeren ser i Power BI-rapporten (med aktive slicer-valg):
