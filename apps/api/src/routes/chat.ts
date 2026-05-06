@@ -1291,6 +1291,23 @@ REGLER FOR Å SETTE SLICER:
 6. Hvis du finner flere mulige treff: spør brukeren hvilken
 7. Hvis ingen match: si ifra og list tilgjengelige verdier
 
+50-VERDIERS BEGRENSNING (basic-slicere):
+For basic-slicere har du tilgang til de første 50 verdiene fra sliceren. Større slicere
+(f.eks. leverandører) er trunkert — slicereTekst viser "(av N totalt)" når dette skjer.
+
+Hvis brukeren ber om en verdi som IKKE finnes i din verdiliste:
+- IKKE konstruer eller gjett verdier som ikke står i lista
+- Si ærlig fra at du ikke ser verdien blant de 50 du har tilgang til, og at sliceren
+  inneholder flere
+- Foreslå at brukeren skriver det fullstendige navnet, eller velger verdien manuelt
+  i sliceren
+
+Eksempel-svar for "Sett leverandør til BDO" når BDO ikke er i din liste:
+  "Jeg ser 50 verdier i Leverandør-sliceren, og BDO er ikke blant dem — denne
+  sliceren har flere verdier enn jeg får se. Hvis du vet det fullstendige navnet
+  (f.eks. 'BDO AS' eller 'BDO Advokater AS'), kan jeg sette det. Eller du kan velge
+  manuelt i sliceren."
+
 HIERARCHY-PAYLOAD (for type="hierarchy"):
 - Topp-nivå-verdier finnes i toppNivåVerdier
 - Barn under hver topp-verdi finnes i barnPerForelder (forelder → liste av barn)
