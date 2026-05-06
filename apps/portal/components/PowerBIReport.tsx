@@ -66,7 +66,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const [excelKandidater, setExcelKandidater] = useState<{ pageKey: string; pageLabel: string; visualKey: string; visualLabel: string; type: string }[]>([]);
   const [excelValgte, setExcelValgte] = useState<Set<string>>(new Set());
   const [excelLaster, setExcelLaster] = useState(false);
-  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'kjører' | 'ferdig' | 'feilet'>('idle');
+  const [elapsedSec, setElapsedSec] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saved'>('idle');
 
@@ -77,6 +78,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const [refreshInfo, setRefreshInfo] = useState<RefreshInfo | null>(null);
   const autoSaveTimer        = useRef<NodeJS.Timeout | null>(null);
   const slicerStateTimer     = useRef<NodeJS.Timeout | null>(null);
+  const refreshTimersRef     = useRef<{
+    poll:    NodeJS.Timeout | null;
+    counter: NodeJS.Timeout | null;
+    safety:  NodeJS.Timeout | null;
+    reset:   NodeJS.Timeout | null;
+  }>({ poll: null, counter: null, safety: null, reset: null });
   const onActiveStateChangeRef = useRef(onActiveStateChange);
   const fetchedRef = useRef(false);
   const reportRef = useRef<Report | null>(null);
@@ -88,6 +95,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   useEffect(() => { reportRef.current = report; }, [report]);
   useEffect(() => { accountRef.current = entraObjectId ?? null; }, [entraObjectId]);
   useEffect(() => { onActiveStateChangeRef.current = onActiveStateChange; }, [onActiveStateChange]);
+
+  // Rydd opp alle refresh-timere ved unmount slik at vi ikke setter state på en avmontert komponent.
+  useEffect(() => {
+    return () => {
+      const t = refreshTimersRef.current;
+      if (t.poll)    clearInterval(t.poll);
+      if (t.counter) clearInterval(t.counter);
+      if (t.safety)  clearTimeout(t.safety);
+      if (t.reset)   clearTimeout(t.reset);
+    };
+  }, []);
 
   useEffect(() => {
     if (!excelPickerOpen) return;
@@ -868,29 +886,120 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     });
   };
 
+  const formatTid = (sec: number): string => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return m > 0 ? `${m}:${s.toString().padStart(2, '0')}` : `${s}s`;
+  };
+
+  const stopRefreshTimers = () => {
+    const t = refreshTimersRef.current;
+    if (t.poll)    { clearInterval(t.poll);    t.poll    = null; }
+    if (t.counter) { clearInterval(t.counter); t.counter = null; }
+    if (t.safety)  { clearTimeout(t.safety);   t.safety  = null; }
+  };
+
+  const planleggIdleReset = (ms: number) => {
+    const t = refreshTimersRef.current;
+    if (t.reset) clearTimeout(t.reset);
+    t.reset = setTimeout(() => setRefreshStatus('idle'), ms);
+  };
+
   const handleRefresh = async () => {
-    if (refreshStatus === 'loading') return;
-    setRefreshStatus('loading');
+    if (refreshStatus === 'kjører' || !pbiDatasetId || !pbiWorkspaceId) return;
+
+    // Avbryt evt. ventende reset fra forrige forsøk
+    if (refreshTimersRef.current.reset) {
+      clearTimeout(refreshTimersRef.current.reset);
+      refreshTimersRef.current.reset = null;
+    }
+
+    setRefreshStatus('kjører');
+    setElapsedSec(0);
+
     try {
-      const res = await apiFetch('/api/pbi/refresh', {
+      const respons = await apiFetch('/api/pbi/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pbiDatasetId, pbiWorkspaceId }),
       });
-      if (res.ok) {
-        setRefreshStatus('success');
-        if (report) await report.refresh();
-        setTimeout(() => setRefreshStatus('idle'), 3000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.error('[Refresh] feil:', err);
-        setRefreshStatus('error');
-        setTimeout(() => setRefreshStatus('idle'), 4000);
+
+      if (!respons.ok) {
+        const err = await respons.json().catch(() => ({}));
+        console.error('[Refresh] trigger feilet:', err);
+        setRefreshStatus('feilet');
+        planleggIdleReset(8000);
+        return;
       }
+
+      const { refreshId } = await respons.json() as { refreshId?: string };
+      if (!refreshId) {
+        console.warn('[Refresh] PBI returnerte ingen refreshId — kan ikke polle status');
+        setRefreshStatus('feilet');
+        planleggIdleReset(8000);
+        return;
+      }
+
+      // Counter: oppdater forløpt tid hvert sekund
+      refreshTimersRef.current.counter = setInterval(() => {
+        setElapsedSec((s) => s + 1);
+      }, 1000);
+
+      // Polling: sjekk PBI-status hvert 4. sekund
+      const sjekkStatus = async () => {
+        try {
+          const statusRes = await apiFetch(
+            `/api/pbi/refresh-status?datasetId=${encodeURIComponent(pbiDatasetId)}` +
+            `&workspaceId=${encodeURIComponent(pbiWorkspaceId)}` +
+            `&refreshId=${encodeURIComponent(refreshId)}`,
+          );
+          if (!statusRes.ok) {
+            console.warn('[Refresh] status-poll svarte', statusRes.status);
+            return; // forbigående feil — fortsett polling
+          }
+          const { status, error } = await statusRes.json() as { status: string; error: string | null };
+
+          if (status === 'Completed') {
+            stopRefreshTimers();
+            setRefreshStatus('ferdig');
+            // Tving rapporten til å hente fersk data uten full sidereload —
+            // bruker beholder filtre, slicer-state, scroll-posisjon.
+            if (reportRef.current) {
+              try { await reportRef.current.refresh(); }
+              catch (e) { console.warn('[Refresh] report.refresh() feilet:', e); }
+            }
+            // Oppdater "Sist oppdatert"-info i verktøylinja
+            apiFetch(`/api/pbi/refresh-info?datasetId=${pbiDatasetId}&workspaceId=${pbiWorkspaceId}`)
+              .then((r) => r.ok ? r.json() : null)
+              .then((data) => { if (data) setRefreshInfo(data as RefreshInfo); })
+              .catch(() => { /* ikke kritisk */ });
+            planleggIdleReset(5000);
+          } else if (status === 'Failed' || status === 'Disabled') {
+            stopRefreshTimers();
+            console.error('[Refresh] PBI rapporterte', status, error);
+            setRefreshStatus('feilet');
+            planleggIdleReset(8000);
+          }
+          // Alle andre statuser ('Unknown', 'InProgress'): la pollingen fortsette
+        } catch (e) {
+          console.warn('[Refresh] poll-feil:', e);
+        }
+      };
+      refreshTimersRef.current.poll = setInterval(sjekkStatus, 4000);
+
+      // Safety: gi opp etter 5 minutter slik at brukeren ikke sitter fast
+      refreshTimersRef.current.safety = setTimeout(() => {
+        if (refreshTimersRef.current.poll) {
+          stopRefreshTimers();
+          setRefreshStatus('feilet');
+          planleggIdleReset(8000);
+        }
+      }, 300_000);
     } catch (e) {
       console.error('[Refresh] nettverksfeil:', e);
-      setRefreshStatus('error');
-      setTimeout(() => setRefreshStatus('idle'), 4000);
+      stopRefreshTimers();
+      setRefreshStatus('feilet');
+      planleggIdleReset(8000);
     }
   };
 
@@ -1175,14 +1284,14 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             {(brukerRolle === 'admin' || brukerRolle === 'tenantadmin' || brukerRolle === 'redaktør') && (
               <ToolBtn
                 onClick={handleRefresh}
-                disabled={!pbiDatasetId || refreshStatus === 'loading'}
+                disabled={!pbiDatasetId || refreshStatus === 'kjører'}
                 title="Oppdater datasett fra kilde"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshStatus === 'loading' ? 'animate-spin' : ''}`} />
-                {refreshStatus === 'loading' ? 'Oppdaterer...'
-                  : refreshStatus === 'success' ? '✓ Oppdatert'
-                  : refreshStatus === 'error'   ? '✗ Feil'
-                  : 'Refresh'}
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshStatus === 'kjører' ? 'animate-spin' : ''}`} />
+                {refreshStatus === 'idle'   && 'Refresh'}
+                {refreshStatus === 'kjører' && `Oppdaterer... ${formatTid(elapsedSec)}`}
+                {refreshStatus === 'ferdig' && '✓ Data oppdatert'}
+                {refreshStatus === 'feilet' && '✗ Refresh feilet'}
               </ToolBtn>
             )}
             {/* Fullskjerm — gold accent */}

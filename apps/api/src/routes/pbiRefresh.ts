@@ -3,10 +3,12 @@ import { getAzureToken } from './embedToken';
 
 interface RefreshEntry {
   id?: string;
+  requestId?: string;
   refreshType?: string;
   startTime?: string;
   endTime?: string;
   status?: string;
+  serviceExceptionJson?: string;
 }
 
 interface RefreshHistoryResponse {
@@ -49,11 +51,124 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
         );
 
         if (res.status === 202) {
-          return reply.status(202).send({ ok: true });
+          // Diagnostikk: PBI dokumenterer Location-header for både basic og enhanced
+          // refresh, men i praksis er den bare garantert for enhanced refresh
+          // (når body inneholder f.eks. `type`). Logg alt midlertidig så vi ser hva
+          // PBI faktisk returnerer.
+          const headersDump = Object.fromEntries(res.headers.entries());
+          console.log('[refresh] PBI respons status:', res.status);
+          console.log('[refresh] PBI respons headers:', headersDump);
+
+          // 1) Forsøk Location-header (siste path-segment).
+          const location = res.headers.get('location') ?? '';
+          let refreshId: string | null = location
+            ? (location.split('/').filter(Boolean).pop() ?? null)
+            : null;
+
+          // 2) Fallback: enkelte tenants/proxier returnerer i RequestId-header i stedet.
+          if (!refreshId) {
+            refreshId = res.headers.get('requestid') ?? null;
+          }
+
+          // 3) Siste utvei: hent siste refresh fra history-listen og bruk dens requestId.
+          //    History-endepunktet er sortert i descending startTime, så index 0 er nyeste.
+          if (!refreshId) {
+            try {
+              const histRes = await fetch(
+                `https://api.powerbi.com/v1.0/myorg/groups/${pbiWorkspaceId}/datasets/${pbiDatasetId}/refreshes?$top=1`,
+                { headers: { Authorization: `Bearer ${token}` } },
+              );
+              if (histRes.ok) {
+                const histData = await histRes.json() as RefreshHistoryResponse;
+                const siste = histData.value?.[0];
+                refreshId = siste?.requestId ?? siste?.id ?? null;
+                console.log('[refresh] history-fallback siste refresh:', siste);
+              } else {
+                console.warn('[refresh] history-fallback svarte', histRes.status);
+              }
+            } catch (e) {
+              console.warn('[refresh] history-fallback feilet:', e);
+            }
+          }
+
+          console.log('[refresh] Parsed refreshId:', refreshId);
+
+          if (!refreshId) {
+            return reply.status(500).send({
+              error: 'Klarte ikke å lese refreshId fra PBI-respons',
+              detail: { status: res.status, headers: headersDump },
+            });
+          }
+          return reply.status(202).send({ ok: true, refreshId });
         }
         const body = await res.text().catch(() => '');
         fastify.log.error(`[pbiRefresh] PBI svarte ${res.status}: ${body}`);
         return reply.status(res.status).send({ error: `PBI svarte ${res.status}`, detail: body });
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
+      }
+    },
+  );
+
+  fastify.get<{ Querystring: { datasetId?: string; workspaceId?: string; refreshId?: string } }>(
+    '/api/pbi/refresh-status',
+    async (request, reply) => {
+      const { datasetId, workspaceId, refreshId } = request.query;
+      if (!datasetId || !workspaceId || !refreshId) {
+        return reply.status(400).send({ error: 'Mangler datasetId, workspaceId eller refreshId.' });
+      }
+
+      const tenantId     = process.env.PBI_TENANT_ID;
+      const clientId     = process.env.PBI_CLIENT_ID;
+      const clientSecret = process.env.PBI_CLIENT_SECRET;
+      if (!tenantId || !clientId || !clientSecret) {
+        return reply.status(500).send({ error: 'Mangler Power BI-konfigurasjon på serveren.' });
+      }
+
+      try {
+        const token   = await getAzureToken(tenantId, clientId, clientSecret);
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // Prøv først direkte GET (virker for enhanced refresh).
+        const direct = await fetch(
+          `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/refreshes/${refreshId}`,
+          { headers },
+        );
+
+        if (direct.ok) {
+          const entry = await direct.json() as RefreshEntry;
+          return reply.send({
+            status:    entry.status ?? 'Unknown',
+            startTime: entry.startTime ?? null,
+            endTime:   entry.endTime ?? null,
+            error:     entry.serviceExceptionJson ?? null,
+          });
+        }
+
+        // Fallback: hent fra history-liste og match på requestId (basic refresh).
+        const histRes = await fetch(
+          `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/refreshes?$top=20`,
+          { headers },
+        );
+        if (!histRes.ok) {
+          const body = await histRes.text().catch(() => '');
+          fastify.log.error(`[pbiRefresh] status-history svarte ${histRes.status}: ${body}`);
+          return reply.status(histRes.status).send({ error: `PBI svarte ${histRes.status}`, detail: body });
+        }
+        const data  = await histRes.json() as RefreshHistoryResponse;
+        const entry = data.value?.find((r) => (r.requestId ?? r.id) === refreshId);
+
+        if (!entry) {
+          // Refresh kan være så ny at den ikke har dukket opp i historikken ennå.
+          return reply.send({ status: 'Unknown', startTime: null, endTime: null, error: null });
+        }
+        return reply.send({
+          status:    entry.status ?? 'Unknown',
+          startTime: entry.startTime ?? null,
+          endTime:   entry.endTime ?? null,
+          error:     entry.serviceExceptionJson ?? null,
+        });
       } catch (err) {
         fastify.log.error(err);
         return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
