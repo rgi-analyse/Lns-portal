@@ -11,18 +11,16 @@ import * as XLSX from 'xlsx';
 import SamtaleHistorikkSidebar from '@/components/chat/SamtaleHistorikkSidebar';
 import { genererRapportØktId } from '@/lib/chatØkt';
 import { byggRapportVelkomst } from '@/lib/hilsen';
+import type { SlicerConfig, SlicerInfo, SlicerState, SlicerTittel } from '@/lib/slicerOps';
+
+// Re-eksport for konsumenter som tidligere importerte SlicerConfig herfra.
+export type { SlicerConfig } from '@/lib/slicerOps';
 
 export interface FilterConfig {
   table: string;
   column: string;
   values: (string | number)[];
   operator?: 'In' | 'NotIn' | 'All';
-}
-
-export interface SlicerConfig {
-  slicerTitle: string;
-  values: string[];
-  år?: number;
 }
 
 interface ChatMessage {
@@ -70,9 +68,8 @@ interface AIChatProps {
   rapportId?: string;
   pbiReportId?: string;
   rapportNavn?: string;
-  slicers?: string[];
-  slicerValues?: Record<string, Record<string, string[]>>;
-  activeSlicerState?: Record<string, unknown>;
+  slicere?: SlicerInfo[];
+  activeSlicerState?: SlicerState;
   availableTables?: string[];
   aktivSide?: string;
   kanLageRapport?: boolean;
@@ -99,7 +96,7 @@ interface AIChatProps {
   getVisualsData?: () => Promise<Record<string, string>>;
   onSetFilter?:   (config: FilterConfig) => void;
   onSetSlicer?:   (config: SlicerConfig) => void;
-  onClearSlicer?: (slicerTitle: string) => void;
+  onClearSlicer?: (tittel: SlicerTittel) => void;
   /** Kalles når AI-svar er ferdig — brukes av ChatWidget til å trigge sidebar-refetch */
   onResponseComplete?: () => void;
 }
@@ -158,7 +155,7 @@ function parseMarkdownTable(text: string): Record<string, unknown>[] | null {
 }
 
 export default function AIChat({
-  entraObjectId, rapportId, pbiReportId, rapportNavn, slicers, slicerValues,
+  entraObjectId, rapportId, pbiReportId, rapportNavn, slicere,
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
   aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar, brukerNavn,
@@ -631,7 +628,7 @@ export default function AIChat({
 
     const requestBody = {
       messages: nextMessages, rapportId, pbiReportId, rapportNavn,
-      slicers, slicerValues: slicerValues ?? {},
+      slicere: slicere ?? [],
       activeSlicerState: activeSlicerState ?? {},
       aktivSide, visualData,
       grupper: grupper ?? [],
@@ -645,7 +642,7 @@ export default function AIChat({
     };
     console.log('[AIChat] sender melding med øktId:', øktIdRef.current, '| rapportId (chatRapportId):', rapportId ?? null);
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
-    console.log('[AIChat] slicerValues som sendes:', JSON.stringify(slicerValues));
+    console.log('[AIChat] slicere som sendes:', slicere?.length ?? 0);
     console.log('[AIChat] sender body activeSlicerState:', JSON.stringify(requestBody.activeSlicerState));
 
     try {
@@ -687,9 +684,8 @@ export default function AIChat({
             content?: string;
             tool?: string;
             filterConfig?: FilterConfig;
-            slicerTitle?: string;
-            values?: string[];
-            år?: number;
+            config?: SlicerConfig;
+            tittel?: SlicerTittel;
             message?: string;
             rapportId?: string;
             rapportNavn?: string;
@@ -716,13 +712,12 @@ export default function AIChat({
             addDisplay({ role: 'status', content: labels[chunk.tool ?? ''] ?? `⚙️ ${chunk.tool}` });
           } else if (chunk.type === 'filter' && chunk.filterConfig) {
             onSetFilter?.(chunk.filterConfig);
-          } else if (chunk.type === 'slicer' && chunk.slicerTitle && chunk.values) {
-            const slicerConfig: SlicerConfig = { slicerTitle: chunk.slicerTitle, values: chunk.values, år: chunk.år };
-            console.log('[AIChat] kaller onSetSlicer:', slicerConfig);
-            onSetSlicer?.(slicerConfig);
-          } else if (chunk.type === 'slicer_clear' && chunk.slicerTitle) {
-            console.log('[AIChat] kaller onClearSlicer:', chunk.slicerTitle);
-            onClearSlicer?.(chunk.slicerTitle);
+          } else if (chunk.type === 'slicer' && chunk.config) {
+            console.log('[AIChat] kaller onSetSlicer:', chunk.config);
+            onSetSlicer?.(chunk.config);
+          } else if (chunk.type === 'slicer_clear' && chunk.tittel) {
+            console.log('[AIChat] kaller onClearSlicer:', chunk.tittel);
+            onClearSlicer?.(chunk.tittel);
           } else if (chunk.type === 'open_report' && chunk.rapportId) {
             router.push(`/dashboard/rapport/${chunk.rapportId}`);
           } else if (chunk.type === 'rapport_forslag' && chunk.forslag) {

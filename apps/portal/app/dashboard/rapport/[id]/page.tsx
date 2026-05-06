@@ -6,7 +6,8 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
-import type { FilterConfig, SlicerConfig } from '@/components/AIChat';
+import type { FilterConfig } from '@/components/AIChat';
+import type { SlicerConfig, SlicerInfo, SlicerState } from '@/lib/slicerOps';
 import LagRapportModal from '@/components/LagRapportModal';
 import { useLisens } from '@/components/LisensProvider';
 import { harBetaTilgang } from '@/lib/featureFlags';
@@ -60,10 +61,9 @@ export default function RapportPage() {
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
   const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
   const [slicerQueue,   setSlicerQueue]   = useState<SlicerConfig[]>([]);
-  const [slicers,       setSlicers]       = useState<string[]>([]);
-  const [slicerValues,      setSlicerValues]      = useState<Record<string, Record<string, string[]>>>({});
+  const [slicere,       setSlicere]       = useState<SlicerInfo[]>([]);
   const [clearSlicerTitle,  setClearSlicerTitle]  = useState<string | undefined>(undefined);
-  const [activeSlicerState, setActiveSlicerState] = useState<Record<string, unknown>>({});
+  const [activeSlicerState, setActiveSlicerState] = useState<SlicerState>({});
   const [availableTables,   setAvailableTables]   = useState<string[]>([]);
   const [aktivSide,         setAktivSide]         = useState<string>('');
   const getVisualsDataRef = useRef<(() => Promise<Record<string, string>>) | null>(null);
@@ -166,8 +166,7 @@ export default function RapportPage() {
         slicerQueue={slicerQueue}
         onSlicerQueueProcessed={() => setSlicerQueue([])}
         clearSlicerTitle={clearSlicerTitle}
-        onSlicersLoaded={setSlicers}
-        onSlicerValuesLoaded={setSlicerValues}
+        onSlicereLoaded={setSlicere}
         onActiveStateChange={setActiveSlicerState}
         onTablesLoaded={setAvailableTables}
         onAktivSideChange={setAktivSide}
@@ -180,8 +179,7 @@ export default function RapportPage() {
           rapportId={rapport.id}
           pbiReportId={rapport.pbiReportId}
           rapportNavn={rapport.navn}
-          slicers={slicers}
-          slicerValues={slicerValues}
+          slicere={slicere}
           activeSlicerState={activeSlicerState}
           availableTables={availableTables}
           aktivSide={aktivSide}

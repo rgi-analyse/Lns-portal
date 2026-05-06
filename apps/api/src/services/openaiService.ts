@@ -52,8 +52,8 @@ export type SseChunk =
   | { type: 'text';                 content: string }
   | { type: 'tool_call';            tool: string; result: unknown }
   | { type: 'filter';               filterConfig: FilterConfig }
-  | { type: 'slicer';               slicerTitle: string; values: string[]; år?: number }
-  | { type: 'slicer_clear';         slicerTitle: string }
+  | { type: 'slicer';               config: SlicerConfig }
+  | { type: 'slicer_clear';         tittel: string }
   | { type: 'open_report';          rapportId: string; rapportNavn: string }
   | { type: 'query_result';         data: Record<string, unknown>[]; sql: string }
   | { type: 'rapport_forslag';      forslag: RapportForslag }
@@ -87,6 +87,44 @@ export interface FilterConfig {
   values: (string | number)[];
   operator?: 'In' | 'NotIn' | 'All';
 }
+
+// Slicer-typer. Speiler portal/lib/slicerOps.ts (samme JSON-shape over SSE).
+export interface HierarchyLevel {
+  verdi: string | number;
+  barn?: HierarchyLevel[];
+}
+
+export type SlicerConfig =
+  | { tittel: string; type: 'basic';     verdier: (string | number)[] }
+  | { tittel: string; type: 'hierarchy'; nivåer:  HierarchyLevel[] };
+
+interface SlicerMeta {
+  visualName: string;
+  tittel:     string;
+}
+
+export interface BasicSlicerInfo extends SlicerMeta {
+  type:        'basic';
+  target:      { table: string; column: string } | null;
+  kolonneType: 'string' | 'number';
+  verdier:     string[];
+}
+
+export interface HierarchySlicerInfo extends SlicerMeta {
+  type:            'hierarchy';
+  targets:         Array<{ table: string; column: string }>;
+  toppNivåVerdier: string[];
+  barnPerForelder: Record<string, string[]>;
+}
+
+export type SlicerInfo = BasicSlicerInfo | HierarchySlicerInfo;
+
+export type SlicerSeleksjon =
+  | { type: 'basic';     verdier: (string | number)[] }
+  | { type: 'hierarchy'; nivåer:  HierarchyLevel[] }
+  | null;
+
+export type SlicerState = Record<string, SlicerSeleksjon>;
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -162,25 +200,66 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'set_report_slicer',
-      description: 'Setter en slicer i Power BI-rapporten. Bruk når brukeren ber om å vise spesifikke verdier, f.eks. "vis kun profil 3493".',
+      description:
+        'Setter en slicer i Power BI-rapporten. ' +
+        'For vanlige slicere: bruk type="basic" med "verdier". ' +
+        'For hierarki-slicere (slicere markert som type="hierarchy" i activeSlicerState): bruk type="hierarchy" med "nivåer". ' +
+        'Bruk når brukeren ber om å vise spesifikke verdier, f.eks. "vis kun profil 3493" eller "sett år til 2026 og uke 9".',
       parameters: {
         type: 'object',
         properties: {
-          slicerTitle: {
+          tittel: {
             type: 'string',
-            description: 'Tittelen på sliceren i rapporten, f.eks. "Tid", "Profil", "Region".',
+            description: 'Tittelen på sliceren slik den fremkommer i slicere-listen, f.eks. "Tid", "Profil", "Region".',
           },
-          values: {
+          type: {
+            type: 'string',
+            enum: ['basic', 'hierarchy'],
+            description:
+              'Slicer-type. Bruk "basic" for vanlige slicere med én kolonne. ' +
+              'Bruk "hierarchy" for slicere med flere nivåer (typisk Tid: År + Uke/Måned).',
+          },
+          verdier: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Eksakte tekstverdier som skal velges. For "Tid"-sliceren: eksakt UkeTekst-verdi, f.eks. "09 (24.02.26-01.03.26)".',
+            items: { type: ['string', 'number'] },
+            description: 'BARE for type="basic". Eksakte verdier som skal velges. Må matche verdiene i slicere-listen.',
           },
-          år: {
-            type: 'number',
-            description: 'Årstall for hierarchy-slicer (f.eks. Tid). Standard: inneværende år.',
+          nivåer: {
+            type: 'array',
+            description:
+              'BARE for type="hierarchy". Topp-nivå-noder. ' +
+              'Hver node har "verdi" (f.eks. årstall) og evt. "barn" (f.eks. uker/måneder). ' +
+              'Hvis "barn" er udefinert eller tom, velges hele nivået under. ' +
+              'Maks 3 nivåer (Year-Quarter-Month eller Year-Month-Day) — Power BI støtter dypere, ' +
+              'men det er sjelden behov.',
+            items: {
+              type: 'object',
+              properties: {
+                verdi: { type: ['string', 'number'] },
+                barn: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      verdi: { type: ['string', 'number'] },
+                      barn: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: { verdi: { type: ['string', 'number'] } },
+                          required: ['verdi'],
+                        },
+                      },
+                    },
+                    required: ['verdi'],
+                  },
+                },
+              },
+              required: ['verdi'],
+            },
           },
         },
-        required: ['slicerTitle', 'values'],
+        required: ['tittel', 'type'],
       },
     },
   },
@@ -230,12 +309,12 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
-          slicerTitle: {
+          tittel: {
             type: 'string',
             description: 'Tittelen på sliceren som skal nullstilles, f.eks. "Tid", "Profil".',
           },
         },
-        required: ['slicerTitle'],
+        required: ['tittel'],
       },
     },
   },
@@ -677,16 +756,42 @@ export async function chat(
           onChunk({ type: 'filter', filterConfig });
           result = { success: true, message: 'Filter satt i rapporten.' };
         } else if (tc.name === 'set_report_slicer') {
-          const slicerTitle = args['slicerTitle'] as string;
-          const values      = args['values'] as string[];
-          const år          = args['år'] as number | undefined;
-          console.log('[backend] sending slicer SSE event:', slicerTitle, values);
-          onChunk({ type: 'slicer', slicerTitle, values, år });
-          result = { success: true, message: `Slicer "${slicerTitle}" satt til: ${values.join(', ')}${år ? ` (år: ${år})` : ''}` };
+          const tittel  = args['tittel']  as string | undefined;
+          const type    = args['type']    as 'basic' | 'hierarchy' | undefined;
+          const verdier = args['verdier'] as (string | number)[] | undefined;
+          const nivåer  = args['nivåer']  as HierarchyLevel[] | undefined;
+
+          if (!tittel) {
+            result = { error: 'Mangler tittel — angi slicerens tittel slik den fremkommer i slicere-listen.' };
+          } else if (type !== 'basic' && type !== 'hierarchy') {
+            result = { error: 'Mangler eller ugyldig type — angi "basic" eller "hierarchy".' };
+          } else if (type === 'basic' && (!verdier || verdier.length === 0)) {
+            result = { error: 'type="basic" krever verdier-array med minst én verdi.' };
+          } else if (type === 'basic' && nivåer !== undefined) {
+            result = { error: 'type="basic" skal ikke ha nivåer. Hvis sliceren er hierarkisk, bruk type="hierarchy" i stedet.' };
+          } else if (type === 'hierarchy' && (!nivåer || nivåer.length === 0)) {
+            result = { error: 'type="hierarchy" krever nivåer-array med minst ett nivå.' };
+          } else if (type === 'hierarchy' && verdier !== undefined) {
+            result = { error: 'type="hierarchy" skal ikke ha verdier. Hvis sliceren ikke er hierarkisk, bruk type="basic" i stedet.' };
+          } else {
+            const config: SlicerConfig = type === 'basic'
+              ? { tittel, type: 'basic',     verdier: verdier as (string | number)[] }
+              : { tittel, type: 'hierarchy', nivåer:  nivåer  as HierarchyLevel[] };
+            console.log('[backend] sending slicer SSE event:', JSON.stringify(config));
+            onChunk({ type: 'slicer', config });
+            const beskrivelse = config.type === 'basic'
+              ? `verdier=[${config.verdier.join(', ')}]`
+              : `nivåer=${JSON.stringify(config.nivåer)}`;
+            result = { success: true, message: `Slicer "${tittel}" satt (${type}) — ${beskrivelse}.` };
+          }
         } else if (tc.name === 'clear_report_slicer') {
-          const slicerTitle = args['slicerTitle'] as string;
-          onChunk({ type: 'slicer_clear', slicerTitle });
-          result = { success: true, message: `Slicer "${slicerTitle}" nullstilt.` };
+          const tittel = args['tittel'] as string | undefined;
+          if (!tittel) {
+            result = { error: 'Mangler tittel — angi slicerens tittel.' };
+          } else {
+            onChunk({ type: 'slicer_clear', tittel });
+            result = { success: true, message: `Slicer "${tittel}" nullstilt.` };
+          }
         } else if (tc.name === 'open_report') {
           const rapportId   = args['rapportId'] as string;
           const rapportNavn = args['rapportNavn'] as string;
