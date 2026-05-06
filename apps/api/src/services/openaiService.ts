@@ -176,7 +176,10 @@ type MatchResultat =
   | { type: 'ambiguous'; alle:  string[] }
   | { type: 'none' };
 
-function finnEksaktEllerPrefiks(målVerdi: string | number, kandidater: string[]): MatchResultat {
+/** Forsøker å matche en verdi mot en liste av tilgjengelige verdier.
+ *  Eksakt match først, deretter prefiks-match (splittet på første mellomrom/bindestrek).
+ *  Brukes av både validerOgKorrigerVerdier (basic) og validerOgKorrigerNivåer (hierarchy). */
+function finnBesteMatch(målVerdi: string | number, kandidater: string[]): MatchResultat {
   const målStr = String(målVerdi);
   if (kandidater.includes(målStr)) return { type: 'exact', treff: målStr };
 
@@ -195,9 +198,50 @@ interface ValideringFeil {
   forslag?: string[];
 }
 
-interface ValideringOk {
-  ok:     true;
-  nivåer: HierarchyLevel[];
+interface ValideringOkNivåer  { ok: true; nivåer:  HierarchyLevel[] }
+interface ValideringOkVerdier { ok: true; verdier: (string | number)[] }
+
+/** Validerer basic-payload mot slicerInfo. Eksakt match → behold. Prefiks-match
+ *  → korriger til kanonisk verdi. Ingen/flere treff → feil til AI. */
+function validerOgKorrigerVerdier(
+  verdier: (string | number)[],
+  info:    BasicSlicerInfo,
+): ValideringOkVerdier | ValideringFeil {
+  const korrigerte: (string | number)[] = [];
+
+  for (const verdi of verdier) {
+    const match = finnBesteMatch(verdi, info.verdier);
+    if (match.type === 'none') {
+      const prefiks = utledPrefiks(verdi);
+      const filtrerteForslag = info.verdier.filter((v) =>
+        v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
+      );
+      return {
+        ok: false,
+        error:
+          `Verdien "${verdi}" finnes ikke i sliceren "${info.tittel}". ` +
+          `Tilgjengelige (utvalg): ${info.verdier.slice(0, 10).join(', ')}`,
+        forslag: filtrerteForslag.length > 0 ? filtrerteForslag : info.verdier.slice(0, 10),
+      };
+    }
+    if (match.type === 'ambiguous') {
+      return {
+        ok: false,
+        error:
+          `Verdien "${verdi}" har flere mulige treff i "${info.tittel}": ` +
+          `${match.alle.join(', ')}. Vær mer spesifikk og bruk eksakt en av disse.`,
+      };
+    }
+    const korrigert = match.treff;
+    if (match.type === 'prefix') {
+      console.log(`[slicer-match] prefiks (basic): "${verdi}" → "${korrigert}" i "${info.tittel}"`);
+    } else {
+      console.log(`[slicer-match] eksakt (basic): "${korrigert}" i "${info.tittel}"`);
+    }
+    korrigerte.push(korrigert);
+  }
+
+  return { ok: true, verdier: korrigerte };
 }
 
 /** Validerer hierarki-payload mot slicerInfo og korrigerer prefiks-match.
@@ -205,11 +249,11 @@ interface ValideringOk {
 function validerOgKorrigerNivåer(
   nivåer: HierarchyLevel[],
   info:   HierarchySlicerInfo,
-): ValideringOk | ValideringFeil {
+): ValideringOkNivåer | ValideringFeil {
   const korrigerte: HierarchyLevel[] = [];
 
   for (const node of nivåer) {
-    const toppMatch = finnEksaktEllerPrefiks(node.verdi, info.toppNivåVerdier);
+    const toppMatch = finnBesteMatch(node.verdi, info.toppNivåVerdier);
     if (toppMatch.type === 'none') {
       return {
         ok: false,
@@ -239,7 +283,7 @@ function validerOgKorrigerNivåer(
       korrigerteBarn = [];
       const tilgjengeligeBarn = info.barnPerForelder[korrigertTopp] ?? [];
       for (const barn of node.barn) {
-        const barnMatch = finnEksaktEllerPrefiks(barn.verdi, tilgjengeligeBarn);
+        const barnMatch = finnBesteMatch(barn.verdi, tilgjengeligeBarn);
         if (barnMatch.type === 'none') {
           const prefiks = utledPrefiks(barn.verdi);
           const filtrerteForslag = tilgjengeligeBarn.filter((v) =>
@@ -915,12 +959,27 @@ export async function chat(
               ? { tittel, type: 'basic',     verdier: verdier as (string | number)[] }
               : { tittel, type: 'hierarchy', nivåer:  nivåer  as HierarchyLevel[] };
 
-            // For hierarki: valider hver verdi mot slicerInfo og korriger prefiks-treff.
-            // Dette fanger AI-hallusinasjoner ("4600 - ikke spesifisert" når reell verdi er
-            // "4600 - Sokndal") før vi sender til frontend.
+            // Valider og korriger payload mot slicerInfo. Fanger AI-hallusinasjoner
+            // ("BDO" når reell verdi er "BDO AS", eller "4600 - ikke spesifisert" når
+            // reell verdi er "4600 - Sokndal") før vi sender til frontend.
             let valideringsfeil: { error: string; forslag?: string[] } | null = null;
-            if (config.type === 'hierarchy') {
-              const info = context?.slicere?.find((s) => s.tittel === config.tittel);
+            const info = context?.slicere?.find((s) => s.tittel === config.tittel);
+
+            if (config.type === 'basic') {
+              if (info && info.type === 'basic') {
+                const validering = validerOgKorrigerVerdier(config.verdier, info);
+                if (!validering.ok) {
+                  valideringsfeil = {
+                    error: validering.error,
+                    ...(validering.forslag ? { forslag: validering.forslag } : {}),
+                  };
+                } else {
+                  config = { ...config, verdier: validering.verdier };
+                }
+              } else {
+                console.warn(`[backend] mangler basic slicer-info for "${config.tittel}" — hopper over validering`);
+              }
+            } else if (config.type === 'hierarchy') {
               if (info && info.type === 'hierarchy') {
                 const validering = validerOgKorrigerNivåer(config.nivåer, info);
                 if (!validering.ok) {
@@ -932,7 +991,7 @@ export async function chat(
                   config = { ...config, nivåer: validering.nivåer };
                 }
               } else {
-                console.warn(`[backend] mangler slicer-info for "${config.tittel}" — hopper over hierarki-validering`);
+                console.warn(`[backend] mangler hierarki slicer-info for "${config.tittel}" — hopper over validering`);
               }
             }
 
