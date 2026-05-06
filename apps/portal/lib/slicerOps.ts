@@ -34,9 +34,22 @@ export interface BasicSlicerInfo extends SlicerMeta {
   verdier:     string[];
 }
 
+/**
+ * Target-shape for hierarki-slicere. PBI returnerer enten:
+ *   - `{ table, column }`           — multi-kolonne-slicer (f.eks. Year + Month som separate kolonner)
+ *   - `{ table, hierarchy, hierarchyLevel }` — slicer bundet til et navngitt date-hierarki
+ * Vi lagrer hele objektet uendret slik at applyHierarchy kan returnere det til PBI som det kom.
+ */
+export interface HierarchyTarget {
+  table:           string;
+  column?:         string;
+  hierarchy?:      string;
+  hierarchyLevel?: string;
+}
+
 export interface HierarchySlicerInfo extends SlicerMeta {
   type:            'hierarchy';
-  targets:         Array<{ table: string; column: string }>;
+  targets:         HierarchyTarget[];
   toppNivåVerdier: string[];
   barnPerForelder: Record<string, string[]>;
 }
@@ -97,7 +110,8 @@ function tilPbiHierarchyNode(level: HierarchyLevel): Record<string, unknown> {
       children: level.barn.map((b) => tilPbiHierarchyNode(b)),
     };
   }
-  return { operator: 'Selected', value: level.verdi };
+  // Inkluder children: [] eksplisitt — PBI er pirkete på dette feltet for løvnoder.
+  return { operator: 'Selected', value: level.verdi, children: [] };
 }
 
 function fraPbiHierarchyNode(node: Record<string, unknown>): HierarchyLevel | null {
@@ -140,14 +154,17 @@ export async function loadAll(report: Report): Promise<{
   const mapping: SlicerMapping = {};
 
   for (const visual of slicerVisuals) {
-    let targets: Array<{ table: string; column: string }> = [];
+    let targets: HierarchyTarget[] = [];
     try {
       const state = await visual.getSlicerState();
-      const t = (state as unknown as { targets?: Array<{ table: string; column: string }> }).targets;
+      console.log(`[slicerOps] state for "${visual.title ?? visual.name}":`, JSON.stringify(state));
+      const t = (state as unknown as { targets?: HierarchyTarget[] }).targets;
       targets = t ?? [];
     } catch { /* slicer kan være tom — fortsett */ }
 
-    const erHierarki = targets.length > 1;
+    // Hierarki = enten flere targets, eller ett target som bruker hierarchy/hierarchyLevel-felt
+    const erHierarki = targets.length > 1
+      || targets.some((t) => 'hierarchy' in t || 'hierarchyLevel' in t);
     const tittelRaw  = visual.title?.trim() ?? '';
 
     let headers: string[] = [];
@@ -183,7 +200,8 @@ export async function loadAll(report: Report): Promise<{
         type: 'hierarchy',
         visualName: visual.name,
         tittel,
-        targets: targets.map((t) => ({ table: t.table, column: t.column })),
+        // Bevar hele target-shapen fra PBI — kan inneholde hierarchy/hierarchyLevel for date-hierarkier.
+        targets: targets.map((t) => ({ ...t })),
         toppNivåVerdier: Array.from(toppSet),
         barnPerForelder,
       });
@@ -195,7 +213,9 @@ export async function loadAll(report: Report): Promise<{
         type: 'basic',
         visualName: visual.name,
         tittel,
-        target: targets[0] ? { table: targets[0].table, column: targets[0].column } : null,
+        target: targets[0]?.column
+          ? { table: targets[0].table, column: targets[0].column }
+          : null,
         kolonneType: utledKolonneType(verdier),
         verdier,
       });
@@ -365,12 +385,15 @@ async function applyHierarchy(
 
   const hierarchyData = config.nivåer.map((n) => tilPbiHierarchyNode(n));
 
+  const filter = {
+    $schema:       SCHEMA_HIERARCHY,
+    target:        info.targets,
+    filterType:    HIERARCHY_FILTER_TYPE,
+    hierarchyData,
+  };
+  console.log('[applyHierarchy] payload til PBI:', JSON.stringify({ filters: [filter] }, null, 2));
+
   await visual.setSlicerState({
-    filters: [{
-      $schema:       SCHEMA_HIERARCHY,
-      target:        info.targets,
-      filterType:    HIERARCHY_FILTER_TYPE,
-      hierarchyData,
-    }] as unknown as models.ISlicerFilter[],
+    filters: [filter] as unknown as models.ISlicerFilter[],
   });
 }

@@ -110,9 +110,16 @@ export interface BasicSlicerInfo extends SlicerMeta {
   verdier:     string[];
 }
 
+export interface HierarchyTarget {
+  table:           string;
+  column?:         string;
+  hierarchy?:      string;
+  hierarchyLevel?: string;
+}
+
 export interface HierarchySlicerInfo extends SlicerMeta {
   type:            'hierarchy';
-  targets:         Array<{ table: string; column: string }>;
+  targets:         HierarchyTarget[];
   toppNivåVerdier: string[];
   barnPerForelder: Record<string, string[]>;
 }
