@@ -1149,7 +1149,8 @@ Tilgjengelige visualiseringstyper:
           rapportNøkkelord   = rapport.nøkkelord;
           workspaceNavn      = rapport.workspaces?.[0]?.workspace?.navn ?? null;
           prosjektNr         = workspaceNavn?.match(/\b(\d{4,5})\b/)?.[1] ?? null;
-          // Berik chatContext med PBI-IDs og prosjektkontekst for create_report
+          // Berik chatContext med PBI-IDs, prosjektkontekst og slicer-info.
+          // slicere brukes til hierarki-validering i set_report_slicer-handler.
           chatContext = {
             ...chatContext,
             pbiDatasetId:    rapport.pbiDatasetId  ?? undefined,
@@ -1157,6 +1158,7 @@ Tilgjengelige visualiseringstyper:
             kildePbiReportId: rapport.pbiReportId   ?? undefined,
             prosjektNr,
             prosjektNavn:    workspaceNavn,
+            slicere,
           };
           console.log('[Chat] rapport område (Prisma):', rapportOmråde);
           console.log('[Chat] prosjektNr:', prosjektNr ?? 'ingen');
@@ -1276,7 +1278,12 @@ REGLER FOR Å SETTE SLICER:
 1. Slå opp sliceren i slicere-listen — bruk "type"-feltet til å velge riktig payload
 2. For type="basic": bruk set_report_slicer med tittel, type:"basic" og verdier:[...]
 3. For type="hierarchy": bruk set_report_slicer med tittel, type:"hierarchy" og nivåer:[...]
-4. Bruk EKSAKT verdi fra listen — aldri lag egne verdier
+4. KRITISK: Verdier MÅ være EKSAKT slik de står i toppNivåVerdier eller barnPerForelder.
+   Du må FINNE verdien i lista og kopiere den ORDRETT — kopier hele strengen, inkludert tall,
+   bindestrek, mellomrom og navn. IKKE gjett navnet basert på mønsteret du ser i andre verdier.
+   Eksempel: Hvis "200 - Tunnel" har barn ["4500 - Snøhvit", "4600 - Sokndal"] og brukeren
+   ber om prosjekt 4600, skal verdien være EKSAKT "4600 - Sokndal" — ikke "4600 - …" eller
+   "4600 - ikke spesifisert" eller noen annen variant. Backend vil avvise hallusinerte verdier.
 5. Hvis du finner én match: sett sliceren direkte
 6. Hvis du finner flere mulige treff: spør brukeren hvilken
 7. Hvis ingen match: si ifra og list tilgjengelige verdier

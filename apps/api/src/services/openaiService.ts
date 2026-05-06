@@ -152,6 +152,133 @@ export interface ChatContext {
   prosjektNavn?: string | null;
   /** Tillatte view-navn (lowercase) for denne brukeren — undefined = ingen begrensning */
   tillatteViewNavn?: string[];
+  /** Slicer-info fra aktiv side — brukes til å validere/korrigere AI sin slicer-payload */
+  slicere?: SlicerInfo[];
+}
+
+// ─────────────────────────────────────────────
+// Slicer-validering
+// ─────────────────────────────────────────────
+
+/** Henter ut prefiks frem til første mellomrom eller bindestrek. F.eks. "4600 - Sokndal" → "4600". */
+function utledPrefiks(verdi: string | number): string {
+  const s = String(verdi);
+  const m = s.match(/^([^\s-]+)/);
+  return m?.[1] ?? s;
+}
+
+type MatchResultat =
+  | { type: 'exact';     treff: string }
+  | { type: 'prefix';    treff: string }
+  | { type: 'ambiguous'; alle:  string[] }
+  | { type: 'none' };
+
+function finnEksaktEllerPrefiks(målVerdi: string | number, kandidater: string[]): MatchResultat {
+  const målStr = String(målVerdi);
+  if (kandidater.includes(målStr)) return { type: 'exact', treff: målStr };
+
+  const prefiks = utledPrefiks(målVerdi);
+  const treff = kandidater.filter((k) =>
+    k === prefiks || k.startsWith(prefiks + ' ') || k.startsWith(prefiks + '-'),
+  );
+  if (treff.length === 1) return { type: 'prefix', treff: treff[0] };
+  if (treff.length >  1) return { type: 'ambiguous', alle: treff };
+  return { type: 'none' };
+}
+
+interface ValideringFeil {
+  ok:      false;
+  error:   string;
+  forslag?: string[];
+}
+
+interface ValideringOk {
+  ok:     true;
+  nivåer: HierarchyLevel[];
+}
+
+/** Validerer hierarki-payload mot slicerInfo og korrigerer prefiks-match.
+ *  Returnerer ok med (eventuelt korrigerte) nivåer, eller feil som AI kan handle på. */
+function validerOgKorrigerNivåer(
+  nivåer: HierarchyLevel[],
+  info:   HierarchySlicerInfo,
+): ValideringOk | ValideringFeil {
+  const korrigerte: HierarchyLevel[] = [];
+
+  for (const node of nivåer) {
+    const toppMatch = finnEksaktEllerPrefiks(node.verdi, info.toppNivåVerdier);
+    if (toppMatch.type === 'none') {
+      return {
+        ok: false,
+        error:
+          `Topp-nivå-verdien "${node.verdi}" finnes ikke i sliceren "${info.tittel}". ` +
+          `Tilgjengelige: ${info.toppNivåVerdier.slice(0, 10).join(', ')}`,
+        forslag: info.toppNivåVerdier,
+      };
+    }
+    if (toppMatch.type === 'ambiguous') {
+      return {
+        ok: false,
+        error:
+          `Topp-nivå-verdien "${node.verdi}" har flere mulige treff i "${info.tittel}": ` +
+          `${toppMatch.alle.join(', ')}. Vær mer spesifikk.`,
+      };
+    }
+    const korrigertTopp = toppMatch.treff;
+    if (toppMatch.type === 'prefix') {
+      console.log(`[slicer-match] prefiks (topp): "${node.verdi}" → "${korrigertTopp}"`);
+    } else {
+      console.log(`[slicer-match] eksakt (topp): "${korrigertTopp}"`);
+    }
+
+    let korrigerteBarn: HierarchyLevel[] | undefined;
+    if (node.barn && node.barn.length > 0) {
+      korrigerteBarn = [];
+      const tilgjengeligeBarn = info.barnPerForelder[korrigertTopp] ?? [];
+      for (const barn of node.barn) {
+        const barnMatch = finnEksaktEllerPrefiks(barn.verdi, tilgjengeligeBarn);
+        if (barnMatch.type === 'none') {
+          const prefiks = utledPrefiks(barn.verdi);
+          const filtrerteForslag = tilgjengeligeBarn.filter((v) =>
+            v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
+          );
+          return {
+            ok: false,
+            error:
+              `Verdien "${barn.verdi}" finnes ikke under "${korrigertTopp}" i sliceren "${info.tittel}". ` +
+              `Tilgjengelige verdier under denne forelderen: ${tilgjengeligeBarn.slice(0, 10).join(', ')}`,
+            forslag: filtrerteForslag.length > 0 ? filtrerteForslag : tilgjengeligeBarn.slice(0, 10),
+          };
+        }
+        if (barnMatch.type === 'ambiguous') {
+          return {
+            ok: false,
+            error:
+              `Verdien "${barn.verdi}" har flere mulige treff under "${korrigertTopp}": ` +
+              `${barnMatch.alle.join(', ')}. Vær mer spesifikk.`,
+          };
+        }
+        const korrigertBarn = barnMatch.treff;
+        if (barnMatch.type === 'prefix') {
+          console.log(`[slicer-match] prefiks (barn): "${barn.verdi}" → "${korrigertBarn}" under "${korrigertTopp}"`);
+        } else {
+          console.log(`[slicer-match] eksakt (barn): "${korrigertBarn}"`);
+        }
+        // Tredje nivå (barn-of-barn) er sjelden — slipper det gjennom uvalidert.
+        korrigerteBarn.push({
+          verdi: korrigertBarn,
+          ...(barn.barn ? { barn: barn.barn } : {}),
+        });
+      }
+    }
+
+    korrigerte.push({
+      verdi: korrigertTopp,
+      ...(korrigerteBarn !== undefined ? { barn: korrigerteBarn } : {}),
+    });
+  }
+
+  return { ok: true, nivåer: korrigerte };
 }
 
 const tools: OpenAI.Chat.ChatCompletionTool[] = [
@@ -781,15 +908,41 @@ export async function chat(
           } else if (type === 'hierarchy' && verdier !== undefined) {
             result = { error: 'type="hierarchy" skal ikke ha verdier. Hvis sliceren ikke er hierarkisk, bruk type="basic" i stedet.' };
           } else {
-            const config: SlicerConfig = type === 'basic'
+            let config: SlicerConfig = type === 'basic'
               ? { tittel, type: 'basic',     verdier: verdier as (string | number)[] }
               : { tittel, type: 'hierarchy', nivåer:  nivåer  as HierarchyLevel[] };
-            console.log('[backend] sending slicer SSE event:', JSON.stringify(config));
-            onChunk({ type: 'slicer', config });
-            const beskrivelse = config.type === 'basic'
-              ? `verdier=[${config.verdier.join(', ')}]`
-              : `nivåer=${JSON.stringify(config.nivåer)}`;
-            result = { success: true, message: `Slicer "${tittel}" satt (${type}) — ${beskrivelse}.` };
+
+            // For hierarki: valider hver verdi mot slicerInfo og korriger prefiks-treff.
+            // Dette fanger AI-hallusinasjoner ("4600 - ikke spesifisert" når reell verdi er
+            // "4600 - Sokndal") før vi sender til frontend.
+            let valideringsfeil: { error: string; forslag?: string[] } | null = null;
+            if (config.type === 'hierarchy') {
+              const info = context?.slicere?.find((s) => s.tittel === config.tittel);
+              if (info && info.type === 'hierarchy') {
+                const validering = validerOgKorrigerNivåer(config.nivåer, info);
+                if (!validering.ok) {
+                  valideringsfeil = {
+                    error: validering.error,
+                    ...(validering.forslag ? { forslag: validering.forslag } : {}),
+                  };
+                } else {
+                  config = { ...config, nivåer: validering.nivåer };
+                }
+              } else {
+                console.warn(`[backend] mangler slicer-info for "${config.tittel}" — hopper over hierarki-validering`);
+              }
+            }
+
+            if (valideringsfeil) {
+              result = valideringsfeil;
+            } else {
+              console.log('[backend] sending slicer SSE event:', JSON.stringify(config));
+              onChunk({ type: 'slicer', config });
+              const beskrivelse = config.type === 'basic'
+                ? `verdier=[${config.verdier.join(', ')}]`
+                : `nivåer=${JSON.stringify(config.nivåer)}`;
+              result = { success: true, message: `Slicer "${tittel}" satt (${type}) — ${beskrivelse}.` };
+            }
           }
         } else if (tc.name === 'clear_report_slicer') {
           const tittel = args['tittel'] as string | undefined;
