@@ -1149,7 +1149,8 @@ Tilgjengelige visualiseringstyper:
           rapportNøkkelord   = rapport.nøkkelord;
           workspaceNavn      = rapport.workspaces?.[0]?.workspace?.navn ?? null;
           prosjektNr         = workspaceNavn?.match(/\b(\d{4,5})\b/)?.[1] ?? null;
-          // Berik chatContext med PBI-IDs og prosjektkontekst for create_report
+          // Berik chatContext med PBI-IDs, prosjektkontekst og slicer-info.
+          // slicere brukes til hierarki-validering i set_report_slicer-handler.
           chatContext = {
             ...chatContext,
             pbiDatasetId:    rapport.pbiDatasetId  ?? undefined,
@@ -1157,6 +1158,7 @@ Tilgjengelige visualiseringstyper:
             kildePbiReportId: rapport.pbiReportId   ?? undefined,
             prosjektNr,
             prosjektNavn:    workspaceNavn,
+            slicere,
           };
           console.log('[Chat] rapport område (Prisma):', rapportOmråde);
           console.log('[Chat] prosjektNr:', prosjektNr ?? 'ingen');
@@ -1209,27 +1211,31 @@ Tilgjengelige visualiseringstyper:
       console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
       console.log('[Chat] harKobletView:', harKobletView);
 
-      // Bygg kompakt slicer-oversikt for prompten. Begrenser verdier per slicer for å spare tokens.
-      const slicereSummary = (slicere ?? []).map((s) => {
+      // Bygg lese-vennlig slicer-oversikt for prompten — bullet-list per slicer.
+      // AI parser dette mer pålitelig enn nestet JSON. Begrenser verdier per
+      // slicer for å spare tokens (50 dekker 52 uker per år eller >20 prosjekter
+      // per Hovedprosjekt).
+      const SLICER_VERDIER_GRENSE = 50;
+      const slicereTekst = (slicere ?? []).map((s) => {
         if (s.type === 'basic') {
-          return {
-            tittel:      s.tittel,
-            type:        'basic' as const,
-            kolonneType: s.kolonneType,
-            verdier:     s.verdier.slice(0, 20),
-          };
+          const v = s.verdier.slice(0, SLICER_VERDIER_GRENSE);
+          const trunkert = s.verdier.length > SLICER_VERDIER_GRENSE
+            ? ` (av ${s.verdier.length} totalt)` : '';
+          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert}): ${v.join(', ')}`;
         }
-        const barnTrunkert: Record<string, string[]> = {};
+        const linjer = [`• ${s.tittel} (hierarchy):`];
+        linjer.push(`    Topp-nivå: ${s.toppNivåVerdier.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
-          barnTrunkert[forelder] = barn.slice(0, 20);
+          const trunkert = barn.length > SLICER_VERDIER_GRENSE
+            ? ` (av ${barn.length} totalt)` : '';
+          linjer.push(`    Under "${forelder}"${trunkert}: ${barn.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         }
-        return {
-          tittel:          s.tittel,
-          type:            'hierarchy' as const,
-          toppNivåVerdier: s.toppNivåVerdier,
-          barnPerForelder: barnTrunkert,
-        };
-      });
+        return linjer.join('\n');
+      }).join('\n');
+
+      console.log('[Chat] slicere mottatt:', slicere?.length ?? 0,
+        slicere?.map((s) => `${s.tittel}(${s.type})`).join(', ') ?? '(ingen)');
+      console.log('[Chat] slicereTekst-lengde:', slicereTekst.length, 'tegn');
 
       const aktivKontekst = prosjektNr
         ? `
@@ -1261,9 +1267,10 @@ Når du henter data fra database, filtrer ALLTID på de aktive slicer-verdiene m
 Eksempel: Slicer "Stuff" = "AKs - Adkomst kraftstasjon" → legg til WHERE Profilnavn = 'AKs - Adkomst kraftstasjon' (eller tilsvarende kolonnenavn for det aktuelle viewet).
 Match slicer-nøkkelen mot kolonnenavn i viewet — bruk LIKE '%verdi%' om eksakt match er usikker.
 
-SLICER-REGLER:
-- Tilgjengelige slicere (med type og verdier, maks 20 per gruppe): ${slicereSummary.length > 0 ? JSON.stringify(slicereSummary) : '(ikke lastet ennå)'}
-- Aktivt slicer-state (JSON): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
+SLICERE PÅ AKTIV SIDE — bruk EKSAKT verdi som vist her:
+${slicereTekst || '(ingen slicere lastet ennå)'}
+
+Aktivt slicer-state (hva som er valgt nå): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
 
 VIKTIG - I denne applikasjonen finnes det IKKE rapportfiltre.
 Når brukeren sier "filter", "filtrer", "sett filter", "fjern filter", "ta bort filter" e.l. betyr det alltid SLICER.
@@ -1274,19 +1281,64 @@ REGLER FOR Å SETTE SLICER:
 1. Slå opp sliceren i slicere-listen — bruk "type"-feltet til å velge riktig payload
 2. For type="basic": bruk set_report_slicer med tittel, type:"basic" og verdier:[...]
 3. For type="hierarchy": bruk set_report_slicer med tittel, type:"hierarchy" og nivåer:[...]
-4. Bruk EKSAKT verdi fra listen — aldri lag egne verdier
+4. KRITISK: Verdier MÅ være EKSAKT slik de står i toppNivåVerdier eller barnPerForelder.
+   Du må FINNE verdien i lista og kopiere den ORDRETT — kopier hele strengen, inkludert tall,
+   bindestrek, mellomrom og navn. IKKE gjett navnet basert på mønsteret du ser i andre verdier.
+   Eksempel: Hvis "200 - Tunnel" har barn ["4500 - Snøhvit", "4600 - Sokndal"] og brukeren
+   ber om prosjekt 4600, skal verdien være EKSAKT "4600 - Sokndal" — ikke "4600 - …" eller
+   "4600 - ikke spesifisert" eller noen annen variant. Backend vil avvise hallusinerte verdier.
 5. Hvis du finner én match: sett sliceren direkte
 6. Hvis du finner flere mulige treff: spør brukeren hvilken
 7. Hvis ingen match: si ifra og list tilgjengelige verdier
 
+50-VERDIERS BEGRENSNING (basic-slicere):
+For basic-slicere har du tilgang til de første 50 verdiene fra sliceren. Større slicere
+(f.eks. leverandører) er trunkert — slicereTekst viser "(av N totalt)" når dette skjer.
+
+Hvis brukeren ber om en verdi som IKKE finnes i din verdiliste:
+- IKKE konstruer eller gjett verdier som ikke står i lista
+- Si ærlig fra at du ikke ser verdien blant de 50 du har tilgang til, og at sliceren
+  inneholder flere
+- Foreslå at brukeren skriver det fullstendige navnet, eller velger verdien manuelt
+  i sliceren
+
+Eksempel-svar for "Sett leverandør til BDO" når BDO ikke er i din liste:
+  "Jeg ser 50 verdier i Leverandør-sliceren, og BDO er ikke blant dem — denne
+  sliceren har flere verdier enn jeg får se. Hvis du vet det fullstendige navnet
+  (f.eks. 'BDO AS' eller 'BDO Advokater AS'), kan jeg sette det. Eller du kan velge
+  manuelt i sliceren."
+
 HIERARCHY-PAYLOAD (for type="hierarchy"):
-- Topp-nivå-verdier finnes i toppNivåVerdier (f.eks. årstall)
-- Barn under hver topp-verdi finnes i barnPerForelder (f.eks. uker eller måneder)
-- "Hele 2026":         nivåer=[{ verdi: 2026 }]
-- "Uke 9 i 2026":      nivåer=[{ verdi: 2026, barn: [{ verdi: "9 (24.02.26-01.03.26)" }] }]
-- "Januar+februar 26": nivåer=[{ verdi: 2026, barn: [{ verdi: "januar" }, { verdi: "februar" }] }]
-- "2025 og 2026":      nivåer=[{ verdi: 2025 }, { verdi: 2026 }]
-Hvis "barn" er udefinert eller tom, betyr det at hele nivået under er valgt.
+- Topp-nivå-verdier finnes i toppNivåVerdier
+- Barn under hver topp-verdi finnes i barnPerForelder (forelder → liste av barn)
+- Hvis "barn" er udefinert eller tom, betyr det at hele nivået under er valgt.
+
+ALGORITME for hierarchy-slicer når brukeren oppgir kun barn-verdier (uten å si forelder):
+1. For HVERT barn brukeren nevner: slå opp i barnPerForelder for å finne hvilken forelder som inneholder akkurat det barnet.
+2. Grupper barna per forelder de tilhører.
+3. Lag én nivå-node per unik forelder, hver med "barn" som inneholder kun de barna som hører til DEN forelderen.
+4. Aldri putt et barn under feil forelder. Hvis du er usikker, slå opp i barnPerForelder før du svarer.
+
+Eksempler:
+
+  // Topp-nivå direkte: "Hele 2026"
+  nivåer: [{ verdi: 2026 }]
+
+  // Ett barn under én forelder: "Uke 9 i 2026"
+  nivåer: [{ verdi: 2026, barn: [{ verdi: "9 (24.02.26-01.03.26)" }] }]
+
+  // Flere barn under SAMME forelder: "Januar og februar 2026"
+  nivåer: [{ verdi: 2026, barn: [{ verdi: "januar" }, { verdi: "februar" }] }]
+
+  // Flere barn under FORSKJELLIGE foreldre: "Vis prosjekt 4200 og 4600"
+  // (forutsetter barnPerForelder = { '200 - Tunnel': ['4600 - …'], '250 - Gruvedrift': ['4200 - Nussir'] })
+  nivåer: [
+    { verdi: '200 - Tunnel',     barn: [{ verdi: '4600 - ikke spesifisert' }] },
+    { verdi: '250 - Gruvedrift', barn: [{ verdi: '4200 - Nussir' }] }
+  ]
+
+  // Flere topp-nivåer hele: "2025 og 2026"
+  nivåer: [{ verdi: 2025 }, { verdi: 2026 }]
 ${formaterteVisualData ? `
 VISUAL DATA — INNHOLD PÅ SKJERMEN AKKURAT NÅ:
 Dette er CSV-eksport av det brukeren ser i Power BI-rapporten (med aktive slicer-valg):

@@ -642,7 +642,12 @@ export default function AIChat({
     };
     console.log('[AIChat] sender melding med øktId:', øktIdRef.current, '| rapportId (chatRapportId):', rapportId ?? null);
     console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
-    console.log('[AIChat] slicere som sendes:', slicere?.length ?? 0);
+    console.log('[AIChat] slicere som sendes:', slicere?.length ?? 0,
+      slicere?.map((s) => `${s.tittel}(${s.type}, ${s.type === 'basic' ? s.verdier.length : Object.keys(s.barnPerForelder ?? {}).length} verdier)`));
+    if (slicere && slicere.length > 0) {
+      const første = slicere[0];
+      console.log('[AIChat] første slicer detaljert:', JSON.stringify(første).slice(0, 500));
+    }
     console.log('[AIChat] sender body activeSlicerState:', JSON.stringify(requestBody.activeSlicerState));
 
     try {

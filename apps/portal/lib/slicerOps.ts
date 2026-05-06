@@ -34,11 +34,27 @@ export interface BasicSlicerInfo extends SlicerMeta {
   verdier:     string[];
 }
 
+/**
+ * Target-shape for hierarki-slicere. PBI returnerer enten:
+ *   - `{ table, column }`           — multi-kolonne-slicer (f.eks. Year + Month som separate kolonner)
+ *   - `{ table, hierarchy, hierarchyLevel }` — slicer bundet til et navngitt date-hierarki
+ * Vi lagrer hele objektet uendret slik at applyHierarchy kan returnere det til PBI som det kom.
+ */
+export interface HierarchyTarget {
+  table:           string;
+  column?:         string;
+  hierarchy?:      string;
+  hierarchyLevel?: string;
+}
+
 export interface HierarchySlicerInfo extends SlicerMeta {
   type:            'hierarchy';
-  targets:         Array<{ table: string; column: string }>;
+  targets:         HierarchyTarget[];
   toppNivåVerdier: string[];
   barnPerForelder: Record<string, string[]>;
+  /** Forventet datatype per nivå-dybde (0 = topp). Brukes til å konvertere
+   *  AI-payload til riktig JSON-type før vi sender til PBI. */
+  nivåTyper:       Array<'string' | 'number'>;
 }
 
 export type SlicerInfo = BasicSlicerInfo | HierarchySlicerInfo;
@@ -89,6 +105,32 @@ function utledKolonneType(verdier: string[]): 'string' | 'number' {
   return numeriske.length === verdier.length ? 'number' : 'string';
 }
 
+/**
+ * Konverter en verdi til riktig JSON-type før vi sender til PBI.
+ * PBI matcher ikke filterverdier mot data hvis JSON-typen er feil
+ * (number vs string skiller). Brukes av både applyBasic og applyHierarchy.
+ */
+function tilPbiVerdi(verdi: string | number, kolonneType: 'string' | 'number'): string | number {
+  if (kolonneType === 'number') {
+    const n = typeof verdi === 'number' ? verdi : Number(String(verdi).replace(',', '.'));
+    return Number.isFinite(n) ? n : verdi;
+  }
+  return typeof verdi === 'number' ? String(verdi) : verdi;
+}
+
+/** Rekursivt konverter verdier i hver nivå-node til riktig JSON-type basert på nivåTyper. */
+function konverterNivåer(
+  nivåer:    HierarchyLevel[],
+  nivåTyper: Array<'string' | 'number'>,
+  depth = 0,
+): HierarchyLevel[] {
+  const type = nivåTyper[depth] ?? 'string';
+  return nivåer.map((n) => ({
+    verdi: tilPbiVerdi(n.verdi, type),
+    ...(n.barn ? { barn: konverterNivåer(n.barn, nivåTyper, depth + 1) } : {}),
+  }));
+}
+
 function tilPbiHierarchyNode(level: HierarchyLevel): Record<string, unknown> {
   if (level.barn && level.barn.length > 0) {
     return {
@@ -97,7 +139,8 @@ function tilPbiHierarchyNode(level: HierarchyLevel): Record<string, unknown> {
       children: level.barn.map((b) => tilPbiHierarchyNode(b)),
     };
   }
-  return { operator: 'Selected', value: level.verdi };
+  // Inkluder children: [] eksplisitt — PBI er pirkete på dette feltet for løvnoder.
+  return { operator: 'Selected', value: level.verdi, children: [] };
 }
 
 function fraPbiHierarchyNode(node: Record<string, unknown>): HierarchyLevel | null {
@@ -140,14 +183,17 @@ export async function loadAll(report: Report): Promise<{
   const mapping: SlicerMapping = {};
 
   for (const visual of slicerVisuals) {
-    let targets: Array<{ table: string; column: string }> = [];
+    let targets: HierarchyTarget[] = [];
     try {
       const state = await visual.getSlicerState();
-      const t = (state as unknown as { targets?: Array<{ table: string; column: string }> }).targets;
+      console.log(`[slicerOps] state for "${visual.title ?? visual.name}":`, JSON.stringify(state));
+      const t = (state as unknown as { targets?: HierarchyTarget[] }).targets;
       targets = t ?? [];
     } catch { /* slicer kan være tom — fortsett */ }
 
-    const erHierarki = targets.length > 1;
+    // Hierarki = enten flere targets, eller ett target som bruker hierarchy/hierarchyLevel-felt
+    const erHierarki = targets.length > 1
+      || targets.some((t) => 'hierarchy' in t || 'hierarchyLevel' in t);
     const tittelRaw  = visual.title?.trim() ?? '';
 
     let headers: string[] = [];
@@ -179,23 +225,51 @@ export async function loadAll(report: Report): Promise<{
         if (!barnPerForelder[topp]) barnPerForelder[topp] = [];
         if (!barnPerForelder[topp].includes(barn)) barnPerForelder[topp].push(barn);
       }
+
+      // Utled type per nivå fra CSV-kolonnene. Tid-slicer har Year (number) + UkeTekst (string).
+      // PBI er pirkete på JSON-typer i hierarchyData — value: 2026 ≠ value: "2026".
+      const nivåTyper: Array<'string' | 'number'> = [];
+      const numNivåer = headers.length;
+      for (let kol = 0; kol < numNivåer; kol++) {
+        const kolverdier = dataLinjer.slice(0, 50)
+          .map((l) => parseCSVRad(l)[kol])
+          .filter((v): v is string => v !== undefined && v !== '');
+        const numeriske = kolverdier.filter((v) => !isNaN(Number(v.replace(',', '.'))));
+        nivåTyper.push(
+          kolverdier.length > 0 && numeriske.length === kolverdier.length ? 'number' : 'string',
+        );
+      }
+
+      console.log(
+        `[slicerOps] hierarchy "${tittel}": ${toppSet.size} forelder-noder, ` +
+        `${Object.values(barnPerForelder).reduce((s, b) => s + b.length, 0)} barn totalt ` +
+        `(${dataLinjer.length} CSV-rader, nivåTyper=[${nivåTyper.join(',')}])`,
+      );
       slicere.push({
         type: 'hierarchy',
         visualName: visual.name,
         tittel,
-        targets: targets.map((t) => ({ table: t.table, column: t.column })),
+        // Bevar hele target-shapen fra PBI — kan inneholde hierarchy/hierarchyLevel for date-hierarkier.
+        targets: targets.map((t) => ({ ...t })),
         toppNivåVerdier: Array.from(toppSet),
         barnPerForelder,
+        nivåTyper,
       });
     } else {
       const verdier = dataLinjer.slice(0, 50)
         .map((l) => parseCSVRad(l)[0])
         .filter((v): v is string => v !== undefined && v !== '');
+      console.log(
+        `[slicerOps] basic "${tittel}": ${verdier.length} verdier ` +
+        `(første 3: ${verdier.slice(0, 3).join(' | ')}${verdier.length > 3 ? ', …' : ''})`,
+      );
       slicere.push({
         type: 'basic',
         visualName: visual.name,
         tittel,
-        target: targets[0] ? { table: targets[0].table, column: targets[0].column } : null,
+        target: targets[0]?.column
+          ? { table: targets[0].table, column: targets[0].column }
+          : null,
         kolonneType: utledKolonneType(verdier),
         verdier,
       });
@@ -332,13 +406,7 @@ async function applyBasic(
     throw new Error(`Slicer "${info.tittel}" mangler target — kan ikke sette verdier.`);
   }
 
-  const konverterte = config.verdier.map((v) => {
-    if (info.kolonneType === 'number') {
-      const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
-      return Number.isFinite(n) ? n : v;
-    }
-    return typeof v === 'number' ? String(v) : v;
-  });
+  const konverterte = config.verdier.map((v) => tilPbiVerdi(v, info.kolonneType));
 
   await visual.setSlicerState({
     filters: [{
@@ -363,14 +431,23 @@ async function applyHierarchy(
     throw new Error(`Hierarchy-config for "${info.tittel}" må ha minst ett nivå.`);
   }
 
-  const hierarchyData = config.nivåer.map((n) => tilPbiHierarchyNode(n));
+  // Konverter AI-payload til riktig JSON-type per nivå (Year=number, UkeTekst=string osv).
+  // PBI matcher ikke filterverdier mot data hvis JSON-typen er feil.
+  const konverterte   = konverterNivåer(config.nivåer, info.nivåTyper);
+  const hierarchyData = konverterte.map((n) => tilPbiHierarchyNode(n));
+
+  const filter = {
+    $schema:       SCHEMA_HIERARCHY,
+    target:        info.targets,
+    filterType:    HIERARCHY_FILTER_TYPE,
+    hierarchyData,
+  };
+  console.log(
+    `[applyHierarchy] "${info.tittel}" nivåTyper=[${info.nivåTyper.join(',')}], ` +
+    `payload:`, JSON.stringify({ filters: [filter] }, null, 2),
+  );
 
   await visual.setSlicerState({
-    filters: [{
-      $schema:       SCHEMA_HIERARCHY,
-      target:        info.targets,
-      filterType:    HIERARCHY_FILTER_TYPE,
-      hierarchyData,
-    }] as unknown as models.ISlicerFilter[],
+    filters: [filter] as unknown as models.ISlicerFilter[],
   });
 }
