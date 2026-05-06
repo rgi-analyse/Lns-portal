@@ -105,8 +105,13 @@ function utledKolonneType(verdier: string[]): 'string' | 'number' {
   return numeriske.length === verdier.length ? 'number' : 'string';
 }
 
-function konverterTilType(verdi: string | number, type: 'string' | 'number'): string | number {
-  if (type === 'number') {
+/**
+ * Konverter en verdi til riktig JSON-type før vi sender til PBI.
+ * PBI matcher ikke filterverdier mot data hvis JSON-typen er feil
+ * (number vs string skiller). Brukes av både applyBasic og applyHierarchy.
+ */
+function tilPbiVerdi(verdi: string | number, kolonneType: 'string' | 'number'): string | number {
+  if (kolonneType === 'number') {
     const n = typeof verdi === 'number' ? verdi : Number(String(verdi).replace(',', '.'));
     return Number.isFinite(n) ? n : verdi;
   }
@@ -121,7 +126,7 @@ function konverterNivåer(
 ): HierarchyLevel[] {
   const type = nivåTyper[depth] ?? 'string';
   return nivåer.map((n) => ({
-    verdi: konverterTilType(n.verdi, type),
+    verdi: tilPbiVerdi(n.verdi, type),
     ...(n.barn ? { barn: konverterNivåer(n.barn, nivåTyper, depth + 1) } : {}),
   }));
 }
@@ -401,13 +406,7 @@ async function applyBasic(
     throw new Error(`Slicer "${info.tittel}" mangler target — kan ikke sette verdier.`);
   }
 
-  const konverterte = config.verdier.map((v) => {
-    if (info.kolonneType === 'number') {
-      const n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
-      return Number.isFinite(n) ? n : v;
-    }
-    return typeof v === 'number' ? String(v) : v;
-  });
+  const konverterte = config.verdier.map((v) => tilPbiVerdi(v, info.kolonneType));
 
   await visual.setSlicerState({
     filters: [{
