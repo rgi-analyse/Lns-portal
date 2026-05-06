@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { chat, type ChatMessage, type ChatContext } from '../services/openaiService';
+import { chat, type ChatMessage, type ChatContext, type SlicerInfo, type SlicerState } from '../services/openaiService';
 import { queryAzureSQL } from '../services/azureSqlService';
 import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
@@ -494,9 +494,8 @@ interface ChatBody {
   rapportId?: string;
   pbiReportId?: string;
   rapportNavn?: string;
-  slicers?: string[];
-  slicerValues?: Record<string, Record<string, string[]>>;
-  activeSlicerState?: Record<string, unknown>;
+  slicere?: SlicerInfo[];
+  activeSlicerState?: SlicerState;
   aktivSide?: string;
   visualData?: Record<string, string>;
   kanLageRapport?: boolean;
@@ -681,8 +680,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             rapportId:   { type: 'string' },
             pbiReportId: { type: 'string' },
             rapportNavn: { type: 'string' },
-            slicers:      { type: 'array', items: { type: 'string' } },
-            slicerValues:      { type: 'object', additionalProperties: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } } },
+            slicere:           { type: 'array' },
             activeSlicerState: { type: 'object' },
             aktivSide:         { type: 'string' },
             visualData:        { type: 'object', additionalProperties: { type: 'string' } },
@@ -697,7 +695,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const t0 = Date.now();
-      const { messages: rawMessages, rapportId, pbiReportId, slicers, slicerValues, activeSlicerState, aktivSide, visualData } = request.body;
+      const { messages: rawMessages, rapportId, pbiReportId, slicere, activeSlicerState, aktivSide, visualData } = request.body;
 
       // Timing-state — oppdateres underveis og logges ved stream-slutt
       let t1 = 0; // etter tilgang-sjekk (bruker-rolle + workspace-view-kjede)
@@ -1211,17 +1209,27 @@ Tilgjengelige visualiseringstyper:
       console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
       console.log('[Chat] harKobletView:', harKobletView);
 
-      // FIX 1: Begrens slicer-verdier til maks 20 verdier per år/gruppe for å spare tokens
-      const slicerValuesSummary = slicerValues
-        ? Object.fromEntries(
-            Object.entries(slicerValues).map(([slicer, years]) => [
-              slicer,
-              Object.fromEntries(
-                Object.entries(years as Record<string, string[]>).map(([yr, vals]) => [yr, vals.slice(0, 20)])
-              ),
-            ])
-          )
-        : null;
+      // Bygg kompakt slicer-oversikt for prompten. Begrenser verdier per slicer for å spare tokens.
+      const slicereSummary = (slicere ?? []).map((s) => {
+        if (s.type === 'basic') {
+          return {
+            tittel:      s.tittel,
+            type:        'basic' as const,
+            kolonneType: s.kolonneType,
+            verdier:     s.verdier.slice(0, 20),
+          };
+        }
+        const barnTrunkert: Record<string, string[]> = {};
+        for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
+          barnTrunkert[forelder] = barn.slice(0, 20);
+        }
+        return {
+          tittel:          s.tittel,
+          type:            'hierarchy' as const,
+          toppNivåVerdier: s.toppNivåVerdier,
+          barnPerForelder: barnTrunkert,
+        };
+      });
 
       const aktivKontekst = prosjektNr
         ? `
@@ -1254,8 +1262,7 @@ Eksempel: Slicer "Stuff" = "AKs - Adkomst kraftstasjon" → legg til WHERE Profi
 Match slicer-nøkkelen mot kolonnenavn i viewet — bruk LIKE '%verdi%' om eksakt match er usikker.
 
 SLICER-REGLER:
-- Tilgjengelige slicers: ${slicers?.join(', ') ?? '(ingen)'}
-- Gyldige slicer-verdier (maks 20 per gruppe): ${slicerValuesSummary && Object.keys(slicerValuesSummary).length > 0 ? JSON.stringify(slicerValuesSummary) : '(ikke lastet ennå)'}
+- Tilgjengelige slicere (med type og verdier, maks 20 per gruppe): ${slicereSummary.length > 0 ? JSON.stringify(slicereSummary) : '(ikke lastet ennå)'}
 - Aktivt slicer-state (JSON): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
 
 VIKTIG - I denne applikasjonen finnes det IKKE rapportfiltre.
@@ -1264,18 +1271,22 @@ Når brukeren sier "filter", "filtrer", "sett filter", "fjern filter", "ta bort 
 - For å fjerne/nullstille slicer: bruk clear_report_slicer
 
 REGLER FOR Å SETTE SLICER:
-1. Les gyldige verdier fra slicer-verdier over for aktuell slicer
-2. Match brukerens forespørsel mot verdilisten
-3. Bruk EKSAKT verdi fra listen - aldri lag egne verdier
-4. Hvis du finner én match: sett sliceren direkte
-5. Hvis du finner flere mulige treff: spør brukeren hvilken
-6. Hvis ingen match: si ifra og list tilgjengelige verdier
+1. Slå opp sliceren i slicere-listen — bruk "type"-feltet til å velge riktig payload
+2. For type="basic": bruk set_report_slicer med tittel, type:"basic" og verdier:[...]
+3. For type="hierarchy": bruk set_report_slicer med tittel, type:"hierarchy" og nivåer:[...]
+4. Bruk EKSAKT verdi fra listen — aldri lag egne verdier
+5. Hvis du finner én match: sett sliceren direkte
+6. Hvis du finner flere mulige treff: spør brukeren hvilken
+7. Hvis ingen match: si ifra og list tilgjengelige verdier
 
-SPESIELT FOR TID-SLICER (hierarchy):
-- Verdier er gruppert per år: { "2025": [...], "2026": [...] }
-- Format: "9 (23.02.26-01.03.26)"
-- Match "uke 9" → finn verdien som starter med "9 "
-- Bruk set_report_slicer med slicerTitle, values og år
+HIERARCHY-PAYLOAD (for type="hierarchy"):
+- Topp-nivå-verdier finnes i toppNivåVerdier (f.eks. årstall)
+- Barn under hver topp-verdi finnes i barnPerForelder (f.eks. uker eller måneder)
+- "Hele 2026":         nivåer=[{ verdi: 2026 }]
+- "Uke 9 i 2026":      nivåer=[{ verdi: 2026, barn: [{ verdi: "9 (24.02.26-01.03.26)" }] }]
+- "Januar+februar 26": nivåer=[{ verdi: 2026, barn: [{ verdi: "januar" }, { verdi: "februar" }] }]
+- "2025 og 2026":      nivåer=[{ verdi: 2025 }, { verdi: 2026 }]
+Hvis "barn" er udefinert eller tom, betyr det at hele nivået under er valgt.
 ${formaterteVisualData ? `
 VISUAL DATA — INNHOLD PÅ SKJERMEN AKKURAT NÅ:
 Dette er CSV-eksport av det brukeren ser i Power BI-rapporten (med aktive slicer-valg):

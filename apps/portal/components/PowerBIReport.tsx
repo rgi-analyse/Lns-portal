@@ -3,7 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { PowerBIEmbed } from 'powerbi-client-react';
 import { models, Report } from 'powerbi-client';
-import type { FilterConfig, SlicerConfig } from './AIChat';
+import type { FilterConfig } from './AIChat';
+import * as slicerOps from '@/lib/slicerOps';
+import type {
+  SlicerConfig, SlicerInfo, SlicerMapping, SlicerState,
+} from '@/lib/slicerOps';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   FileText, Presentation, Table,
@@ -36,9 +40,8 @@ interface PowerBIReportProps {
   filterConfig?: FilterConfig;  // AI-drevet filter
   slicerQueue?: SlicerConfig[];  // AI-drevet slicer-kø (støtter flere samtidige endringer)
   onSlicerQueueProcessed?: () => void;
-  onSlicersLoaded?: (slicers: string[]) => void;
-  onSlicerValuesLoaded?: (values: Record<string, Record<string, string[]>>) => void;
-  onActiveStateChange?: (state: Record<string, unknown>) => void;
+  onSlicereLoaded?: (slicere: SlicerInfo[]) => void;
+  onActiveStateChange?: (state: SlicerState) => void;
   onTablesLoaded?: (tables: string[]) => void;
   onRegisterGetVisualData?: (fn: () => Promise<Record<string, string>>) => void;
   onAktivSideChange?: (side: string) => void;
@@ -48,7 +51,7 @@ interface PowerBIReportProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerQueue, onSlicerQueueProcessed, clearSlicerTitle, onSlicersLoaded, onSlicerValuesLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
+export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerQueue, onSlicerQueueProcessed, clearSlicerTitle, onSlicereLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
   const { entraObjectId } = usePortalAuth();
 
   // Workspace-spesifikk nøkkel for bookmark-lagring
@@ -89,8 +92,10 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const reportRef = useRef<Report | null>(null);
   const accountRef = useRef<string | null>(null);
   const embedContainerRef = useRef<HTMLDivElement>(null);
-  // Mapping: nøkkel (kolonne-/visningsnavn) → visual.name (intern PBI-identifikator)
-  const slicerMappingRef = useRef<Record<string, string>>({});
+  // Mapping: tittel (kolonne-/visningsnavn) → visual.name (intern PBI-identifikator)
+  const slicerMappingRef = useRef<SlicerMapping>({});
+  // Cached slicer-info etter siste loadAll — brukes av apply/getActiveState
+  const slicereRef       = useRef<SlicerInfo[]>([]);
 
   useEffect(() => { reportRef.current = report; }, [report]);
   useEffect(() => { accountRef.current = entraObjectId ?? null; }, [entraObjectId]);
@@ -143,18 +148,21 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     if (!slicerQueue || slicerQueue.length === 0 || !reportRef.current) return;
     let avbrutt = false;
     (async () => {
+      const r = reportRef.current;
+      if (!r) return;
       for (const config of slicerQueue) {
         if (avbrutt) return;
         try {
-          console.log('[PBI] slicer-kø prosesserer:', config.slicerTitle, config.values);
-          await setSlicerValue(config.slicerTitle, config.values, config.år);
-          console.log('[PBI] slicer prosessert:', config.slicerTitle);
+          console.log('[PBI] slicer-kø prosesserer:', config);
+          await slicerOps.apply(r, slicerMappingRef.current, slicereRef.current, config);
+          console.log('[PBI] slicer prosessert:', config.tittel);
         } catch (err) {
-          console.error('[PBI] slicer feilet:', config.slicerTitle, err);
+          console.error('[PBI] slicer feilet:', config.tittel, err);
         }
       }
-      if (!avbrutt) {
-        await getActiveSlicerState().then(onActiveStateChange);
+      if (!avbrutt && reportRef.current) {
+        const state = await slicerOps.getActiveState(reportRef.current, slicerMappingRef.current, slicereRef.current);
+        onActiveStateChangeRef.current?.(state);
         onSlicerQueueProcessed?.();
       }
     })();
@@ -164,8 +172,14 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   useEffect(() => {
     if (!clearSlicerTitle || !reportRef.current) return;
     console.log('[PBI] clearSlicerTitle endret, nullstiller slicer:', clearSlicerTitle);
-    clearSlicerValue(clearSlicerTitle)
-      .then(() => getActiveSlicerState().then(onActiveStateChange));
+    const r = reportRef.current;
+    slicerOps.clear(r, slicerMappingRef.current, clearSlicerTitle)
+      .then(async () => {
+        if (!reportRef.current) return;
+        const state = await slicerOps.getActiveState(reportRef.current, slicerMappingRef.current, slicereRef.current);
+        onActiveStateChangeRef.current?.(state);
+      })
+      .catch((err) => console.warn('[PBI] clearSlicer feilet:', err));
   }, [clearSlicerTitle]);
 
   async function exportVisualData(visualTitle: string): Promise<string> {
@@ -295,282 +309,20 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     return kandidater;
   };
 
-  async function getSlicers(r: Report = reportRef.current!): Promise<string[]> {
-    if (!r) return [];
+  /** Re-leser alle slicere på aktiv side og sender til parent. */
+  const refreshSlicere = async (r: Report) => {
     try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) return [];
-      const visuals = await activePage.getVisuals();
-
-      console.log('[PBI] ALLE visuals:', visuals.map((v) => ({
-        title:       v.title,
-        type:        v.type,
-        name:        v.name,
-        displayName: (v as unknown as Record<string, unknown>)['displayName'],
-      })));
-
-      console.log('[PBI] alle visual typer:', [...new Set(visuals.map((v) => v.type))]);
-
-      const slicers = visuals
-        .filter((v) => erSlicerType(v.type))
-        .map((v) => {
-          const title = v.title?.trim() || v.name;
-          if (!v.title?.trim()) console.warn('[PBI] Slicer mangler tittel, bruker name:', v.name);
-          return title;
-        });
-      console.log('[PBI] Tilgjengelige slicers:', slicers);
-      return slicers;
+      const { slicere, mapping } = await slicerOps.loadAll(r);
+      slicereRef.current = slicere;
+      slicerMappingRef.current = mapping;
+      console.log('[PBI] slicere lastet:', slicere.length, '— titler:', Object.keys(mapping));
+      onSlicereLoaded?.(slicere);
+      const state = await slicerOps.getActiveState(r, mapping, slicere);
+      onActiveStateChangeRef.current?.(state);
     } catch (err) {
-      console.error('[PBI] getSlicers feil:', err);
-      return [];
+      console.error('[PBI] refreshSlicere feilet:', err);
     }
-  }
-
-  async function getActiveSlicerState(): Promise<Record<string, unknown>> {
-    const r = reportRef.current;
-    if (!r) return {};
-    try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) return {};
-      const visuals = await activePage.getVisuals();
-      const slicerVisuals = visuals.filter((v) => erSlicerType(v.type));
-
-      // Bygg reverse mapping: visual.name → nøkkel
-      const reverseMapping: Record<string, string> = {};
-      for (const [nøkkel, visualName] of Object.entries(slicerMappingRef.current)) {
-        reverseMapping[visualName] = nøkkel;
-      }
-
-      const state: Record<string, unknown> = {};
-      for (const slicer of slicerVisuals) {
-        // Bruk nøkkel fra mapping hvis tilgjengelig, ellers tittel/name som fallback
-        const title = reverseMapping[slicer.name] ?? slicer.title?.trim() ?? slicer.name;
-        const slicerState = await slicer.getSlicerState();
-        const firstFilter = slicerState.filters?.[0] as unknown as Record<string, unknown> | undefined;
-
-        if (firstFilter?.['filterType'] === 9) {
-          // Hierarchy slicer (Tid)
-          const hData = firstFilter['hierarchyData'] as Array<Record<string, unknown>> | undefined;
-          state[title] = hData?.map((parent) => ({
-            år: parent['value'],
-            uker: (parent['children'] as Array<Record<string, unknown>> | undefined)
-              ?.filter((c) => c['operator'] === 'Selected')
-              ?.map((c) => c['value']),
-          }));
-        } else if (firstFilter && Array.isArray((firstFilter as Record<string, unknown>)['values'])) {
-          state[title] = (firstFilter as Record<string, unknown>)['values'];
-        } else {
-          state[title] = null;
-        }
-      }
-
-      console.log('[PBI] aktivt slicer-state raw:', JSON.stringify(state));
-      return state;
-    } catch (err) {
-      console.error('[PBI] getActiveSlicerState feil:', err);
-      return {};
-    }
-  }
-
-  async function getSlicerValues(slicerTitle: string, r: Report): Promise<Record<string, string[]>> {
-    try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) return {};
-      const visuals = await activePage.getVisuals();
-      const slicer = visuals.find((v) => erSlicerType(v.type) && (v.title?.trim() || v.name) === slicerTitle);
-      if (!slicer) return {};
-
-      const exported = await slicer.exportData();
-      const lines = exported.data.split('\n').slice(1).filter(Boolean);
-      const result: Record<string, string[]> = {};
-      lines.forEach((line) => {
-        const parts = line.split(',');
-        const firstCol = parts[0].trim();
-        const år = parseInt(firstCol, 10);
-        if (!isNaN(år) && parts.length > 1) {
-          const key = String(år);
-          const value = parts.slice(1).join(',').trim();
-          if (!result[key]) result[key] = [];
-          result[key].push(value);
-        } else {
-          if (!result['0']) result['0'] = [];
-          result['0'].push(firstCol);
-        }
-      });
-      return result;
-    } catch (err) {
-      console.error('[PBI] getSlicerValues feil for', slicerTitle, ':', err);
-      return {};
-    }
-  }
-
-  /** Les kolonnenavn fra exportData() og bygg nøkkel + mapping for alle slicere i én pass */
-  async function loadAllSlicers(r: Report): Promise<{
-    nøkler: string[];
-    values: Record<string, Record<string, string[]>>;
-  }> {
-    const newMapping: Record<string, string> = {};
-    const slicerValuesMap: Record<string, Record<string, string[]>> = {};
-    const nøkler: string[] = [];
-
-    try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) return { nøkler: [], values: {} };
-      const visuals = await activePage.getVisuals();
-      console.log('[PBI] alle visual typer:', [...new Set(visuals.map((v) => v.type))]);
-      const slicerVisuals = visuals.filter((v) => erSlicerType(v.type));
-
-      // Logg alle slicere som finnes på siden
-      console.log(`[PBI] Antall slicere funnet: ${slicerVisuals.length} (av ${visuals.length} visuals)`);
-      slicerVisuals.forEach((s) => console.log(`[PBI] slicer: name="${s.name}" title="${s.title ?? '(ingen)'}" type="${s.type}"`));
-
-      for (const visual of slicerVisuals) {
-        const tittel = visual.title?.trim() ?? '';
-
-        try {
-          // STEG 2: Eksporter data og logg resultat/feil per slicer
-          const exported = await visual.exportData(models.ExportDataType.Summarized);
-          const rawLines = exported.data.split('\n').map((l: string) => l.trim()).filter(Boolean);
-          const kolonneNavn = rawLines[0] ?? '';       // første linje = kolonnenavn
-          // STEG 5: Begrens til maks 50 verdier per slicer
-          const verdier = rawLines.slice(1, 51);
-
-          // Bruk kolonneNavn som nøkkel hvis tittel er generisk ("Slicer") eller mangler
-          const nøkkel = (!tittel || tittel === 'Slicer') ? kolonneNavn : tittel;
-
-          console.log(`[PBI] ✅ slicer: "${nøkkel}" (title="${tittel}" kolonneNavn="${kolonneNavn}") → ${verdier.length} verdier`);
-
-          newMapping[nøkkel] = visual.name;            // nøkkel → intern PBI visual.name
-          slicerValuesMap[nøkkel] = { '0': verdier };  // STEG 3: flat struktur
-          nøkler.push(nøkkel);
-        } catch (err) {
-          // STEG 2: Logg feil, men legg allikevel til i mapping med tomme verdier
-          // slik at AI kan referere til sliceren og sette den via setSlicerValue
-          const nøkkel = tittel || visual.name;
-          console.log(`[PBI] ❌ slicer feilet: "${nøkkel}"`, (err as Error).message);
-          newMapping[nøkkel] = visual.name;
-          slicerValuesMap[nøkkel] = { '0': [] };
-          nøkler.push(nøkkel);
-        }
-      }
-
-      slicerMappingRef.current = newMapping;
-      console.log('[PBI] slicer mapping:', Object.keys(newMapping));
-    } catch (err) {
-      console.error('[PBI] loadAllSlicers feil:', err);
-    }
-
-    return { nøkler, values: slicerValuesMap };
-  }
-
-  async function setSlicerValue(slicerTitle: string, values: string[], år?: number): Promise<void> {
-    const r = reportRef.current;
-    if (!r) return;
-    try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) { console.warn('[PBI] Ingen aktiv side funnet'); return; }
-
-      const visuals = await activePage.getVisuals();
-      // Finn slicer via intern visual.name fra mapping, ellers tittel som fallback
-      const mappedName = slicerMappingRef.current[slicerTitle];
-      const slicer = mappedName
-        ? visuals.find((v) => erSlicerType(v.type) && v.name === mappedName)
-        : visuals.find((v) => erSlicerType(v.type) && (v.title?.trim() || v.name) === slicerTitle);
-      if (!slicer) { console.warn(`[PBI] Slicer "${slicerTitle}" ikke funnet (mapping: ${mappedName ?? 'ingen'})`); return; }
-
-      // Les slicer state FØR setting
-      let beforeState: models.ISlicerState | null = null;
-      try {
-        beforeState = await slicer.getSlicerState();
-        console.log('[PBI] Slicer state FØR setting:', JSON.stringify(beforeState, null, 2));
-      } catch (e) {
-        console.log('[PBI] Kunne ikke lese slicer state før setting:', e);
-      }
-
-      const firstFilter = beforeState?.filters?.[0] as Record<string, unknown> | undefined;
-      const isHierarchy = firstFilter?.['filterType'] === 9;
-
-      if (isHierarchy) {
-        // Hierarchy slicer (f.eks. Tid med år + UkeTekst)
-        const targetYear = år ?? new Date().getFullYear();
-        console.log(`[PBI] Hierarchy slicer "${slicerTitle}" - år: ${targetYear}, verdier:`, values);
-
-        await slicer.setSlicerState({
-          filters: [{
-            $schema: 'http://powerbi.com/product/schema#hierarchy',
-            target:      (firstFilter as Record<string, unknown>)['target'],
-            filterType:  9,
-            hierarchyData: [{
-              operator: 'Inherited',
-              value:    targetYear,
-              children: values.map((v) => ({ operator: 'Selected', value: v })),
-            }],
-          }] as unknown as models.ISlicerFilter[],
-        });
-      } else {
-        // Standard basic slicer — bygg filter fra targets, uavhengig av om filters er tom
-        const target = (beforeState as unknown as { targets?: { table: string; column: string }[] })?.targets?.[0];
-        if (!target) { console.warn(`[PBI] Slicer "${slicerTitle}" har ingen target`); return; }
-
-        // Konverter innkommende verdier til samme type som eksisterende slicer-verdier
-        const currentValues = (firstFilter?.['values'] as unknown[]) ?? [];
-        const forventetType = currentValues.length > 0 ? typeof currentValues[0] : 'string';
-        const konverterteVerdier = values.map((v) => {
-          if (forventetType === 'number') return typeof v === 'string' ? Number(v) : v;
-          if (forventetType === 'string') return typeof v === 'number' ? String(v) : v;
-          return v;
-        });
-        console.log(`[PBI] Basic slicer "${slicerTitle}" - target:`, target, 'innkommende:', values, 'forventet type:', forventetType, 'konvertert:', konverterteVerdier);
-
-        await slicer.setSlicerState({
-          filters: [{
-            $schema: 'http://powerbi.com/product/schema#basic',
-            target: { table: target.table, column: target.column },
-            filterType: models.FilterType.Basic,
-            operator: 'In',
-            values: konverterteVerdier,
-          }] as unknown as models.ISlicerFilter[],
-        });
-      }
-
-      console.log(`[PBI] Slicer "${slicerTitle}" satt til:`, values);
-
-      // Les slicer state ETTER setting for å bekrefte
-      try {
-        const currentState = await slicer.getSlicerState();
-        console.log('[PBI] Slicer state ETTER setting:', JSON.stringify(currentState, null, 2));
-      } catch (e) {
-        console.log('[PBI] Kunne ikke lese slicer state etter setting:', e);
-      }
-    } catch (err) {
-      console.warn('[PBI] setSlicerValue feil:', err);
-    }
-  }
-
-  async function clearSlicerValue(slicerTitle: string): Promise<void> {
-    const r = reportRef.current;
-    if (!r) return;
-    try {
-      const pages = await r.getPages();
-      const activePage = pages.find((p) => p.isActive);
-      if (!activePage) return;
-      const visuals = await activePage.getVisuals();
-      const mappedName = slicerMappingRef.current[slicerTitle];
-      const slicer = mappedName
-        ? visuals.find((v) => erSlicerType(v.type) && v.name === mappedName)
-        : visuals.find((v) => erSlicerType(v.type) && (v.title?.trim() || v.name) === slicerTitle);
-      if (!slicer) { console.warn(`[PBI] Slicer "${slicerTitle}" ikke funnet for nullstilling (mapping: ${mappedName ?? 'ingen'})`); return; }
-      await slicer.setSlicerState({ filters: [] });
-      console.log(`[PBI] Slicer "${slicerTitle}" nullstilt`);
-    } catch (err) {
-      console.warn('[PBI] clearSlicerValue feil:', err);
-    }
-  }
+  };
 
   useEffect(() => {
     return () => {
@@ -704,7 +456,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   const triggerSlicerStateUpdate = () => {
     if (slicerStateTimer.current) clearTimeout(slicerStateTimer.current);
     slicerStateTimer.current = setTimeout(async () => {
-      const state = await getActiveSlicerState();
+      if (!reportRef.current) return;
+      const state = await slicerOps.getActiveState(reportRef.current, slicerMappingRef.current, slicereRef.current);
       console.log('[PBI] slicer state oppdatert (bruker-interaksjon):', JSON.stringify(state));
       onActiveStateChangeRef.current?.(state);
     }, 500);
@@ -1370,15 +1123,8 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                 }
               } catch { /* ignorer */ }
 
-              // Bruk loadAllSlicers — leser kolonnenavn fra exportData() som nøkkel
-              const { nøkler, values: slicerValuesMap } = await loadAllSlicers(r);
-              console.log('[PBI] Slicer-nøkler funnet:', nøkler);
-              console.log('[PBI] Slicer-verdier funnet:', slicerValuesMap);
-              onSlicersLoaded?.(nøkler);
-              onSlicerValuesLoaded?.(slicerValuesMap);
-              // Hent initialt aktivt slicer-state
-              const activeState = await getActiveSlicerState();
-              onActiveStateChange?.(activeState);
+              // Last alle slicere via slicerOps — bygger SlicerInfo[] + mapping i én pass
+              await refreshSlicere(r);
               // Hent tilgjengelige tabeller fra Fabric
               try {
                 const tablesUrl = rapportId ? `${API}/api/tables?rapportId=${encodeURIComponent(rapportId)}` : `${API}/api/tables`;
@@ -1433,6 +1179,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             console.log('[PBI] aktiv side:', side);
             onAktivSideChange?.(side);
             triggerAutoSave();
+            // Re-mapp slicere på den nye siden — slicer-titler kan referere til andre visual.name
+            if (reportRef.current) {
+              refreshSlicere(reportRef.current).catch((err) =>
+                console.warn('[PBI] refreshSlicere ved pageChanged feilet:', err),
+              );
+            }
           }],
           ['bookmarkApplied', (event) => { console.log('[PBI] bookmarkApplied event', event); triggerAutoSave(); }],
           ['visualClicked',   (event) => { console.log('[PBI] visualClicked event', event); triggerAutoSave(); }],
