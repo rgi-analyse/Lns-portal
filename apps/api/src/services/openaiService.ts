@@ -122,6 +122,9 @@ export interface HierarchySlicerInfo extends SlicerMeta {
   targets:         HierarchyTarget[];
   toppNivåVerdier: string[];
   barnPerForelder: Record<string, string[]>;
+  /** Forventet datatype per nivå-dybde (0 = topp). Frontend bruker denne til å
+   *  konvertere AI-payload til riktig JSON-type før den sendes til PBI. */
+  nivåTyper:       Array<'string' | 'number'>;
 }
 
 export type SlicerInfo = BasicSlicerInfo | HierarchySlicerInfo;
