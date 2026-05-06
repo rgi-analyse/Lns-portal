@@ -196,6 +196,11 @@ export async function loadAll(report: Report): Promise<{
         if (!barnPerForelder[topp]) barnPerForelder[topp] = [];
         if (!barnPerForelder[topp].includes(barn)) barnPerForelder[topp].push(barn);
       }
+      console.log(
+        `[slicerOps] hierarchy "${tittel}": ${toppSet.size} forelder-noder, ` +
+        `${Object.values(barnPerForelder).reduce((s, b) => s + b.length, 0)} barn totalt ` +
+        `(${dataLinjer.length} CSV-rader)`,
+      );
       slicere.push({
         type: 'hierarchy',
         visualName: visual.name,
@@ -209,6 +214,10 @@ export async function loadAll(report: Report): Promise<{
       const verdier = dataLinjer.slice(0, 50)
         .map((l) => parseCSVRad(l)[0])
         .filter((v): v is string => v !== undefined && v !== '');
+      console.log(
+        `[slicerOps] basic "${tittel}": ${verdier.length} verdier ` +
+        `(første 3: ${verdier.slice(0, 3).join(' | ')}${verdier.length > 3 ? ', …' : ''})`,
+      );
       slicere.push({
         type: 'basic',
         visualName: visual.name,

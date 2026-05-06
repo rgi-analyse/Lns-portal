@@ -1211,29 +1211,31 @@ Tilgjengelige visualiseringstyper:
       console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
       console.log('[Chat] harKobletView:', harKobletView);
 
-      // Bygg kompakt slicer-oversikt for prompten. Begrenser verdier per slicer for å spare tokens
-      // — men 50 er nok til å dekke 52 uker per år eller ~30+ prosjekter per Hovedprosjekt.
+      // Bygg lese-vennlig slicer-oversikt for prompten — bullet-list per slicer.
+      // AI parser dette mer pålitelig enn nestet JSON. Begrenser verdier per
+      // slicer for å spare tokens (50 dekker 52 uker per år eller >20 prosjekter
+      // per Hovedprosjekt).
       const SLICER_VERDIER_GRENSE = 50;
-      const slicereSummary = (slicere ?? []).map((s) => {
+      const slicereTekst = (slicere ?? []).map((s) => {
         if (s.type === 'basic') {
-          return {
-            tittel:      s.tittel,
-            type:        'basic' as const,
-            kolonneType: s.kolonneType,
-            verdier:     s.verdier.slice(0, SLICER_VERDIER_GRENSE),
-          };
+          const v = s.verdier.slice(0, SLICER_VERDIER_GRENSE);
+          const trunkert = s.verdier.length > SLICER_VERDIER_GRENSE
+            ? ` (av ${s.verdier.length} totalt)` : '';
+          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert}): ${v.join(', ')}`;
         }
-        const barnTrunkert: Record<string, string[]> = {};
+        const linjer = [`• ${s.tittel} (hierarchy):`];
+        linjer.push(`    Topp-nivå: ${s.toppNivåVerdier.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
-          barnTrunkert[forelder] = barn.slice(0, SLICER_VERDIER_GRENSE);
+          const trunkert = barn.length > SLICER_VERDIER_GRENSE
+            ? ` (av ${barn.length} totalt)` : '';
+          linjer.push(`    Under "${forelder}"${trunkert}: ${barn.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         }
-        return {
-          tittel:          s.tittel,
-          type:            'hierarchy' as const,
-          toppNivåVerdier: s.toppNivåVerdier,
-          barnPerForelder: barnTrunkert,
-        };
-      });
+        return linjer.join('\n');
+      }).join('\n');
+
+      console.log('[Chat] slicere mottatt:', slicere?.length ?? 0,
+        slicere?.map((s) => `${s.tittel}(${s.type})`).join(', ') ?? '(ingen)');
+      console.log('[Chat] slicereTekst-lengde:', slicereTekst.length, 'tegn');
 
       const aktivKontekst = prosjektNr
         ? `
@@ -1265,9 +1267,10 @@ Når du henter data fra database, filtrer ALLTID på de aktive slicer-verdiene m
 Eksempel: Slicer "Stuff" = "AKs - Adkomst kraftstasjon" → legg til WHERE Profilnavn = 'AKs - Adkomst kraftstasjon' (eller tilsvarende kolonnenavn for det aktuelle viewet).
 Match slicer-nøkkelen mot kolonnenavn i viewet — bruk LIKE '%verdi%' om eksakt match er usikker.
 
-SLICER-REGLER:
-- Tilgjengelige slicere (med type og verdier, maks 20 per gruppe): ${slicereSummary.length > 0 ? JSON.stringify(slicereSummary) : '(ikke lastet ennå)'}
-- Aktivt slicer-state (JSON): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
+SLICERE PÅ AKTIV SIDE — bruk EKSAKT verdi som vist her:
+${slicereTekst || '(ingen slicere lastet ennå)'}
+
+Aktivt slicer-state (hva som er valgt nå): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
 
 VIKTIG - I denne applikasjonen finnes det IKKE rapportfiltre.
 Når brukeren sier "filter", "filtrer", "sett filter", "fjern filter", "ta bort filter" e.l. betyr det alltid SLICER.
