@@ -201,9 +201,11 @@ function finnBesteMatch(målVerdi: string | number, kandidater: string[]): Match
 }
 
 interface ValideringFeil {
-  ok:      false;
-  error:   string;
-  forslag?: string[];
+  ok:        false;
+  /** ambiguous: flere mulige treff. not_found: ingen treff. AI bruker dette til å velge respons. */
+  kategori:  'ambiguous' | 'not_found';
+  error:     string;
+  forslag?:  string[];
 }
 
 interface ValideringOkNivåer  { ok: true; nivåer:  HierarchyLevel[] }
@@ -231,10 +233,12 @@ async function matchEnBasicVerdi(
   }
   if (lokal.type === 'ambiguous') {
     return {
-      ok: false,
+      ok:       false,
+      kategori: 'ambiguous',
       error:
         `Verdien "${verdi}" har flere mulige lokale treff i "${info.tittel}": ` +
         `${lokal.alle.join(', ')}. Vær mer spesifikk og bruk eksakt en av disse.`,
+      forslag:  lokal.alle,
     };
   }
 
@@ -253,7 +257,8 @@ async function matchEnBasicVerdi(
             const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
             console.log(`[validator] tvetydig (${respons.treff.length} treff)`);
             return {
-              ok: false,
+              ok:       false,
+              kategori: 'ambiguous',
               error: `Det finnes flere matches for "${verdi}" i "${info.tittel}":\n${liste}\nHvilken mente du?`,
               forslag: respons.treff.map((t) => t.verdi),
             };
@@ -277,7 +282,8 @@ async function matchEnBasicVerdi(
     v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
   );
   return {
-    ok: false,
+    ok:       false,
+    kategori: 'not_found',
     error:
       `Verdien "${verdi}" finnes ikke i sliceren "${info.tittel}". ` +
       `Tilgjengelige (utvalg): ${info.verdier.slice(0, 10).join(', ')}`,
@@ -322,10 +328,12 @@ async function matchEnBarn(
   }
   if (lokal.type === 'ambiguous') {
     return {
-      ok: false,
+      ok:       false,
+      kategori: 'ambiguous',
       error:
         `Verdien "${barnVerdi}" har flere mulige lokale treff under "${forelder}": ` +
         `${lokal.alle.join(', ')}. Vær mer spesifikk.`,
+      forslag:  lokal.alle,
     };
   }
 
@@ -346,7 +354,8 @@ async function matchEnBarn(
             const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
             console.log(`[validator] tvetydig barn (${respons.treff.length} treff)`);
             return {
-              ok: false,
+              ok:       false,
+              kategori: 'ambiguous',
               error: `Det finnes flere matches for "${barnVerdi}" under "${forelder}":\n${liste}\nHvilken mente du?`,
               forslag: respons.treff.map((t) => t.verdi),
             };
@@ -368,7 +377,8 @@ async function matchEnBarn(
     v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
   );
   return {
-    ok: false,
+    ok:       false,
+    kategori: 'not_found',
     error:
       `Verdien "${barnVerdi}" finnes ikke under "${forelder}" i sliceren "${info.tittel}". ` +
       `Tilgjengelige verdier under denne forelderen: ${tilgjengeligeBarn.slice(0, 10).join(', ')}`,
@@ -390,7 +400,8 @@ async function validerOgKorrigerNivåer(
     const toppMatch = finnBesteMatch(node.verdi, info.toppNivåVerdier);
     if (toppMatch.type === 'none') {
       return {
-        ok: false,
+        ok:       false,
+        kategori: 'not_found',
         error:
           `Topp-nivå-verdien "${node.verdi}" finnes ikke i sliceren "${info.tittel}". ` +
           `Tilgjengelige: ${info.toppNivåVerdier.slice(0, 10).join(', ')}`,
@@ -399,10 +410,12 @@ async function validerOgKorrigerNivåer(
     }
     if (toppMatch.type === 'ambiguous') {
       return {
-        ok: false,
+        ok:       false,
+        kategori: 'ambiguous',
         error:
           `Topp-nivå-verdien "${node.verdi}" har flere mulige treff i "${info.tittel}": ` +
           `${toppMatch.alle.join(', ')}. Vær mer spesifikk.`,
+        forslag:  toppMatch.alle,
       };
     }
     const korrigertTopp = toppMatch.treff;
@@ -1051,17 +1064,17 @@ export async function chat(
           const nivåer  = args['nivåer']  as HierarchyLevel[] | undefined;
 
           if (!tittel) {
-            result = { error: 'Mangler tittel — angi slicerens tittel slik den fremkommer i slicere-listen.' };
+            result = { status: 'invalid_input', melding: 'Mangler tittel — angi slicerens tittel slik den fremkommer i slicere-listen.' };
           } else if (type !== 'basic' && type !== 'hierarchy') {
-            result = { error: 'Mangler eller ugyldig type — angi "basic" eller "hierarchy".' };
+            result = { status: 'invalid_input', melding: 'Mangler eller ugyldig type — angi "basic" eller "hierarchy".' };
           } else if (type === 'basic' && (!verdier || verdier.length === 0)) {
-            result = { error: 'type="basic" krever verdier-array med minst én verdi.' };
+            result = { status: 'invalid_input', melding: 'type="basic" krever verdier-array med minst én verdi.' };
           } else if (type === 'basic' && nivåer !== undefined) {
-            result = { error: 'type="basic" skal ikke ha nivåer. Hvis sliceren er hierarkisk, bruk type="hierarchy" i stedet.' };
+            result = { status: 'invalid_input', melding: 'type="basic" skal ikke ha nivåer. Hvis sliceren er hierarkisk, bruk type="hierarchy" i stedet.' };
           } else if (type === 'hierarchy' && (!nivåer || nivåer.length === 0)) {
-            result = { error: 'type="hierarchy" krever nivåer-array med minst ett nivå.' };
+            result = { status: 'invalid_input', melding: 'type="hierarchy" krever nivåer-array med minst ett nivå.' };
           } else if (type === 'hierarchy' && verdier !== undefined) {
-            result = { error: 'type="hierarchy" skal ikke ha verdier. Hvis sliceren ikke er hierarkisk, bruk type="basic" i stedet.' };
+            result = { status: 'invalid_input', melding: 'type="hierarchy" skal ikke ha verdier. Hvis sliceren ikke er hierarkisk, bruk type="basic" i stedet.' };
           } else {
             let config: SlicerConfig = type === 'basic'
               ? { tittel, type: 'basic',     verdier: verdier as (string | number)[] }
@@ -1070,7 +1083,11 @@ export async function chat(
             // Valider og korriger payload mot slicerInfo. Fanger AI-hallusinasjoner
             // ("BDO" når reell verdi er "BDO AS", eller "4600 - ikke spesifisert" når
             // reell verdi er "4600 - Sokndal") før vi sender til frontend.
-            let valideringsfeil: { error: string; forslag?: string[] } | null = null;
+            let valideringsfeil: {
+              kategori: 'ambiguous' | 'not_found';
+              error:    string;
+              forslag?: string[];
+            } | null = null;
             const info = context?.slicere?.find((s) => s.tittel === config.tittel);
 
             console.log(
@@ -1080,6 +1097,9 @@ export async function chat(
               `tilgjengelige_titler=[${(context?.slicere ?? []).map((s) => s.tittel).join(', ')}]`,
             );
 
+            // Spor original AI-payload for å rapportere korrigerte verdier
+            const originalVerdier = config.type === 'basic' ? [...config.verdier] : null;
+
             if (config.type === 'basic') {
               if (info && info.type === 'basic') {
                 const validering = await validerOgKorrigerVerdier(
@@ -1087,7 +1107,8 @@ export async function chat(
                 );
                 if (!validering.ok) {
                   valideringsfeil = {
-                    error: validering.error,
+                    kategori: validering.kategori,
+                    error:    validering.error,
                     ...(validering.forslag ? { forslag: validering.forslag } : {}),
                   };
                 } else {
@@ -1103,7 +1124,8 @@ export async function chat(
                 );
                 if (!validering.ok) {
                   valideringsfeil = {
-                    error: validering.error,
+                    kategori: validering.kategori,
+                    error:    validering.error,
                     ...(validering.forslag ? { forslag: validering.forslag } : {}),
                   };
                 } else {
@@ -1115,24 +1137,43 @@ export async function chat(
             }
 
             if (valideringsfeil) {
-              console.log(`[validator] returnerer feil til AI (ingen SSE emittes): ${valideringsfeil.error.slice(0, 200)}`);
-              result = valideringsfeil;
+              console.log(`[validator] returnerer status=${valideringsfeil.kategori} til AI (ingen SSE emittes): ${valideringsfeil.error.slice(0, 200)}`);
+              result = {
+                status:  valideringsfeil.kategori,
+                melding: valideringsfeil.error,
+                ...(valideringsfeil.forslag ? { forslag: valideringsfeil.forslag } : {}),
+              };
             } else {
               console.log('[backend] sending slicer SSE event:', JSON.stringify(config));
               onChunk({ type: 'slicer', config });
-              const beskrivelse = config.type === 'basic'
-                ? `verdier=[${config.verdier.join(', ')}]`
-                : `nivåer=${JSON.stringify(config.nivåer)}`;
-              result = { success: true, message: `Slicer "${tittel}" satt (${type}) — ${beskrivelse}.` };
+
+              // Bygg melding som tydelig viser korrigeringer (hvis noen)
+              let melding: string;
+              if (config.type === 'basic' && originalVerdier) {
+                const korrigeringer = config.verdier
+                  .map((v, i) => ({ original: originalVerdier[i], korrigert: v }))
+                  .filter((p) => String(p.original) !== String(p.korrigert));
+                if (korrigeringer.length > 0) {
+                  const liste = korrigeringer.map((p) => `"${p.original}" → "${p.korrigert}"`).join(', ');
+                  melding = `Slicer "${tittel}" satt til [${config.verdier.join(', ')}]. Korrigert: ${liste}.`;
+                } else {
+                  melding = `Slicer "${tittel}" satt til [${config.verdier.join(', ')}].`;
+                }
+              } else if (config.type === 'hierarchy') {
+                melding = `Slicer "${tittel}" satt med nivåer ${JSON.stringify(config.nivåer)}.`;
+              } else {
+                melding = `Slicer "${tittel}" satt.`;
+              }
+              result = { status: 'success', melding };
             }
           }
         } else if (tc.name === 'clear_report_slicer') {
           const tittel = args['tittel'] as string | undefined;
           if (!tittel) {
-            result = { error: 'Mangler tittel — angi slicerens tittel.' };
+            result = { status: 'invalid_input', melding: 'Mangler tittel — angi slicerens tittel.' };
           } else {
             onChunk({ type: 'slicer_clear', tittel });
-            result = { success: true, message: `Slicer "${tittel}" nullstilt.` };
+            result = { status: 'success', melding: `Slicer "${tittel}" nullstilt.` };
           }
         } else if (tc.name === 'open_report') {
           const rapportId   = args['rapportId'] as string;
