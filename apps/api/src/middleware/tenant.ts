@@ -3,7 +3,10 @@ import { prisma } from '../lib/prisma';
 import { getPrismaForTenant } from '../lib/tenantPrisma';
 import type { PrismaClient } from '../generated/prisma/client';
 
-export type TenantRequest = FastifyRequest & { tenantPrisma: PrismaClient };
+export type TenantRequest = FastifyRequest & {
+  tenantPrisma: PrismaClient;
+  tenantSlug?: string;
+};
 
 function extractSlug(request: FastifyRequest): string {
   const header = (request.headers['x-tenant-id'] as string | undefined)?.trim().toLowerCase();
@@ -51,6 +54,7 @@ export async function resolveTenant(
     return reply.status(404).send({ error: `Tenant '${slug}' ikke funnet.` });
   }
   (request as TenantRequest).tenantPrisma = getPrismaForTenant(tenant.databaseUrl);
+  (request as TenantRequest).tenantSlug   = slug;
 }
 
 /**
@@ -67,4 +71,5 @@ export async function resolveTenantAdmin(
     return reply.status(404).send({ error: `Tenant '${slug}' ikke funnet.` });
   }
   (request as TenantRequest).tenantPrisma = getPrismaForTenant(tenant.databaseUrl);
+  (request as TenantRequest).tenantSlug   = slug;
 }

@@ -1159,6 +1159,9 @@ Tilgjengelige visualiseringstyper:
             prosjektNr,
             prosjektNavn:    workspaceNavn,
             slicere,
+            // Brukes av AI Search-fallback i validator
+            tenant:    tenantSlug,
+            rapportId: rapportId ?? undefined,
           };
           console.log('[Chat] rapport område (Prisma):', rapportOmråde);
           console.log('[Chat] prosjektNr:', prosjektNr ?? 'ingen');
@@ -1291,22 +1294,29 @@ REGLER FOR Å SETTE SLICER:
 6. Hvis du finner flere mulige treff: spør brukeren hvilken
 7. Hvis ingen match: si ifra og list tilgjengelige verdier
 
-50-VERDIERS BEGRENSNING (basic-slicere):
-For basic-slicere har du tilgang til de første 50 verdiene fra sliceren. Større slicere
-(f.eks. leverandører) er trunkert — slicereTekst viser "(av N totalt)" når dette skjer.
+SLICER-SØKEKATALOG (gjelder basic-slicere):
+For basic-slicere har du tilgang til de første 50 verdiene fra sliceren — sliceren
+kan inneholde mange flere i datasettet. Systemet har en utvidet søkekatalog (AI
+Search) som kan finne verdier utenfor de 50 du ser.
 
-Hvis brukeren ber om en verdi som IKKE finnes i din verdiliste:
-- IKKE konstruer eller gjett verdier som ikke står i lista
-- Si ærlig fra at du ikke ser verdien blant de 50 du har tilgang til, og at sliceren
-  inneholder flere
-- Foreslå at brukeren skriver det fullstendige navnet, eller velger verdien manuelt
-  i sliceren
+KRITISK: Når brukeren ber om å sette en slicer-verdi, skal du ALLTID bygge
+set_report_slicer-tool-call — selv om verdien ikke er i din synlige liste:
+- Hvis verdien finnes EKSAKT i listen din: bruk den ordrett
+- Hvis verdien ligner noe i listen (f.eks. "Vianor" → "Vianor AS"): bygg tool-
+  call med det brukeren skrev. Systemet korrigerer automatisk via søk
+- Hvis verdien ikke er i listen i det hele tatt: bygg likevel tool-call.
+  Systemet kan finne den i den utvidede katalogen
 
-Eksempel-svar for "Sett leverandør til BDO" når BDO ikke er i din liste:
-  "Jeg ser 50 verdier i Leverandør-sliceren, og BDO er ikke blant dem — denne
-  sliceren har flere verdier enn jeg får se. Hvis du vet det fullstendige navnet
-  (f.eks. 'BDO AS' eller 'BDO Advokater AS'), kan jeg sette det. Eller du kan velge
-  manuelt i sliceren."
+Tool-systemet returnerer status til deg etter kjøring:
+  status: 'success'    — slicer satt (kanskje med korrigert verdi — meldingen sier hvilken)
+  status: 'ambiguous'  — flere matches funnet, du må spørre brukeren hvilken (forslag-array vises)
+  status: 'not_found'  — verdien finnes ikke, fortell brukeren med forslag
+  status: 'invalid_input' — payloaden var ufullstendig (du må rette og prøve igjen)
+
+ALDRI svar "filteret er satt" eller "kan ikke finne verdi" UTEN å først ha kjørt
+set_report_slicer. Du SKAL kjøre toolen og la systemet svare deg — det er den
+eneste pålitelige måten å vite om en verdi finnes. Hvis du ikke har kjørt
+toolen, vet du ikke om sliceren faktisk ble satt.
 
 HIERARCHY-PAYLOAD (for type="hierarchy"):
 - Topp-nivå-verdier finnes i toppNivåVerdier
