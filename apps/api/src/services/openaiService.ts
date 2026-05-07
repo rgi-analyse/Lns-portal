@@ -1073,6 +1073,13 @@ export async function chat(
             let valideringsfeil: { error: string; forslag?: string[] } | null = null;
             const info = context?.slicere?.find((s) => s.tittel === config.tittel);
 
+            console.log(
+              `[validator] start — tittel="${config.tittel}" type=${config.type} ` +
+              `tenant=${context?.tenant ?? '(mangler)'} rapportId=${context?.rapportId ?? '(mangler)'} ` +
+              `info=${info ? `found(${info.type})` : '(mangler)'} ` +
+              `tilgjengelige_titler=[${(context?.slicere ?? []).map((s) => s.tittel).join(', ')}]`,
+            );
+
             if (config.type === 'basic') {
               if (info && info.type === 'basic') {
                 const validering = await validerOgKorrigerVerdier(
@@ -1108,6 +1115,7 @@ export async function chat(
             }
 
             if (valideringsfeil) {
+              console.log(`[validator] returnerer feil til AI (ingen SSE emittes): ${valideringsfeil.error.slice(0, 200)}`);
               result = valideringsfeil;
             } else {
               console.log('[backend] sending slicer SSE event:', JSON.stringify(config));

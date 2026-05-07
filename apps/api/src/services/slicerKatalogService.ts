@@ -152,7 +152,24 @@ export async function erIndeksert(
     where:  { tenant_rapport_id_slicer_tittel: { tenant, rapport_id: rapportId, slicer_tittel: slicerTittel } },
     select: { er_aktiv: true, sist_indeksert: true, sist_antall_rader: true },
   });
-  if (!konfig || !konfig.er_aktiv || !konfig.sist_indeksert) {
+  if (!konfig) {
+    console.log(`[search-katalog] erIndeksert: ingen konfig for tenant=${tenant} rapport=${rapportId} tittel="${slicerTittel}"`);
+    // Hjelp diagnose: list eksisterende konfig-tittel-er for denne rapporten
+    const alleForRapport = await prisma.slicerIndeksering.findMany({
+      where:  { tenant, rapport_id: rapportId },
+      select: { slicer_tittel: true, er_aktiv: true },
+    });
+    if (alleForRapport.length > 0) {
+      console.log(`[search-katalog] eksisterende titler for samme rapport: ${alleForRapport.map((k) => `"${k.slicer_tittel}"${k.er_aktiv ? '' : '(inaktiv)'}`).join(', ')}`);
+    }
+    return { indeksert: false, sistIndeksert: null, antallDokumenter: null };
+  }
+  if (!konfig.er_aktiv) {
+    console.log(`[search-katalog] erIndeksert: konfig for "${slicerTittel}" finnes men er inaktiv`);
+    return { indeksert: false, sistIndeksert: null, antallDokumenter: null };
+  }
+  if (!konfig.sist_indeksert) {
+    console.log(`[search-katalog] erIndeksert: konfig for "${slicerTittel}" finnes, aktiv, men aldri indeksert`);
     return { indeksert: false, sistIndeksert: null, antallDokumenter: null };
   }
   return {
