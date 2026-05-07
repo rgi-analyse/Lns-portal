@@ -1159,6 +1159,9 @@ Tilgjengelige visualiseringstyper:
             prosjektNr,
             prosjektNavn:    workspaceNavn,
             slicere,
+            // Brukes av AI Search-fallback i validator
+            tenant:    tenantSlug,
+            rapportId: rapportId ?? undefined,
           };
           console.log('[Chat] rapport område (Prisma):', rapportOmråde);
           console.log('[Chat] prosjektNr:', prosjektNr ?? 'ingen');

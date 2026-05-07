@@ -2,6 +2,11 @@ import OpenAI from 'openai';
 import { executeQuery } from './fabricService';
 import { queryAzureSQL } from './azureSqlService';
 import { prisma } from '../lib/prisma';
+import {
+  søk as søkSlicerKatalog,
+  erIndeksert as slicerErIndeksert,
+  erTvetydig as slicerErTvetydig,
+} from './slicerKatalogService';
 
 console.log('[OpenAI] Konfigurasjon:', {
   endpoint:   process.env.AZURE_OPENAI_ENDPOINT,
@@ -157,6 +162,9 @@ export interface ChatContext {
   tillatteViewNavn?: string[];
   /** Slicer-info fra aktiv side — brukes til å validere/korrigere AI sin slicer-payload */
   slicere?: SlicerInfo[];
+  /** Tenant-slug og portal-rapport-id — brukes til AI Search-fallback i validator */
+  tenant?: string;
+  rapportId?: string;
 }
 
 // ─────────────────────────────────────────────
@@ -201,58 +209,184 @@ interface ValideringFeil {
 interface ValideringOkNivåer  { ok: true; nivåer:  HierarchyLevel[] }
 interface ValideringOkVerdier { ok: true; verdier: (string | number)[] }
 
-/** Validerer basic-payload mot slicerInfo. Eksakt match → behold. Prefiks-match
- *  → korriger til kanonisk verdi. Ingen/flere treff → feil til AI. */
-function validerOgKorrigerVerdier(
-  verdier: (string | number)[],
-  info:    BasicSlicerInfo,
-): ValideringOkVerdier | ValideringFeil {
-  const korrigerte: (string | number)[] = [];
-
-  for (const verdi of verdier) {
-    const match = finnBesteMatch(verdi, info.verdier);
-    if (match.type === 'none') {
-      const prefiks = utledPrefiks(verdi);
-      const filtrerteForslag = info.verdier.filter((v) =>
-        v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
-      );
-      return {
-        ok: false,
-        error:
-          `Verdien "${verdi}" finnes ikke i sliceren "${info.tittel}". ` +
-          `Tilgjengelige (utvalg): ${info.verdier.slice(0, 10).join(', ')}`,
-        forslag: filtrerteForslag.length > 0 ? filtrerteForslag : info.verdier.slice(0, 10),
-      };
-    }
-    if (match.type === 'ambiguous') {
-      return {
-        ok: false,
-        error:
-          `Verdien "${verdi}" har flere mulige treff i "${info.tittel}": ` +
-          `${match.alle.join(', ')}. Vær mer spesifikk og bruk eksakt en av disse.`,
-      };
-    }
-    const korrigert = match.treff;
-    if (match.type === 'prefix') {
-      console.log(`[slicer-match] prefiks (basic): "${verdi}" → "${korrigert}" i "${info.tittel}"`);
-    } else {
-      console.log(`[slicer-match] eksakt (basic): "${korrigert}" i "${info.tittel}"`);
-    }
-    korrigerte.push(korrigert);
+/**
+ * Match én basic-verdi: lokal først, så AI Search hvis sliceren er indeksert.
+ * Returnerer korrigert verdi eller feil med forslag/tvetydighets-info.
+ */
+async function matchEnBasicVerdi(
+  verdi:     string | number,
+  info:      BasicSlicerInfo,
+  tenant?:   string,
+  rapportId?: string,
+): Promise<{ ok: true; verdi: string } | ValideringFeil> {
+  // 1. Lokal eksakt/prefiks
+  const lokal = finnBesteMatch(verdi, info.verdier);
+  if (lokal.type === 'exact') {
+    console.log(`[validator] eksakt (basic): "${lokal.treff}" i "${info.tittel}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'prefix') {
+    console.log(`[validator] prefiks (basic): "${verdi}" → "${lokal.treff}" i "${info.tittel}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'ambiguous') {
+    return {
+      ok: false,
+      error:
+        `Verdien "${verdi}" har flere mulige lokale treff i "${info.tittel}": ` +
+        `${lokal.alle.join(', ')}. Vær mer spesifikk og bruk eksakt en av disse.`,
+    };
   }
 
+  // 2. AI Search-fallback
+  if (tenant && rapportId) {
+    try {
+      const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
+      if (status.indeksert) {
+        console.log(`[validator] ingen lokal match for "${verdi}", prøver AI Search`);
+        const respons = await søkSlicerKatalog({
+          tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
+          søketerm: String(verdi), top: 5,
+        });
+        if (respons.treff.length > 0) {
+          if (slicerErTvetydig(respons.treff)) {
+            const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
+            console.log(`[validator] tvetydig (${respons.treff.length} treff)`);
+            return {
+              ok: false,
+              error: `Det finnes flere matches for "${verdi}" i "${info.tittel}":\n${liste}\nHvilken mente du?`,
+              forslag: respons.treff.map((t) => t.verdi),
+            };
+          }
+          const valgt = respons.treff[0].verdi;
+          console.log(`[validator] AI Search match: "${verdi}" → "${valgt}" (score ${respons.treff[0].score.toFixed(2)})`);
+          return { ok: true, verdi: valgt };
+        }
+        console.log(`[validator] AI Search ingen treff for "${verdi}"`);
+      } else {
+        console.log(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes`);
+      }
+    } catch (err) {
+      console.warn(`[validator] AI Search feilet for "${verdi}", faller tilbake til lokal-only:`, err);
+    }
+  }
+
+  // 3. Ingen match
+  const prefiks = utledPrefiks(verdi);
+  const filtrerteForslag = info.verdier.filter((v) =>
+    v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
+  );
+  return {
+    ok: false,
+    error:
+      `Verdien "${verdi}" finnes ikke i sliceren "${info.tittel}". ` +
+      `Tilgjengelige (utvalg): ${info.verdier.slice(0, 10).join(', ')}`,
+    forslag: filtrerteForslag.length > 0 ? filtrerteForslag : info.verdier.slice(0, 10),
+  };
+}
+
+/** Validerer basic-payload mot slicerInfo. */
+async function validerOgKorrigerVerdier(
+  verdier:    (string | number)[],
+  info:       BasicSlicerInfo,
+  tenant?:    string,
+  rapportId?: string,
+): Promise<ValideringOkVerdier | ValideringFeil> {
+  const korrigerte: (string | number)[] = [];
+  for (const v of verdier) {
+    const r = await matchEnBasicVerdi(v, info, tenant, rapportId);
+    if (!r.ok) return r;
+    korrigerte.push(r.verdi);
+  }
   return { ok: true, verdier: korrigerte };
 }
 
-/** Validerer hierarki-payload mot slicerInfo og korrigerer prefiks-match.
- *  Returnerer ok med (eventuelt korrigerte) nivåer, eller feil som AI kan handle på. */
-function validerOgKorrigerNivåer(
-  nivåer: HierarchyLevel[],
-  info:   HierarchySlicerInfo,
-): ValideringOkNivåer | ValideringFeil {
+/** Match én barn-verdi mot en spesifikk forelder. Lokal først, så AI Search hvis indeksert. */
+async function matchEnBarn(
+  barnVerdi:           string | number,
+  forelder:            string,
+  info:                HierarchySlicerInfo,
+  tilgjengeligeBarn:   string[],
+  tenant?:             string,
+  rapportId?:          string,
+): Promise<{ ok: true; verdi: string } | ValideringFeil> {
+  // 1. Lokal eksakt/prefiks under forelder
+  const lokal = finnBesteMatch(barnVerdi, tilgjengeligeBarn);
+  if (lokal.type === 'exact') {
+    console.log(`[validator] eksakt (barn): "${lokal.treff}" under "${forelder}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'prefix') {
+    console.log(`[validator] prefiks (barn): "${barnVerdi}" → "${lokal.treff}" under "${forelder}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'ambiguous') {
+    return {
+      ok: false,
+      error:
+        `Verdien "${barnVerdi}" har flere mulige lokale treff under "${forelder}": ` +
+        `${lokal.alle.join(', ')}. Vær mer spesifikk.`,
+    };
+  }
+
+  // 2. AI Search-fallback med forelder-filter
+  if (tenant && rapportId) {
+    try {
+      const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
+      if (status.indeksert) {
+        console.log(`[validator] ingen lokal match for barn "${barnVerdi}" under "${forelder}", prøver AI Search`);
+        const respons = await søkSlicerKatalog({
+          tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
+          søketerm: String(barnVerdi),
+          forelder_verdi: forelder,
+          top: 5,
+        });
+        if (respons.treff.length > 0) {
+          if (slicerErTvetydig(respons.treff)) {
+            const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
+            console.log(`[validator] tvetydig barn (${respons.treff.length} treff)`);
+            return {
+              ok: false,
+              error: `Det finnes flere matches for "${barnVerdi}" under "${forelder}":\n${liste}\nHvilken mente du?`,
+              forslag: respons.treff.map((t) => t.verdi),
+            };
+          }
+          const valgt = respons.treff[0].verdi;
+          console.log(`[validator] AI Search match (barn): "${barnVerdi}" → "${valgt}" under "${forelder}" (score ${respons.treff[0].score.toFixed(2)})`);
+          return { ok: true, verdi: valgt };
+        }
+        console.log(`[validator] AI Search ingen treff for "${barnVerdi}" under "${forelder}"`);
+      }
+    } catch (err) {
+      console.warn(`[validator] AI Search feilet for barn "${barnVerdi}", faller tilbake:`, err);
+    }
+  }
+
+  // 3. Ingen match
+  const prefiks = utledPrefiks(barnVerdi);
+  const filtrerteForslag = tilgjengeligeBarn.filter((v) =>
+    v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
+  );
+  return {
+    ok: false,
+    error:
+      `Verdien "${barnVerdi}" finnes ikke under "${forelder}" i sliceren "${info.tittel}". ` +
+      `Tilgjengelige verdier under denne forelderen: ${tilgjengeligeBarn.slice(0, 10).join(', ')}`,
+    forslag: filtrerteForslag.length > 0 ? filtrerteForslag : tilgjengeligeBarn.slice(0, 10),
+  };
+}
+
+/** Validerer hierarki-payload. Topp-nivå er lokal-bare; barn har AI Search-fallback. */
+async function validerOgKorrigerNivåer(
+  nivåer:     HierarchyLevel[],
+  info:       HierarchySlicerInfo,
+  tenant?:    string,
+  rapportId?: string,
+): Promise<ValideringOkNivåer | ValideringFeil> {
   const korrigerte: HierarchyLevel[] = [];
 
   for (const node of nivåer) {
+    // Topp-nivå: lokal-bare (per Fase 2E-scope)
     const toppMatch = finnBesteMatch(node.verdi, info.toppNivåVerdier);
     if (toppMatch.type === 'none') {
       return {
@@ -273,9 +407,9 @@ function validerOgKorrigerNivåer(
     }
     const korrigertTopp = toppMatch.treff;
     if (toppMatch.type === 'prefix') {
-      console.log(`[slicer-match] prefiks (topp): "${node.verdi}" → "${korrigertTopp}"`);
+      console.log(`[validator] prefiks (topp): "${node.verdi}" → "${korrigertTopp}"`);
     } else {
-      console.log(`[slicer-match] eksakt (topp): "${korrigertTopp}"`);
+      console.log(`[validator] eksakt (topp): "${korrigertTopp}"`);
     }
 
     let korrigerteBarn: HierarchyLevel[] | undefined;
@@ -283,37 +417,11 @@ function validerOgKorrigerNivåer(
       korrigerteBarn = [];
       const tilgjengeligeBarn = info.barnPerForelder[korrigertTopp] ?? [];
       for (const barn of node.barn) {
-        const barnMatch = finnBesteMatch(barn.verdi, tilgjengeligeBarn);
-        if (barnMatch.type === 'none') {
-          const prefiks = utledPrefiks(barn.verdi);
-          const filtrerteForslag = tilgjengeligeBarn.filter((v) =>
-            v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
-          );
-          return {
-            ok: false,
-            error:
-              `Verdien "${barn.verdi}" finnes ikke under "${korrigertTopp}" i sliceren "${info.tittel}". ` +
-              `Tilgjengelige verdier under denne forelderen: ${tilgjengeligeBarn.slice(0, 10).join(', ')}`,
-            forslag: filtrerteForslag.length > 0 ? filtrerteForslag : tilgjengeligeBarn.slice(0, 10),
-          };
-        }
-        if (barnMatch.type === 'ambiguous') {
-          return {
-            ok: false,
-            error:
-              `Verdien "${barn.verdi}" har flere mulige treff under "${korrigertTopp}": ` +
-              `${barnMatch.alle.join(', ')}. Vær mer spesifikk.`,
-          };
-        }
-        const korrigertBarn = barnMatch.treff;
-        if (barnMatch.type === 'prefix') {
-          console.log(`[slicer-match] prefiks (barn): "${barn.verdi}" → "${korrigertBarn}" under "${korrigertTopp}"`);
-        } else {
-          console.log(`[slicer-match] eksakt (barn): "${korrigertBarn}"`);
-        }
+        const r = await matchEnBarn(barn.verdi, korrigertTopp, info, tilgjengeligeBarn, tenant, rapportId);
+        if (!r.ok) return r;
         // Tredje nivå (barn-of-barn) er sjelden — slipper det gjennom uvalidert.
         korrigerteBarn.push({
-          verdi: korrigertBarn,
+          verdi: r.verdi,
           ...(barn.barn ? { barn: barn.barn } : {}),
         });
       }
@@ -967,7 +1075,9 @@ export async function chat(
 
             if (config.type === 'basic') {
               if (info && info.type === 'basic') {
-                const validering = validerOgKorrigerVerdier(config.verdier, info);
+                const validering = await validerOgKorrigerVerdier(
+                  config.verdier, info, context?.tenant, context?.rapportId,
+                );
                 if (!validering.ok) {
                   valideringsfeil = {
                     error: validering.error,
@@ -981,7 +1091,9 @@ export async function chat(
               }
             } else if (config.type === 'hierarchy') {
               if (info && info.type === 'hierarchy') {
-                const validering = validerOgKorrigerNivåer(config.nivåer, info);
+                const validering = await validerOgKorrigerNivåer(
+                  config.nivåer, info, context?.tenant, context?.rapportId,
+                );
                 if (!validering.ok) {
                   valideringsfeil = {
                     error: validering.error,

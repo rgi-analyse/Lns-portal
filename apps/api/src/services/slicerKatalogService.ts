@@ -14,6 +14,7 @@
 import { createHash } from 'node:crypto';
 import type { SearchIndex } from '@azure/search-documents';
 import { getSearchService } from './searchService';
+import { prisma } from '../lib/prisma';
 
 export const SLICER_INDEKS_NAVN = 'synapse-slicer-katalog';
 
@@ -135,6 +136,42 @@ export async function indekserVerdier(verdier: SlicerVerdi[]): Promise<void> {
     oppdatert:       nå,
   }));
   await getSearchService().indekserDokumenter(SLICER_INDEKS_NAVN, dokumenter);
+}
+
+/**
+ * Returnerer true hvis sliceren har en aktiv konfig i ai_slicer_indeksering
+ * OG er blitt indeksert minst én gang. Brukes av validator-laget for å
+ * avgjøre om AI Search-fallback er tilgjengelig for denne sliceren.
+ */
+export async function erIndeksert(
+  tenant:        string,
+  rapportId:     string,
+  slicerTittel:  string,
+): Promise<{ indeksert: boolean; sistIndeksert: Date | null; antallDokumenter: number | null }> {
+  const konfig = await prisma.slicerIndeksering.findUnique({
+    where:  { tenant_rapport_id_slicer_tittel: { tenant, rapport_id: rapportId, slicer_tittel: slicerTittel } },
+    select: { er_aktiv: true, sist_indeksert: true, sist_antall_rader: true },
+  });
+  if (!konfig || !konfig.er_aktiv || !konfig.sist_indeksert) {
+    return { indeksert: false, sistIndeksert: null, antallDokumenter: null };
+  }
+  return {
+    indeksert:        true,
+    sistIndeksert:    konfig.sist_indeksert,
+    antallDokumenter: konfig.sist_antall_rader,
+  };
+}
+
+/**
+ * Vurder tvetydighet basert på score-forhold. Default: #1 må være > 1.5x #2.
+ * Med kun ett treff er det per definisjon ikke tvetydig.
+ */
+export function erTvetydig(treff: SlicerSøkTreff[], terskelRatio = 1.5): boolean {
+  if (treff.length < 2) return false;
+  const førsteScore = treff[0].score;
+  const andreScore  = treff[1].score;
+  if (andreScore <= 0) return false;
+  return førsteScore < terskelRatio * andreScore;
 }
 
 export async function søk(forespørsel: SlicerSøkForespørsel): Promise<SlicerSøkResultat> {
