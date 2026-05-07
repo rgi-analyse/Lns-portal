@@ -180,15 +180,46 @@ export async function erIndeksert(
 }
 
 /**
- * Vurder tvetydighet basert på score-forhold. Default: #1 må være > 1.5x #2.
- * Med kun ett treff er det per definisjon ikke tvetydig.
+ * Velg blant AI Search-treff basert på relevans og søketerm:
+ *   1. Eksakt streng-match (case-insensitive) vinner alltid → unique
+ *   2. Treff under absolutt minimum (score < 1.0) avvises som støy
+ *   3. Treff under relativ terskel (40 % av #1 score) regnes ikke som
+ *      reelle konkurrenter — filtreres bort fra ambiguous-listen
+ *   4. Etter filtrering: 0 → none, 1 → unique, 2+ → ambiguous
+ *
+ * Eksempel — "BDO" returnerer:
+ *   BDO AS              13.90  ← over terskel (>= 5.56)
+ *   BDO Advokater AS    11.74  ← over terskel
+ *   AS Fjellsprengning   1.04  ← under relativ terskel, droppet
+ *   FNC AS               0.99  ← under absolutt minimum, droppet
+ *   → ambiguous med [BDO AS, BDO Advokater AS]
  */
-export function erTvetydig(treff: SlicerSøkTreff[], terskelRatio = 1.5): boolean {
-  if (treff.length < 2) return false;
-  const førsteScore = treff[0].score;
-  const andreScore  = treff[1].score;
-  if (andreScore <= 0) return false;
-  return førsteScore < terskelRatio * andreScore;
+export type TreffVurdering =
+  | { type: 'unique';    treff: string }
+  | { type: 'ambiguous'; alle:  SlicerSøkTreff[] }
+  | { type: 'none' };
+
+export function velgFraTreff(
+  treff:    SlicerSøkTreff[],
+  søketerm: string,
+): TreffVurdering {
+  if (treff.length === 0) return { type: 'none' };
+
+  // 1. Eksakt streng-match overstyrer alt
+  const søketermLav = søketerm.toLowerCase();
+  const eksakt = treff.find((t) => t.verdi.toLowerCase() === søketermLav);
+  if (eksakt) return { type: 'unique', treff: eksakt.verdi };
+
+  // 2. Absolutt minimum — avvis tilfeldig støy fra delvis ord-match
+  const oversAbsolutt = treff.filter((t) => t.score >= 1.0);
+  if (oversAbsolutt.length === 0) return { type: 'none' };
+
+  // 3. Relativ terskel — behold kun treff som er minst 40 % av top-score
+  const topScore   = oversAbsolutt[0].score;
+  const relevante  = oversAbsolutt.filter((t) => t.score >= topScore * 0.4);
+
+  if (relevante.length === 1) return { type: 'unique', treff: relevante[0].verdi };
+  return { type: 'ambiguous', alle: relevante };
 }
 
 export async function søk(forespørsel: SlicerSøkForespørsel): Promise<SlicerSøkResultat> {

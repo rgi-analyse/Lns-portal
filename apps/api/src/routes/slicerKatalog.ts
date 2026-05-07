@@ -14,7 +14,7 @@ import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import {
   søk as søkKatalog,
   erIndeksert,
-  erTvetydig,
+  velgFraTreff,
 } from '../services/slicerKatalogService';
 
 interface SøkBody {
@@ -83,11 +83,19 @@ export async function slicerKatalogRoutes(fastify: FastifyInstance) {
         top: top ?? 5,
       });
 
-      const tvetydig = erTvetydig(respons.treff);
-      console.log(`[search-katalog] ${respons.treff.length} treff, ${tvetydig ? 'tvetydig' : 'entydig'}${respons.treff.length >= 2 ? ` (${respons.treff[0].score.toFixed(2)} vs ${respons.treff[1].score.toFixed(2)})` : ''}`);
+      const vurdering = velgFraTreff(respons.treff, søketerm);
+      const tvetydig  = vurdering.type === 'ambiguous';
+      // Returner kun de relevante treffene (etter terskel-filtrering) for å unngå at klienten
+      // blir distrahert av svake treff.
+      const treffTilUt = vurdering.type === 'ambiguous'
+        ? vurdering.alle
+        : vurdering.type === 'unique'
+          ? respons.treff.filter((t) => t.verdi === vurdering.treff)
+          : [];
+      console.log(`[search-katalog] ${respons.treff.length} råtreff → ${treffTilUt.length} relevante (vurdering=${vurdering.type})`);
 
       return reply.send({
-        treff:             respons.treff,
+        treff:             treffTilUt,
         tvetydig,
         indeksert:         true,
         antall_dokumenter: status.antallDokumenter ?? 0,

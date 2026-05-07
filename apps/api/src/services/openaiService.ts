@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma';
 import {
   søk as søkSlicerKatalog,
   erIndeksert as slicerErIndeksert,
-  erTvetydig as slicerErTvetydig,
+  velgFraTreff as slicerVelgFraTreff,
 } from './slicerKatalogService';
 
 console.log('[OpenAI] Konfigurasjon:', {
@@ -252,22 +252,22 @@ async function matchEnBasicVerdi(
           tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
           søketerm: String(verdi), top: 5,
         });
-        if (respons.treff.length > 0) {
-          if (slicerErTvetydig(respons.treff)) {
-            const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
-            console.log(`[validator] tvetydig (${respons.treff.length} treff)`);
-            return {
-              ok:       false,
-              kategori: 'ambiguous',
-              error: `Det finnes flere matches for "${verdi}" i "${info.tittel}":\n${liste}\nHvilken mente du?`,
-              forslag: respons.treff.map((t) => t.verdi),
-            };
-          }
-          const valgt = respons.treff[0].verdi;
-          console.log(`[validator] AI Search match: "${verdi}" → "${valgt}" (score ${respons.treff[0].score.toFixed(2)})`);
-          return { ok: true, verdi: valgt };
+        const vurdering = slicerVelgFraTreff(respons.treff, String(verdi));
+        if (vurdering.type === 'unique') {
+          console.log(`[validator] AI Search match (basic): "${verdi}" → "${vurdering.treff}"`);
+          return { ok: true, verdi: vurdering.treff };
         }
-        console.log(`[validator] AI Search ingen treff for "${verdi}"`);
+        if (vurdering.type === 'ambiguous') {
+          const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
+          console.log(`[validator] tvetydig basic (${vurdering.alle.length} relevante etter filtrering)`);
+          return {
+            ok:       false,
+            kategori: 'ambiguous',
+            error: `Det finnes flere matches for "${verdi}" i "${info.tittel}":\n${liste}\nHvilken mente du?`,
+            forslag: vurdering.alle.map((t) => t.verdi),
+          };
+        }
+        console.log(`[validator] AI Search ingen relevante treff for "${verdi}" (alle under terskel)`);
       } else {
         console.log(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes`);
       }
@@ -349,22 +349,22 @@ async function matchEnBarn(
           forelder_verdi: forelder,
           top: 5,
         });
-        if (respons.treff.length > 0) {
-          if (slicerErTvetydig(respons.treff)) {
-            const liste = respons.treff.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
-            console.log(`[validator] tvetydig barn (${respons.treff.length} treff)`);
-            return {
-              ok:       false,
-              kategori: 'ambiguous',
-              error: `Det finnes flere matches for "${barnVerdi}" under "${forelder}":\n${liste}\nHvilken mente du?`,
-              forslag: respons.treff.map((t) => t.verdi),
-            };
-          }
-          const valgt = respons.treff[0].verdi;
-          console.log(`[validator] AI Search match (barn): "${barnVerdi}" → "${valgt}" under "${forelder}" (score ${respons.treff[0].score.toFixed(2)})`);
-          return { ok: true, verdi: valgt };
+        const vurdering = slicerVelgFraTreff(respons.treff, String(barnVerdi));
+        if (vurdering.type === 'unique') {
+          console.log(`[validator] AI Search match (barn): "${barnVerdi}" → "${vurdering.treff}" under "${forelder}"`);
+          return { ok: true, verdi: vurdering.treff };
         }
-        console.log(`[validator] AI Search ingen treff for "${barnVerdi}" under "${forelder}"`);
+        if (vurdering.type === 'ambiguous') {
+          const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
+          console.log(`[validator] tvetydig barn (${vurdering.alle.length} relevante etter filtrering)`);
+          return {
+            ok:       false,
+            kategori: 'ambiguous',
+            error: `Det finnes flere matches for "${barnVerdi}" under "${forelder}":\n${liste}\nHvilken mente du?`,
+            forslag: vurdering.alle.map((t) => t.verdi),
+          };
+        }
+        console.log(`[validator] AI Search ingen relevante treff for "${barnVerdi}" under "${forelder}" (alle under terskel)`);
       }
     } catch (err) {
       console.warn(`[validator] AI Search feilet for barn "${barnVerdi}", faller tilbake:`, err);

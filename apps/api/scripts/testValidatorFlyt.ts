@@ -10,7 +10,7 @@ import 'dotenv/config';
 import {
   erIndeksert,
   søk,
-  erTvetydig,
+  velgFraTreff,
 } from '../src/services/slicerKatalogService';
 
 const RAPPORT_RESULTAT = '6c758833-1f94-497f-b89a-2e89b4db2af7';
@@ -27,21 +27,27 @@ interface Scenario {
 }
 
 const SCENARIOER: Scenario[] = [
-  { navn: '1. Leverandør "BDO" — forventet TVETYDIG (BDO AS + BDO Advokater AS)',
+  { navn: '1. Leverandør "BDO AS" (eksakt streng) — forventet ENTYDIG (eksakt vinner)',
+    tenant: 'lns', rapport_id: RAPPORT_LEV, slicer_tittel: 'LevNavn', søketerm: 'BDO AS' },
+
+  { navn: '2. Leverandør "BDO" (kortform) — forventet TVETYDIG (BDO AS + BDO Advokater AS)',
     tenant: 'lns', rapport_id: RAPPORT_LEV, slicer_tittel: 'LevNavn', søketerm: 'BDO' },
 
-  { navn: '2. Leverandør "Vianor" — forventet ENTYDIG (Vianor AS)',
+  { navn: '3. Leverandør "Vianor" — forventet ENTYDIG (Vianor AS)',
     tenant: 'lns', rapport_id: RAPPORT_LEV, slicer_tittel: 'LevNavn', søketerm: 'Vianor' },
 
-  { navn: '3a. Hovedprosjekt-barn "Nussir" under "250 - Gruvedrift" — forventet ENTYDIG',
+  { navn: '4. Leverandør "Apple" (finnes ikke) — forventet NONE',
+    tenant: 'lns', rapport_id: RAPPORT_LEV, slicer_tittel: 'LevNavn', søketerm: 'Apple' },
+
+  { navn: '5a. Hovedprosjekt-barn "Nussir" under "250 - Gruvedrift" — forventet ENTYDIG',
     tenant: 'lns', rapport_id: RAPPORT_RESULTAT, slicer_tittel: 'Hovedprosjekt',
     søketerm: 'Nussir', forelder: '250 - Gruvedrift' },
 
-  { navn: '3b. Hovedprosjekt-barn "Snøhvit" under "200 - Tunnel" — forventet ENTYDIG',
+  { navn: '5b. Hovedprosjekt-barn "Snøhvit" under "200 - Tunnel" — forventet ENTYDIG',
     tenant: 'lns', rapport_id: RAPPORT_RESULTAT, slicer_tittel: 'Hovedprosjekt',
     søketerm: 'Snøhvit', forelder: '200 - Tunnel' },
 
-  { navn: '5. Maskinliste-slicer som IKKE er indeksert — forventet FALLBACK til lokal',
+  { navn: '6. Maskinliste-slicer som IKKE er indeksert — forventet FALLBACK til lokal',
     tenant: 'lns', rapport_id: RAPPORT_USETT, slicer_tittel: 'Anlegg', søketerm: 'Elkem' },
 ];
 
@@ -68,24 +74,26 @@ async function simulerScenario(s: Scenario): Promise<void> {
   });
 
   if (respons.treff.length === 0) {
-    console.log('   → ERROR: ingen AI Search-treff. Validator returnerer feil til AI med forslag.');
+    console.log('   → NONE: ingen AI Search-treff. Validator returnerer not_found til AI.');
     return;
   }
 
-  // Steg 3: Tvetydighet
-  const tvetydig = erTvetydig(respons.treff);
-  if (tvetydig) {
-    console.log(`   → TVETYDIG: ${respons.treff.length} treff (#1=${respons.treff[0].score.toFixed(2)}, #2=${respons.treff[1].score.toFixed(2)})`);
-    console.log('     Validator returnerer alle treff til AI som spør brukeren:');
-    respons.treff.forEach((t, i) => {
-      console.log(`       ${i + 1}. "${t.verdi}"${t.forelder_verdi ? ` (under ${t.forelder_verdi})` : ''} (score ${t.score.toFixed(2)})`);
-    });
+  // Steg 3: Vurdering med eksakt-match-prioritet og terskel-filtrering
+  const vurdering = velgFraTreff(respons.treff, s.søketerm);
+  console.log(`   → råtreff: ${respons.treff.length}`);
+  respons.treff.forEach((t, i) => {
+    console.log(`      ${i + 1}. score=${t.score.toFixed(3)}  "${t.verdi}"${t.forelder_verdi ? ` (under ${t.forelder_verdi})` : ''}`);
+  });
+
+  if (vurdering.type === 'none') {
+    console.log('   → NONE: alle treff under terskel. Validator returnerer not_found.');
+  } else if (vurdering.type === 'unique') {
+    console.log(`   → ENTYDIG: validator korrigerer "${s.søketerm}" → "${vurdering.treff}"`);
   } else {
-    const t = respons.treff[0];
-    console.log(`   → ENTYDIG: validator korrigerer stille "${s.søketerm}" → "${t.verdi}" (score ${t.score.toFixed(2)})`);
-    if (respons.treff.length > 1) {
-      console.log(`     (#2 er ${respons.treff[1].score.toFixed(2)} — ikke tvetydig fordi ratio < 1.5x)`);
-    }
+    console.log(`   → TVETYDIG: ${vurdering.alle.length} relevante etter filtrering. Validator spør AI:`);
+    vurdering.alle.forEach((t, i) => {
+      console.log(`      ${i + 1}. "${t.verdi}" (score ${t.score.toFixed(2)})`);
+    });
   }
 }
 
