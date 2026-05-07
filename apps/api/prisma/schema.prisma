@@ -226,3 +226,27 @@ model OrganisasjonTema {
   oppdatert        DateTime @updatedAt
   opprettet        DateTime @default(now())
 }
+
+/// Konfig for indeksering av slicer-verdier til Azure AI Search.
+/// Én rad per slicer per rapport. DAX-spørringen kjøres mot Power BI-datasettet,
+/// rader transformeres til SlicerVerdi[] og indekseres i synapse-slicer-katalog.
+model SlicerIndeksering {
+  id                String    @id @default(uuid())
+  tenant            String    @db.NVarChar(100)
+  rapport_id        String    @db.NVarChar(100)
+  workspace_id      String    @db.NVarChar(100)
+  dataset_id        String    @db.NVarChar(100)
+  slicer_tittel     String    @db.NVarChar(200)
+  slicer_type       String    @db.NVarChar(20) // 'basic' | 'hierarchy'
+  dax_query         String    @db.NVarChar(Max)
+  forelder_kolonne  String?   @db.NVarChar(200)
+  verdi_kolonne     String    @db.NVarChar(200)
+  er_aktiv          Boolean   @default(true)
+  sist_indeksert    DateTime?
+  sist_antall_rader Int?
+  opprettet         DateTime  @default(now())
+  oppdatert         DateTime  @updatedAt
+
+  @@unique([tenant, rapport_id, slicer_tittel])
+  @@map("ai_slicer_indeksering")
+}
