@@ -30,10 +30,24 @@ interface ChatMessage {
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
 }
 
+interface KpiForslag {
+  teknisk_navn: string;
+  visningsnavn: string;
+  sql_uttrykk:  string;
+  format:       'prosent' | 'nok' | 'antall' | 'desimal';
+  beskrivelse?: string;
+}
+
+interface KpiForslagPakke {
+  forslag:  KpiForslag[];
+  viewNavn: string | null;
+}
+
 interface MeldingMetadata {
-  type: 'rapport_forslag';
+  type: 'rapport_forslag' | 'kpi_forslag';
   versjon: number;
-  forslag: Omit<RapportForslag, 'data'>;
+  forslag?: Omit<RapportForslag, 'data'>;
+  kpi_forslag?: KpiForslagPakke;
 }
 
 interface RapportForslag {
@@ -56,11 +70,13 @@ interface RapportForslag {
 }
 
 interface DisplayMessage {
-  role: 'user' | 'assistant' | 'status' | 'actions' | 'rapport_forslag';
+  role: 'user' | 'assistant' | 'status' | 'actions' | 'rapport_forslag' | 'kpi_forslag';
   content: string;
   queryData?: Record<string, unknown>[];
   querySql?: string;
   rapportForslag?: RapportForslag;
+  kpiForslag?: KpiForslag[];
+  kpiViewNavn?: string | null;
 }
 
 interface AIChatProps {
@@ -235,6 +251,9 @@ export default function AIChat({
   const scrollInstantRef = useRef(false);
   // Counter som bumpes etter at AI har svart — trigger re-fetch i sidebar
   const [sidebarRefetchTrigger, setSidebarRefetchTrigger] = useState(0);
+  // KPI-lagre-status per KPI-nøkkel ("viewNavn::teknisk_navn"):
+  //   undefined = ikke forsøkt, 'lagrer' = pågår, 'lagret' = ok, string = feilmelding
+  const [kpiLagretStatus, setKpiLagretStatus] = useState<Record<string, 'lagrer' | 'lagret' | string>>({});
   // Intern sidebar-synlighet: default SKJULT i rapport-modus (visSidebar=true), ellers synlig
   const [sidebarSynligIntern, setSidebarSynligIntern] = useState(!visSidebar);
   // Effektiv synlighet: ekstern prop overstyrer intern (RapportPage styrer via localStorage)
@@ -374,8 +393,16 @@ export default function AIChat({
           .flatMap(m => {
             const msgs: DisplayMessage[] = [{ role: m.rolle as 'user' | 'assistant', content: m.innhold }];
             const meta = (m as { rolle: string; innhold: string; metadata?: MeldingMetadata | null }).metadata;
-            if (meta?.type === 'rapport_forslag') {
+            if (meta?.type === 'rapport_forslag' && meta.forslag) {
               msgs.push({ role: 'rapport_forslag', content: '', rapportForslag: { ...meta.forslag, data: [] } });
+            }
+            if (meta?.kpi_forslag && Array.isArray(meta.kpi_forslag.forslag) && meta.kpi_forslag.forslag.length > 0) {
+              msgs.push({
+                role: 'kpi_forslag',
+                content: '',
+                kpiForslag: meta.kpi_forslag.forslag,
+                kpiViewNavn: meta.kpi_forslag.viewNavn ?? null,
+              });
             }
             // Gjenopprett Excel-knapp for historiske assistant-meldinger med markdown-tabeller
             if (m.rolle === 'assistant') {
@@ -604,6 +631,45 @@ export default function AIChat({
     exportToExcel(forslag.data, forslag.tittel || 'rapport');
   }
 
+  async function lagreKpi(forslag: KpiForslag, viewNavn: string | null) {
+    if (!viewNavn) {
+      console.warn('[KPI] mangler viewNavn — kan ikke lagre');
+      return;
+    }
+    const key = `${viewNavn}::${forslag.teknisk_navn}`;
+    setKpiLagretStatus(prev => ({ ...prev, [key]: 'lagrer' }));
+    try {
+      // Samme auth-mønster som /api/chat-kallet lenger nede: apiFetch
+      // legger på x-tenant-id, vi setter X-Entra-Object-Id manuelt.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
+      const res = await apiFetch('/api/kpi/lagre', {
+        method:      'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({
+          view_navn:    viewNavn,
+          navn:         forslag.teknisk_navn,
+          visningsnavn: forslag.visningsnavn,
+          sql_uttrykk:  forslag.sql_uttrykk,
+          format:       forslag.format,
+          ...(forslag.beskrivelse ? { beskrivelse: forslag.beskrivelse } : {}),
+        }),
+      });
+      if (res.ok || res.status === 409) {
+        // 409 = duplikat — behandle som "allerede lagret"
+        setKpiLagretStatus(prev => ({ ...prev, [key]: 'lagret' }));
+        return;
+      }
+      const errBody = await res.json().catch(() => ({})) as { error?: string };
+      const melding = errBody.error || `HTTP ${res.status}`;
+      setKpiLagretStatus(prev => ({ ...prev, [key]: melding }));
+    } catch (err) {
+      const melding = err instanceof Error ? err.message : 'Ukjent feil';
+      setKpiLagretStatus(prev => ({ ...prev, [key]: melding }));
+    }
+  }
+
   function åpneRapportFraHistorikk(forslag: Omit<RapportForslag, 'data'>) {
     // Lagre uten data[] — rapport-interaktiv auto-fetcher friske data
     const forslagMedTomData: RapportForslag = { ...forslag, data: [] };
@@ -737,7 +803,8 @@ export default function AIChat({
             data?: Record<string, unknown>[];
             sql?: string;
             messages?: ChatMessage[];
-            forslag?: RapportForslag;
+            forslag?: RapportForslag | KpiForslag[];
+            viewNavn?: string | null;
           };
           try { chunk = JSON.parse(json) as typeof chunk; } catch { continue; }
 
@@ -766,7 +833,14 @@ export default function AIChat({
           } else if (chunk.type === 'open_report' && chunk.rapportId) {
             router.push(`/dashboard/rapport/${chunk.rapportId}`);
           } else if (chunk.type === 'rapport_forslag' && chunk.forslag) {
-            addDisplay({ role: 'rapport_forslag', content: '', rapportForslag: chunk.forslag });
+            addDisplay({ role: 'rapport_forslag', content: '', rapportForslag: chunk.forslag as RapportForslag });
+          } else if (chunk.type === 'kpi_forslag' && Array.isArray(chunk.forslag) && chunk.forslag.length > 0) {
+            addDisplay({
+              role: 'kpi_forslag',
+              content: '',
+              kpiForslag: chunk.forslag as KpiForslag[],
+              kpiViewNavn: chunk.viewNavn ?? null,
+            });
           } else if (chunk.type === 'query_result' && chunk.data) {
             pendingQueryRef.current = { data: chunk.data, sql: chunk.sql ?? '' };
           } else if (chunk.type === 'done') {
@@ -1312,6 +1386,70 @@ export default function AIChat({
                       >
                         Lukk
                       </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            if (msg.role === 'kpi_forslag' && msg.kpiForslag && msg.kpiForslag.length > 0) {
+              const viewNavn = msg.kpiViewNavn ?? null;
+              return (
+                <div key={i} className="flex justify-start">
+                  <div
+                    className="max-w-[85%]"
+                    style={{
+                      background: 'var(--glass-bg)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      fontSize: 12,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+                      Foreslåtte KPI-er fra denne rapporten
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {msg.kpiForslag.map((kpi, idx) => {
+                        const key    = `${viewNavn ?? '?'}::${kpi.teknisk_navn}`;
+                        const status = kpiLagretStatus[key];
+                        const lagret = status === 'lagret';
+                        const lagrer = status === 'lagrer';
+                        const feil   = status && status !== 'lagrer' && status !== 'lagret' ? status : null;
+                        const fmtBadge = `var(--gold)`;
+                        return (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button
+                                type="button"
+                                disabled={lagret || lagrer || !viewNavn}
+                                onClick={() => lagreKpi(kpi, viewNavn)}
+                                style={{
+                                  padding: '5px 10px', fontSize: 11, borderRadius: 6,
+                                  border: '1px solid var(--gold-dim)',
+                                  background: lagret ? 'var(--glass-bg)' : 'var(--glass-gold-border)',
+                                  color: lagret ? 'var(--text-muted)' : 'var(--gold)',
+                                  cursor: (lagret || lagrer || !viewNavn) ? 'default' : 'pointer',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {lagret ? '✓ Lagret' : lagrer ? 'Lagrer…' : `💾 Lagre «${kpi.visningsnavn}»`}
+                              </button>
+                              <span style={{ fontSize: 10, color: fmtBadge, fontWeight: 700, fontFamily: 'monospace' }}>
+                                {kpi.format.toUpperCase()}
+                              </span>
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={kpi.sql_uttrykk}>
+                                {kpi.sql_uttrykk}
+                              </span>
+                            </div>
+                            {feil && (
+                              <div style={{ fontSize: 10, color: '#e05c5c', paddingLeft: 4 }}>
+                                {feil}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

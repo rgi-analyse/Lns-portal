@@ -43,6 +43,7 @@ import { pbiCreateRoutes } from './routes/pbiCreate';
 import { speechRoutes } from './routes/speech';
 import { megInnstillingerRoutes } from './routes/megInnstillinger';
 import { rapportDesignerRoutes } from './routes/rapportDesigner';
+import { kpiRoutes } from './routes/kpi';
 import { temaRoutes } from './routes/tema';
 import { tenantRoutes } from './routes/tenants';
 import { aktivitetRoutes } from './routes/aktivitet';
@@ -122,6 +123,7 @@ async function start() {
   await server.register(speechRoutes);
   await server.register(megInnstillingerRoutes);
   await server.register(rapportDesignerRoutes);
+  await server.register(kpiRoutes);
   await server.register(temaRoutes);
   await server.register(tenantRoutes);
   await server.register(aktivitetRoutes);

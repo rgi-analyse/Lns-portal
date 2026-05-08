@@ -309,6 +309,44 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       console.log('[view-kolonner] schema:', schema, '| view:', view, '| original:', viewNavn);
       if (!schema || !view) return reply.status(400).send({ error: 'Ugyldig viewNavn.' });
 
+      // Hent KPI-er for et view uavhengig av kolonne-kilde. KPI-er lever i
+      // ai_metadata_kpi og er ortogonale til INFORMATION_SCHEMA — et view kan
+      // ha KPI-er definert selv om kolonne-metadata mangler eller er inaktiv.
+      const lastKpiKolonner = async () => {
+        const kpi: { kolonne_navn: string; kolonne_type: string; datatype: string; sort_order: number; sql_uttrykk: string; visningsnavn: string; format?: string }[] = [];
+        try {
+          const viewIdRows = await queryAzureSQL(
+            `SELECT TOP 1 id FROM ai_metadata_views
+             WHERE schema_name = @schema AND view_name = @view
+             ORDER BY er_aktiv DESC`,
+            { schema, view },
+          );
+          if (viewIdRows.length === 0) return kpi;
+          const viewId = safeId(String(viewIdRows[0]['id'] ?? ''));
+          const kpiRows = await queryAzureSQL(
+            `SELECT navn, visningsnavn, sql_uttrykk, format
+             FROM ai_metadata_kpi
+             WHERE view_id = '${viewId}' AND er_aktiv = 1
+             ORDER BY visningsnavn`,
+          );
+          for (const k of kpiRows) {
+            kpi.push({
+              kolonne_navn: String(k['navn'] ?? ''),
+              kolonne_type: 'kpi',
+              datatype:     'kpi',
+              sort_order:   9999,
+              sql_uttrykk:  String(k['sql_uttrykk'] ?? ''),
+              visningsnavn: String(k['visningsnavn'] ?? ''),
+              format:       k['format'] ? String(k['format']) : undefined,
+            });
+          }
+          console.log('[view-kolonner] KPI-er lastet:', kpi.length);
+        } catch (kpiErr) {
+          console.warn('[view-kolonner] KPI-henting feilet:', kpiErr);
+        }
+        return kpi;
+      };
+
       try {
         const viewDiag = await queryAzureSQL(
           `SELECT id, schema_name, view_name, er_aktiv
@@ -343,38 +381,13 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           console.log('[view-kolonner] metadata-treff (uten er_aktiv-filter):', metaAlle.length, metaAlle);
           if (metaAlle.length > 0) {
             console.warn('[view-kolonner] er_aktiv er ikke 1 for dette viewet — bruk likevel metadata');
-            return reply.send({ kolonner: metaAlle, kilde: 'metadata' });
-            // NB: KPI ikke lastet i denne fallback-stien (view er inaktivt)
+            const kpiKolonner = await lastKpiKolonner();
+            return reply.send({ kolonner: [...metaAlle, ...kpiKolonner], kilde: 'metadata' });
           }
         }
 
         if (metaRows.length > 0) {
-          // Hent KPI-er og legg til som virtuelle kolonner
-          let kpiKolonner: { kolonne_navn: string; kolonne_type: string; datatype: string; sort_order: number; sql_uttrykk: string }[] = [];
-          try {
-            const viewIdRows = await queryAzureSQL(
-              `SELECT id FROM ai_metadata_views WHERE schema_name = @schema AND view_name = @view AND er_aktiv = 1`,
-              { schema, view },
-            );
-            if (viewIdRows.length > 0) {
-              const viewId = safeId(String(viewIdRows[0]['id'] ?? ''));
-              const kpiRows = await queryAzureSQL(
-                `SELECT navn, visningsnavn, sql_uttrykk, format FROM ai_metadata_kpi WHERE view_id = '${viewId}' AND er_aktiv = 1 ORDER BY visningsnavn`,
-              );
-              kpiKolonner = kpiRows.map(k => ({
-                kolonne_navn: String(k['navn'] ?? ''),
-                kolonne_type: 'kpi',
-                datatype:     'kpi',
-                sort_order:   9999,
-                sql_uttrykk:  String(k['sql_uttrykk'] ?? ''),
-                visningsnavn: String(k['visningsnavn'] ?? ''),
-                format:       k['format'] ? String(k['format']) : undefined,
-              }));
-              console.log('[view-kolonner] KPI-er lastet:', kpiKolonner.length);
-            }
-          } catch (kpiErr) {
-            console.warn('[view-kolonner] KPI-henting feilet:', kpiErr);
-          }
+          const kpiKolonner = await lastKpiKolonner();
           return reply.send({ kolonner: [...metaRows, ...kpiKolonner], kilde: 'metadata' });
         }
 
@@ -413,7 +426,8 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         console.log('[view-kolonner] INFORMATION_SCHEMA kolonner:', rows.length);
 
         if (rows.length > 0) {
-          return reply.send({ kolonner: rows, kilde: 'information_schema' });
+          const kpiKolonner = await lastKpiKolonner();
+          return reply.send({ kolonner: [...rows, ...kpiKolonner], kilde: 'information_schema' });
         }
 
         // Fallback: hent kolonner direkte fra viewet via SELECT TOP 1
@@ -433,13 +447,16 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
               sort_order:   0,
             }));
             console.log('[view-kolonner] fallback direkte SELECT kolonner:', kolonner.length);
-            return reply.send({ kolonner, kilde: 'direkte_select' });
+            const kpiKolonner = await lastKpiKolonner();
+            return reply.send({ kolonner: [...kolonner, ...kpiKolonner], kilde: 'direkte_select' });
           }
           console.warn('[view-kolonner] direkte SELECT ga 0 rader — view er tomt eller ikke tilgjengelig');
-          return reply.send({ kolonner: [], kilde: 'direkte_select' });
+          const kpiKolonner = await lastKpiKolonner();
+          return reply.send({ kolonner: kpiKolonner, kilde: 'direkte_select' });
         } catch (fallbackErr) {
           console.error('[view-kolonner] direkte SELECT feilet:', fallbackErr);
-          return reply.send({ kolonner: [], kilde: 'information_schema' });
+          const kpiKolonner = await lastKpiKolonner();
+          return reply.send({ kolonner: kpiKolonner, kilde: 'information_schema' });
         }
       } catch (err) {
         console.error('[view-kolonner] feil:', err);

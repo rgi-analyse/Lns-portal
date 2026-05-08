@@ -265,6 +265,20 @@ function defaultSorterRetning(xAkse: string): 'ASC' | 'DESC' {
   return tidskolonner.includes(xAkse?.toLowerCase()) ? 'ASC' : 'DESC';
 }
 
+// ── KPI-helper: case-insensitiv lookup ───────────────────────────────────────
+// Detektoren lagrer teknisk_navn i lowercase ("antall"), men AI-aliaset i
+// rapporten kan være "Antall" eller "ANTALL". Aksen-state holder seg til
+// hva brukeren faktisk valgte, så vi kan ikke kreve eksakt case-match.
+function finnKpiUttrykk(navn: string, kpiUttrykk: Record<string, string>): string | undefined {
+  if (!navn) return undefined;
+  if (kpiUttrykk[navn]) return kpiUttrykk[navn]; // exact match først (raskest)
+  const lower = navn.toLowerCase();
+  for (const key of Object.keys(kpiUttrykk)) {
+    if (key.toLowerCase() === lower) return kpiUttrykk[key];
+  }
+  return undefined;
+}
+
 // ── SQL builder ───────────────────────────────────────────────────────────────
 function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kolonnTyper: Record<string, string> = {}, kpiUttrykk: Record<string, string> = {}): string {
   const esc   = (s: string) => `[${s.replace(/[\[\]]/g, '')}]`;
@@ -272,7 +286,7 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
   const y     = esc(cfg.yAkse);
   const alias = esc(cfg.yAkse);
   // KPI-kolonner bruker pre-definert SQL-uttrykk direkte (allerede aggregert)
-  const kpiExpr = kpiUttrykk[cfg.yAkse];
+  const kpiExpr = finnKpiUttrykk(cfg.yAkse, kpiUttrykk);
   // Ikke inkluder grupperPaa hvis den er identisk med xAkse — unngår duplikat i SELECT/GROUP BY
   const grp   = (cfg.grupperPaa && cfg.grupperPaa !== cfg.xAkse) ? esc(cfg.grupperPaa) : null;
 
@@ -1621,7 +1635,8 @@ export default function RapportInteraktivPage() {
       .then(r => r.json())
       .then((res: unknown) => {
         // API kan returnere ren array eller { views: [...] } / { data: [...] }
-        const views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: { navn: string }[] }[] =
+        type KpiMeta = { navn: string; visningsnavn?: string; sql_uttrykk?: string; format?: string };
+        const views: { view_name: string; schema_name: string; kolonner?: { kolonne_navn: string }[]; kpi?: KpiMeta[] }[] =
           Array.isArray(res) ? res
           : Array.isArray((res as Record<string, unknown>).views) ? (res as Record<string, unknown[]>).views as typeof views
           : Array.isArray((res as Record<string, unknown>).data)  ? (res as Record<string, unknown[]>).data  as typeof views
@@ -1637,6 +1652,34 @@ export default function RapportInteraktivPage() {
           const kpier = view.kpi?.map(k => k.navn) ?? [];
           setViewKolonner([...kolonner, ...kpier]);
           console.log('[viewKolonner] lastet:', kolonner.length, 'kolonner +', kpier.length, 'KPI-er for', vn);
+
+          // Hydrér kpiUttrykk/format/visningsnavn fra metadata. Nødvendig når
+          // en KPI er lagret etter at AI bygde rapporten — da mangler den i
+          // forslag.alleViewKolonner, og uten sql_uttrykk her ville byggSQL
+          // falle tilbake til SUM([navn]). Merger inn (overskriver ikke
+          // eksisterende) for å beholde sannheten fra rapport-designer/view-
+          // kolonner som primærkilde.
+          const nyeKpi: Record<string, string> = {};
+          const nyeFmt: Record<string, string> = {};
+          const nyeVns: Record<string, string> = {};
+          for (const k of view.kpi ?? []) {
+            if (k.navn && k.sql_uttrykk) nyeKpi[k.navn] = k.sql_uttrykk;
+            if (k.navn && k.format)       nyeFmt[k.navn] = k.format;
+            if (k.navn && k.visningsnavn) nyeVns[k.navn] = k.visningsnavn;
+          }
+          if (Object.keys(nyeKpi).length > 0) {
+            setKpiUttrykk(prev => ({ ...nyeKpi, ...prev }));
+            setKpiFormat(prev => ({ ...nyeFmt, ...prev }));
+            setKpiVisningsnavn(prev => ({ ...nyeVns, ...prev }));
+            // Merk også kolonne_type slik at kolGroups grupperer korrekt
+            setKolonnTyper(prev => {
+              const oppdatert = { ...prev };
+              for (const navn of Object.keys(nyeKpi)) {
+                if (!oppdatert[navn]) oppdatert[navn] = 'kpi';
+              }
+              return oppdatert;
+            });
+          }
         } else {
           console.warn('[viewKolonner] fant ikke view:', vn, 'blant', views.map(v => v.view_name));
         }
@@ -1793,13 +1836,14 @@ export default function RapportInteraktivPage() {
         filterDeler.push(`[${xAkse}] IS NOT NULL`);
         const whereKlausul = `WHERE ${filterDeler.join(' AND ')}`;
         // KPI-kolonner: injiser sql_uttrykk direkte — de finnes ikke som fysiske kolonner
-        const yUttrykk = kpiMap[yAkse]
-          ? `${kpiMap[yAkse]} AS [${yAkse}]`
+        const initialKpiExpr = finnKpiUttrykk(yAkse, kpiMap);
+        const yUttrykk = initialKpiExpr
+          ? `${initialKpiExpr} AS [${yAkse}]`
           : `SUM([${yAkse}]) AS [${yAkse}]`;
         // Kronologisk sortering for månedsnavn
         const erMånedInitial = ['månedsnavn', 'månednavn'].includes(xAkse.toLowerCase());
         const initialGroupBy = erMånedInitial ? `GROUP BY [${xAkse}], [måned], [årmåned]` : `GROUP BY [${xAkse}]`;
-        const initialOrder   = erMånedInitial ? `ORDER BY CAST([årmåned] AS INT) ASC` : `ORDER BY ${kpiMap[yAkse] ?? `SUM([${yAkse}])`} DESC`;
+        const initialOrder   = erMånedInitial ? `ORDER BY CAST([årmåned] AS INT) ASC` : `ORDER BY ${initialKpiExpr ?? `SUM([${yAkse}])`} DESC`;
         const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} ${initialGroupBy} ${initialOrder}`;
         console.log('[Designer] initial SQL:', sql);
         setLasterData(true);
@@ -1910,14 +1954,14 @@ export default function RapportInteraktivPage() {
         const selectListe = [
           ...valgteDimensjoner.map(k => `[${k}]`),
           ...valgteMeasures.map(k => `SUM([${k}]) AS [${k}]`),
-          ...valgteKpiKol.map(k => `${kpiUtrykkRef.current[k] ?? `SUM([${k}])`} AS [${k}]`),
+          ...valgteKpiKol.map(k => `${finnKpiUttrykk(k, kpiUtrykkRef.current) ?? `SUM([${k}])`} AS [${k}]`),
         ].join(',\n  ');
         const groupBy = valgteDimensjoner.length > 0 ? `GROUP BY ${valgteDimensjoner.map(k => `[${k}]`).join(', ')}` : '';
         const firstMeasure = valgteMeasures[0] ?? valgteKpiKol[0];
         const orderBy = valgteMeasures.length > 0
           ? `ORDER BY SUM([${valgteMeasures[0]}]) DESC`
           : valgteKpiKol.length > 0
-            ? `ORDER BY ${kpiUtrykkRef.current[firstMeasure] ?? `SUM([${firstMeasure}])`} DESC`
+            ? `ORDER BY ${finnKpiUttrykk(firstMeasure, kpiUtrykkRef.current) ?? `SUM([${firstMeasure}])`} DESC`
             : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
@@ -2294,6 +2338,7 @@ export default function RapportInteraktivPage() {
 
   // Kolonner gruppert etter type (for optgroup-dropdowns)
   const kolGroups = useMemo(() => {
+    const kpi:         string[] = [];
     const measures:    string[] = [];
     const dimensjoner: string[] = [];
     const datoer:      string[] = [];
@@ -2301,13 +2346,14 @@ export default function RapportInteraktivPage() {
     const ukjente:     string[] = [];
     for (const col of alleCols) {
       const t = kolonnTyper[col];
-      if (t === 'measure')   measures.push(col);
+      if (t === 'kpi')       kpi.push(col);
+      else if (t === 'measure')   measures.push(col);
       else if (t === 'dato') datoer.push(col);
       else if (t === 'id')   ider.push(col);
       else if (t === 'dimensjon') dimensjoner.push(col);
       else ukjente.push(col);
     }
-    return { measures, dimensjoner, datoer, ider, ukjente };
+    return { kpi, measures, dimensjoner, datoer, ider, ukjente };
   }, [alleCols, kolonnTyper]);
 
   const harTyper = Object.keys(kolonnTyper).length > 0;
@@ -2362,14 +2408,21 @@ export default function RapportInteraktivPage() {
       : `${f.kolonne} ${f.operator} ${f.verdi}`);
 
   // Y-akse label: KPI-er viser visningsnavn, andre viser aggregering(kolonnenavn)
-  const yAkseLabel = kpiUttrykk[config.yAkse]
-    ? (kpiVisningsnavn[config.yAkse] || config.yAkse)
+  // Case-insensitiv lookup — yAkse kan være AI-aliaset "Antall" mens KPI
+  // er lagret som "antall".
+  const yAkseKpiNøkkel = (() => {
+    if (kpiUttrykk[config.yAkse]) return config.yAkse;
+    const lower = config.yAkse?.toLowerCase() ?? '';
+    return Object.keys(kpiUttrykk).find(k => k.toLowerCase() === lower) ?? null;
+  })();
+  const yAkseLabel = yAkseKpiNøkkel
+    ? (kpiVisningsnavn[yAkseKpiNøkkel] || config.yAkse)
     : config.aggregering === 'NONE'
       ? config.yAkse
       : `${config.aggregering}(${config.yAkse})`;
 
   // Format-bevisst tallformatering for KPI-er
-  const yFormat = kpiFormat[config.yAkse];
+  const yFormat = yAkseKpiNøkkel ? kpiFormat[yAkseKpiNøkkel] : undefined;
   function formaterVerdi(val: number, fmt?: string): string {
     if (fmt === 'prosent') return `${val.toFixed(2)} %`;
     if (fmt === 'nok') return val.toLocaleString('nb-NO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' kr';
@@ -3069,6 +3122,7 @@ export default function RapportInteraktivPage() {
                         {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                       </>
                     ) : (
@@ -3087,8 +3141,9 @@ export default function RapportInteraktivPage() {
                     const type = kolonnTyper[col];
                     setConfig(p => {
                       if (!p) return p;
-                      // Auto-switch til COUNT om valgt kolonne er dimensjon/dato/id
-                      const foreslåttAgg = (type === 'measure' || !type) ? p.aggregering : (p.aggregering === 'SUM' || p.aggregering === 'AVG' || p.aggregering === 'MEDIAN' ? 'COUNT' : p.aggregering);
+                      // Auto-switch til COUNT om valgt kolonne er dimensjon/dato/id.
+                      // KPI-er bringer egen aggregering — ingen overstyring.
+                      const foreslåttAgg = (type === 'measure' || type === 'kpi' || !type) ? p.aggregering : (p.aggregering === 'SUM' || p.aggregering === 'AVG' || p.aggregering === 'MEDIAN' ? 'COUNT' : p.aggregering);
                       // Hvis sortering pekte på gammelt yAkse, flytt den til nytt yAkse
                       const nySorterPaa = p.sorterPaa === p.yAkse ? col : p.sorterPaa;
                       return { ...p, yAkse: col, aggregering: foreslåttAgg, sorterPaa: nySorterPaa };
@@ -3096,6 +3151,7 @@ export default function RapportInteraktivPage() {
                   }} style={selectStyle}>
                     {harTyper ? (
                       <>
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
@@ -3325,9 +3381,9 @@ export default function RapportInteraktivPage() {
               {config.visualType!=='table' && (
                 <div>
                   <label style={labelStyle}>Aggregering</label>
-                  {kpiUttrykk[config.yAkse] ? (
+                  {yAkseKpiNøkkel ? (
                     <div style={{ padding:'8px 10px', borderRadius:7, background:'rgba(251,146,60,0.08)', border:'1px solid rgba(251,146,60,0.25)', fontSize:11, color:'rgba(251,146,60,0.9)', lineHeight:1.5 }}>
-                      <span style={{ fontWeight:700 }}>K</span> KPI{kpiFormat[config.yAkse] ? ` (${kpiFormat[config.yAkse]})` : ''} — aggregering håndteres automatisk av SQL-uttrykket
+                      <span style={{ fontWeight:700 }}>K</span> KPI{kpiFormat[yAkseKpiNøkkel] ? ` (${kpiFormat[yAkseKpiNøkkel]})` : ''} — aggregering håndteres automatisk av SQL-uttrykket
                     </div>
                   ) : (
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>

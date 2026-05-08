@@ -1076,6 +1076,8 @@ Tilgjengelige visualiseringstyper:
           reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
         };
         let fullAiTekst = '';
+        let fangstRapportGlobal: Record<string, unknown> | null = null;
+        let fangstKpiGlobal:     { forslag: unknown; viewNavn: unknown } | null = null;
         let fangstMetadataGlobal: string | null = null;
         const writeOgCapture = (chunk: unknown) => {
           write(chunk);
@@ -1093,7 +1095,10 @@ Tilgjengelige visualiseringstyper:
           if (c.type === 'rapport_forslag' && c.forslag) {
             // Lagre forslag uten data[] (kan være store rådatasett)
             const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
-            fangstMetadataGlobal = JSON.stringify({ type: 'rapport_forslag', versjon: 1, forslag: forslagUtenData });
+            fangstRapportGlobal = forslagUtenData;
+          }
+          if (c.type === 'kpi_forslag') {
+            fangstKpiGlobal = { forslag: c.forslag, viewNavn: c.viewNavn };
           }
         };
 
@@ -1105,6 +1110,21 @@ Tilgjengelige visualiseringstyper:
         } finally {
           loggTiming('global');
           reply.raw.end();
+        }
+        // Bygg samlet metadata-objekt etter chat ferdig
+        if (fangstRapportGlobal) {
+          fangstMetadataGlobal = JSON.stringify({
+            type: 'rapport_forslag',
+            versjon: 1,
+            forslag: fangstRapportGlobal,
+            ...(fangstKpiGlobal ? { kpi_forslag: fangstKpiGlobal } : {}),
+          });
+        } else if (fangstKpiGlobal) {
+          fangstMetadataGlobal = JSON.stringify({
+            type: 'kpi_forslag',
+            versjon: 1,
+            kpi_forslag: fangstKpiGlobal,
+          });
         }
         // Lagre assistant-melding etter AI ferdig (fire-and-forget)
         if (entraObjectId && (fullAiTekst || fangstMetadataGlobal)) {
@@ -1462,6 +1482,8 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       };
       let fullAiTekstRapport = '';
+      let fangstRapportR: Record<string, unknown> | null = null;
+      let fangstKpiR:     { forslag: unknown; viewNavn: unknown } | null = null;
       let fangstMetadataRapport: string | null = null;
       const writeOgCapture = (chunk: unknown) => {
         write(chunk);
@@ -1479,7 +1501,10 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
         if (c.type === 'rapport_forslag' && c.forslag) {
           // Lagre forslag uten data[] (kan være store rådatasett)
           const { data: _data, ...forslagUtenData } = c.forslag as Record<string, unknown>;
-          fangstMetadataRapport = JSON.stringify({ type: 'rapport_forslag', versjon: 1, forslag: forslagUtenData });
+          fangstRapportR = forslagUtenData;
+        }
+        if (c.type === 'kpi_forslag') {
+          fangstKpiR = { forslag: c.forslag, viewNavn: c.viewNavn };
         }
       };
 
@@ -1492,6 +1517,21 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       } finally {
         loggTiming('rapport');
         reply.raw.end();
+      }
+      // Bygg samlet metadata-objekt etter chat ferdig
+      if (fangstRapportR) {
+        fangstMetadataRapport = JSON.stringify({
+          type: 'rapport_forslag',
+          versjon: 1,
+          forslag: fangstRapportR,
+          ...(fangstKpiR ? { kpi_forslag: fangstKpiR } : {}),
+        });
+      } else if (fangstKpiR) {
+        fangstMetadataRapport = JSON.stringify({
+          type: 'kpi_forslag',
+          versjon: 1,
+          kpi_forslag: fangstKpiR,
+        });
       }
       // Lagre assistant-melding etter AI ferdig (fire-and-forget)
       if (entraObjectId && (fullAiTekstRapport || fangstMetadataRapport)) {

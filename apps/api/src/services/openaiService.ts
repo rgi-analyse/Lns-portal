@@ -7,6 +7,8 @@ import {
   erIndeksert as slicerErIndeksert,
   velgFraTreff as slicerVelgFraTreff,
 } from './slicerKatalogService';
+import { validerKpiUttrykk } from './kpiValidator';
+import { detekterKpiKandidater, type KpiForslag } from './kpiDetektor';
 
 console.log('[OpenAI] Konfigurasjon:', {
   endpoint:   process.env.AZURE_OPENAI_ENDPOINT,
@@ -62,6 +64,7 @@ export type SseChunk =
   | { type: 'open_report';          rapportId: string; rapportNavn: string }
   | { type: 'query_result';         data: Record<string, unknown>[]; sql: string }
   | { type: 'rapport_forslag';      forslag: RapportForslag }
+  | { type: 'kpi_forslag';          forslag: KpiForslag[]; viewNavn: string | null }
   | { type: 'conversation_history'; messages: ChatMessage[] }
   | { type: 'done' };
 
@@ -1286,8 +1289,10 @@ export async function chat(
               history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
               continue;
             }
-            // Ekstraher viewnavn fra SQL for metadata-oppslag
-            const viewMatch = sqlQuery.match(/\bFROM\s+(ai_gold\.\w+)/i);
+            // Ekstraher viewnavn fra SQL for metadata-oppslag.
+            // \p{L}\p{N} (med /u) tillater æøå i view-navn — ASCII-only \w trunkerer
+            // f.eks. "vw_Fact_Leverandørstatistikk" til "vw_Fact_Leverand".
+            const viewMatch = sqlQuery.match(/\bFROM\s+(ai_gold\.[\p{L}\p{N}_]+)/iu);
             const viewNavn  = viewMatch?.[1] ?? null;
 
             // Hent ALLE kolonner fra viewet via INFORMATION_SCHEMA + LEFT JOIN metadata for kolonne_type
@@ -1442,6 +1447,24 @@ export async function chat(
             };
             console.log('[OpenAI] create_report forslag klar, rader:', data.length);
             onChunk({ type: 'rapport_forslag', forslag });
+
+            // Etter rapporten er bygd: detekter aggregat-uttrykk i SELECT-listen
+            // og foreslå dem som KPI-kandidater. Brukeren kan klikke "Lagre som
+            // KPI" inline i chat-en for å opprette uten ny tool-runde.
+            if (viewNavn) {
+              try {
+                const schemaName  = viewNavn.split('.')[0] ?? 'ai_gold';
+                const viewName    = viewNavn.split('.')[1] ?? viewNavn;
+                const kandidater  = await detekterKpiKandidater(sqlQuery, schemaName, viewName);
+                if (kandidater.length > 0) {
+                  console.log('[OpenAI] kpi-kandidater detektert:', kandidater.length, kandidater.map(k => k.teknisk_navn));
+                  onChunk({ type: 'kpi_forslag', forslag: kandidater, viewNavn });
+                }
+              } catch (kpiDetErr) {
+                console.warn('[OpenAI] kpi-deteksjon feilet:', (kpiDetErr as Error).message);
+              }
+            }
+
             result = { success: true, message: `Rapportforslag "${forslag.tittel}" er klart med ${data.length} rader.` };
           }
         } else if (tc.name === 'opprett_kpi') {
@@ -1494,33 +1517,37 @@ export async function chat(
                     error: `KPI "${visningsnavn_}" finnes allerede (id: ${String(eksisterende[0]['id'])}). Ingen ny KPI ble opprettet.`,
                   };
                 } else {
-                  try {
-                    const rows = await queryAzureSQL(`
-                      INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
-                      OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
-                             INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
-                      VALUES (
-                        '${viewId}', '${safeNavn}', '${safeVns}',
-                        '${safeSql}', '${safeFmt}',
-                        ${safeBesk ? `'${safeBesk}'` : 'NULL'}
-                      )
-                    `, 1);
-                    // Logg for admin-oversikt (ikke kritisk — tabellen kan mangle)
-                    queryAzureSQL(`
-                      INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
-                      VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
-                    `).catch(() => {});
-                    result = {
-                      success: true,
-                      kpi: rows[0],
-                      melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
-                    };
-                  } catch (insertErr) {
-                    const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+                  // Validér uttrykket statisk + prøvekjør mot viewet før INSERT
+                  const validering = await validerKpiUttrykk(sql_uttrykk_, safeSchema, safeView);
+                  if (!validering.ok) {
                     result = {
                       success: false,
-                      error: `KPI-insert feilet: ${insertMsg}. Ingen KPI ble opprettet.`,
+                      error: `KPI ble ikke opprettet: ${validering.feilmelding}`,
                     };
+                  } else {
+                    try {
+                      const rows = await queryAzureSQL(`
+                        INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
+                        OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+                               INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+                        VALUES (
+                          '${viewId}', '${safeNavn}', '${safeVns}',
+                          '${safeSql}', '${safeFmt}',
+                          ${safeBesk ? `'${safeBesk}'` : 'NULL'}
+                        )
+                      `, 1);
+                      result = {
+                        success: true,
+                        kpi: rows[0],
+                        melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
+                      };
+                    } catch (insertErr) {
+                      const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+                      result = {
+                        success: false,
+                        error: `KPI-insert feilet: ${insertMsg}. Ingen KPI ble opprettet.`,
+                      };
+                    }
                   }
                 }
               }
