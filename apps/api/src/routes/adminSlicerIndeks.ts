@@ -382,6 +382,70 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
     },
   );
 
+  // ── 10. GET /api/admin/slicer-indeks/forslag ─────────────────────────
+  // Pragmatisk versjon: backend kan ikke enumerere ikke-indekserte slicere
+  // uten frontend-discovery (PBI report-layout er ikke tilgjengelig via SP).
+  // Endepunktet leverer i stedet to lister UI kan bruke som forslag-kilde:
+  //   1. trenger_reindeksering — konfig-er eldre enn 24 timer
+  //   2. rapporter_uten_konfig — rapporter med 0 aktive konfig-er
+  // UI utvider dette med discovered slicers fra PowerBIReport.loadAll når
+  // admin åpner en rapport.
+  fastify.get(
+    '/api/admin/slicer-indeks/forslag',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const tenant = (request as TenantRequest).tenantSlug;
+      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
+
+      // 1. Konfig-er som trenger reindeksering (eldre enn 24t eller aldri kjørt)
+      const ettDøgnSiden = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const trenger = await prisma.slicerIndeksering.findMany({
+        where: {
+          tenant, er_aktiv: true,
+          OR: [
+            { sist_indeksert: null },
+            { sist_indeksert: { lt: ettDøgnSiden } },
+          ],
+        },
+        orderBy: [{ sist_indeksert: 'asc' }],
+      });
+
+      // 2. Rapporter uten konfig
+      const aktiveRapporter = await (request as TenantRequest).tenantPrisma.rapport.findMany({
+        where:  { erAktiv: true },
+        select: { id: true, navn: true, område: true },
+      });
+      const konfigPerRapport = await prisma.slicerIndeksering.groupBy({
+        by:     ['rapport_id'],
+        where:  { tenant, er_aktiv: true },
+        _count: true,
+      });
+      const harKonfig = new Set(konfigPerRapport.map((c) => c.rapport_id));
+      const utenKonfig = aktiveRapporter
+        .filter((r) => !harKonfig.has(r.id))
+        .map((r) => ({ id: r.id, navn: r.navn, område: r.område }));
+
+      // Slå opp rapport-navn for trenger-reindeksering
+      const navnPerId = new Map(aktiveRapporter.map((r) => [r.id, r.navn]));
+
+      return reply.send({
+        merknad:
+          'Backend kan ikke automatisk oppdage ikke-indekserte slicere uten frontend-discovery. ' +
+          'UI bør supplementere med PowerBIReport.loadAll for å oppdage nye kandidater per rapport.',
+        trenger_reindeksering: trenger.map((k) => ({
+          konfig_id:         k.id,
+          rapport_id:        k.rapport_id,
+          rapport_navn:      navnPerId.get(k.rapport_id) ?? null,
+          slicer_tittel:     k.slicer_tittel,
+          slicer_type:       k.slicer_type,
+          sist_indeksert:    k.sist_indeksert,
+          sist_antall_rader: k.sist_antall_rader,
+        })),
+        rapporter_uten_konfig: utenKonfig,
+      });
+    },
+  );
+
   // ── 9. GET /api/admin/datasets/:workspace_id/:dataset_id/tabeller ────
   // Lister tabeller i et PBI-datasett via DAX INFO.TABLES (krever moderne
   // PBI-tenant). Med ?tabell=<navn> hentes kolonner for én tabell via TOPN.
