@@ -8,6 +8,7 @@ import {
   velgFraTreff as slicerVelgFraTreff,
 } from './slicerKatalogService';
 import { validerKpiUttrykk } from './kpiValidator';
+import { detekterKpiKandidater, type KpiForslag } from './kpiDetektor';
 
 console.log('[OpenAI] Konfigurasjon:', {
   endpoint:   process.env.AZURE_OPENAI_ENDPOINT,
@@ -63,6 +64,7 @@ export type SseChunk =
   | { type: 'open_report';          rapportId: string; rapportNavn: string }
   | { type: 'query_result';         data: Record<string, unknown>[]; sql: string }
   | { type: 'rapport_forslag';      forslag: RapportForslag }
+  | { type: 'kpi_forslag';          forslag: KpiForslag[]; viewNavn: string | null }
   | { type: 'conversation_history'; messages: ChatMessage[] }
   | { type: 'done' };
 
@@ -1443,6 +1445,24 @@ export async function chat(
             };
             console.log('[OpenAI] create_report forslag klar, rader:', data.length);
             onChunk({ type: 'rapport_forslag', forslag });
+
+            // Etter rapporten er bygd: detekter aggregat-uttrykk i SELECT-listen
+            // og foreslå dem som KPI-kandidater. Brukeren kan klikke "Lagre som
+            // KPI" inline i chat-en for å opprette uten ny tool-runde.
+            if (viewNavn) {
+              try {
+                const schemaName  = viewNavn.split('.')[0] ?? 'ai_gold';
+                const viewName    = viewNavn.split('.')[1] ?? viewNavn;
+                const kandidater  = await detekterKpiKandidater(sqlQuery, schemaName, viewName);
+                if (kandidater.length > 0) {
+                  console.log('[OpenAI] kpi-kandidater detektert:', kandidater.length, kandidater.map(k => k.teknisk_navn));
+                  onChunk({ type: 'kpi_forslag', forslag: kandidater, viewNavn });
+                }
+              } catch (kpiDetErr) {
+                console.warn('[OpenAI] kpi-deteksjon feilet:', (kpiDetErr as Error).message);
+              }
+            }
+
             result = { success: true, message: `Rapportforslag "${forslag.tittel}" er klart med ${data.length} rader.` };
           }
         } else if (tc.name === 'opprett_kpi') {
