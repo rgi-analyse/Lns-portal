@@ -103,14 +103,54 @@ interface AIChatProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+/**
+ * Parse markdown-lenke `[tekst](https://url)` til vise-tekst + URL.
+ * Streng regex som kun matcher hele celle-verdien (ikke embedded i lengre tekst)
+ * og krever http(s)://-prefiks slik at vanlige tekst-celler med `[` og `]`
+ * ikke tolkes som lenker. Returnerer null hvis ingen match.
+ */
+function parseMarkdownLink(text: string): { displayText: string; url: string } | null {
+  const m = text.match(/^\s*\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)\s*$/);
+  if (!m) return null;
+  return { displayText: m[1], url: m[2] };
+}
+
 function exportToExcel(data: Record<string, unknown>[], filename: string) {
   if (data.length === 0) return;
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
+
+  // Kolonne-bredde basert på vise-tekst (ikke rå markdown-streng) slik at
+  // kolonner ikke blir unødig brede når lenker konverteres.
   const kolBredder = Object.keys(data[0]).map(key => ({
-    wch: Math.max(key.length, ...data.map(rad => String(rad[key] ?? '').length), 8),
+    wch: Math.max(
+      key.length,
+      ...data.map(rad => {
+        const raw = String(rad[key] ?? '');
+        const lenke = parseMarkdownLink(raw);
+        return (lenke?.displayText ?? raw).length;
+      }),
+      8,
+    ),
   }));
   ws['!cols'] = kolBredder;
+
+  // Konverter markdown-lenker i hver celle til klikkbare hyperlenker.
+  // Excel rendrer celler med .l som blå + understreket automatisk.
+  const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1');
+  for (let R = range.s.r + 1; R <= range.e.r; R++) {     // hopp over header-rad
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = (ws as Record<string, { v?: unknown; l?: { Target: string; Tooltip?: string } }>)[addr];
+      if (!cell || typeof cell.v !== 'string') continue;
+      const lenke = parseMarkdownLink(cell.v);
+      if (lenke) {
+        cell.v = lenke.displayText;
+        cell.l = { Target: lenke.url, Tooltip: lenke.displayText };
+      }
+    }
+  }
+
   XLSX.utils.book_append_sheet(wb, ws, 'Data');
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
