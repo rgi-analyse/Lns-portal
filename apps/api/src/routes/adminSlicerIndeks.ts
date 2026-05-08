@@ -6,7 +6,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, requireBruker, requireAdmin } from '../middleware/auth';
 import { utførDax } from '../services/pbiQueryService';
 import { indekserSlicer } from '../services/slicerIndekseringService';
@@ -30,7 +30,9 @@ interface OppdaterBody {
   er_aktiv?:         boolean;
 }
 
-const PRE = [resolveTenant, resolveBruker, requireBruker, requireAdmin];
+// resolveTenantAdmin hopper IKKE over /api/admin/* slik resolveTenant gjør,
+// så tenantSlug og tenantPrisma blir satt på request.
+const PRE = [resolveTenantAdmin, resolveBruker, requireBruker, requireAdmin];
 
 /** Bygg DAX ut fra type + tabell + kolonner. Felles for opprett og oppdater. */
 function byggDax(
@@ -99,6 +101,63 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
         if (aT !== bT) return bT - aT;
         return (a.rapport_navn ?? '').localeCompare(b.rapport_navn ?? '');
       }));
+    },
+  );
+
+  // ── 10. GET /api/admin/slicer-indeks/forslag ─────────────────────────
+  // VIKTIG: må deklareres før /:id slik at "forslag" ikke matches som id.
+  // Pragmatisk versjon: backend kan ikke enumerere ikke-indekserte slicere
+  // uten frontend-discovery (PBI report-layout er ikke tilgjengelig via SP).
+  fastify.get(
+    '/api/admin/slicer-indeks/forslag',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const tenant = (request as TenantRequest).tenantSlug;
+      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
+
+      const ettDøgnSiden = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const trenger = await prisma.slicerIndeksering.findMany({
+        where: {
+          tenant, er_aktiv: true,
+          OR: [
+            { sist_indeksert: null },
+            { sist_indeksert: { lt: ettDøgnSiden } },
+          ],
+        },
+        orderBy: [{ sist_indeksert: 'asc' }],
+      });
+
+      const aktiveRapporter = await (request as TenantRequest).tenantPrisma.rapport.findMany({
+        where:  { erAktiv: true },
+        select: { id: true, navn: true, område: true },
+      });
+      const konfigPerRapport = await prisma.slicerIndeksering.groupBy({
+        by:     ['rapport_id'],
+        where:  { tenant, er_aktiv: true },
+        _count: true,
+      });
+      const harKonfig = new Set(konfigPerRapport.map((c) => c.rapport_id));
+      const utenKonfig = aktiveRapporter
+        .filter((r) => !harKonfig.has(r.id))
+        .map((r) => ({ id: r.id, navn: r.navn, område: r.område }));
+
+      const navnPerId = new Map(aktiveRapporter.map((r) => [r.id, r.navn]));
+
+      return reply.send({
+        merknad:
+          'Backend kan ikke automatisk oppdage ikke-indekserte slicere uten frontend-discovery. ' +
+          'UI bør supplementere med PowerBIReport.loadAll for å oppdage nye kandidater per rapport.',
+        trenger_reindeksering: trenger.map((k) => ({
+          konfig_id:         k.id,
+          rapport_id:        k.rapport_id,
+          rapport_navn:      navnPerId.get(k.rapport_id) ?? null,
+          slicer_tittel:     k.slicer_tittel,
+          slicer_type:       k.slicer_type,
+          sist_indeksert:    k.sist_indeksert,
+          sist_antall_rader: k.sist_antall_rader,
+        })),
+        rapporter_uten_konfig: utenKonfig,
+      });
     },
   );
 
@@ -379,70 +438,6 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
         verdi_kolonne:      k.verdi_kolonne,
         forelder_kolonne:   k.forelder_kolonne,
       })));
-    },
-  );
-
-  // ── 10. GET /api/admin/slicer-indeks/forslag ─────────────────────────
-  // Pragmatisk versjon: backend kan ikke enumerere ikke-indekserte slicere
-  // uten frontend-discovery (PBI report-layout er ikke tilgjengelig via SP).
-  // Endepunktet leverer i stedet to lister UI kan bruke som forslag-kilde:
-  //   1. trenger_reindeksering — konfig-er eldre enn 24 timer
-  //   2. rapporter_uten_konfig — rapporter med 0 aktive konfig-er
-  // UI utvider dette med discovered slicers fra PowerBIReport.loadAll når
-  // admin åpner en rapport.
-  fastify.get(
-    '/api/admin/slicer-indeks/forslag',
-    { preHandler: PRE },
-    async (request, reply) => {
-      const tenant = (request as TenantRequest).tenantSlug;
-      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
-
-      // 1. Konfig-er som trenger reindeksering (eldre enn 24t eller aldri kjørt)
-      const ettDøgnSiden = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const trenger = await prisma.slicerIndeksering.findMany({
-        where: {
-          tenant, er_aktiv: true,
-          OR: [
-            { sist_indeksert: null },
-            { sist_indeksert: { lt: ettDøgnSiden } },
-          ],
-        },
-        orderBy: [{ sist_indeksert: 'asc' }],
-      });
-
-      // 2. Rapporter uten konfig
-      const aktiveRapporter = await (request as TenantRequest).tenantPrisma.rapport.findMany({
-        where:  { erAktiv: true },
-        select: { id: true, navn: true, område: true },
-      });
-      const konfigPerRapport = await prisma.slicerIndeksering.groupBy({
-        by:     ['rapport_id'],
-        where:  { tenant, er_aktiv: true },
-        _count: true,
-      });
-      const harKonfig = new Set(konfigPerRapport.map((c) => c.rapport_id));
-      const utenKonfig = aktiveRapporter
-        .filter((r) => !harKonfig.has(r.id))
-        .map((r) => ({ id: r.id, navn: r.navn, område: r.område }));
-
-      // Slå opp rapport-navn for trenger-reindeksering
-      const navnPerId = new Map(aktiveRapporter.map((r) => [r.id, r.navn]));
-
-      return reply.send({
-        merknad:
-          'Backend kan ikke automatisk oppdage ikke-indekserte slicere uten frontend-discovery. ' +
-          'UI bør supplementere med PowerBIReport.loadAll for å oppdage nye kandidater per rapport.',
-        trenger_reindeksering: trenger.map((k) => ({
-          konfig_id:         k.id,
-          rapport_id:        k.rapport_id,
-          rapport_navn:      navnPerId.get(k.rapport_id) ?? null,
-          slicer_tittel:     k.slicer_tittel,
-          slicer_type:       k.slicer_type,
-          sist_indeksert:    k.sist_indeksert,
-          sist_antall_rader: k.sist_antall_rader,
-        })),
-        rapporter_uten_konfig: utenKonfig,
-      });
     },
   );
 
