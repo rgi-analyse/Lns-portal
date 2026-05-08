@@ -639,10 +639,14 @@ export default function AIChat({
     const key = `${viewNavn}::${forslag.teknisk_navn}`;
     setKpiLagretStatus(prev => ({ ...prev, [key]: 'lagrer' }));
     try {
-      const res = await fetch(`${API}/api/kpi/lagre`, {
+      // Samme auth-mønster som /api/chat-kallet lenger nede: apiFetch
+      // legger på x-tenant-id, vi setter X-Entra-Object-Id manuelt.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
+      const res = await apiFetch('/api/kpi/lagre', {
         method:      'POST',
         credentials: 'include',
-        headers:     { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           view_navn:    viewNavn,
           navn:         forslag.teknisk_navn,
