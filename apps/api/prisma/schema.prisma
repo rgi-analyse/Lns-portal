@@ -242,8 +242,15 @@ model SlicerIndeksering {
   forelder_kolonne  String?   @db.NVarChar(200)
   verdi_kolonne     String    @db.NVarChar(200)
   er_aktiv          Boolean   @default(true)
+  /// Tidsstempel for siste vellykkede indeksering (null hvis aldri).
   sist_indeksert    DateTime?
+  /// Antall rader fra siste vellykkede indeksering.
   sist_antall_rader Int?
+  /// Tidsstempel for SISTE forsøk (oppdateres uansett utfall — skiller fra
+  /// sist_indeksert som kun trigger ved suksess).
+  sist_kjort        DateTime?
+  /// Feilmelding fra siste forsøk hvis det feilet. Null betyr ok.
+  sist_feil         String?   @db.NVarChar(Max)
   opprettet         DateTime  @default(now())
   oppdatert         DateTime  @updatedAt
 

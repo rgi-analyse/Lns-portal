@@ -50,6 +50,8 @@ import { userEventRoutes } from './routes/userEvents';
 import { lisensRoutes } from './routes/lisens';
 import { analyseRoutes } from './routes/analyse';
 import { slicerKatalogRoutes } from './routes/slicerKatalog';
+import { adminSlicerIndeksRoutes } from './routes/adminSlicerIndeks';
+import { startScheduler } from './services/slicerIndekseringScheduler';
 
 // Azure App Service håndterer TLS ved sin reverse-proxy – appen kjører alltid plain HTTP.
 const server = Fastify({
@@ -127,10 +129,24 @@ async function start() {
   await server.register(lisensRoutes);
   await server.register(analyseRoutes);
   await server.register(slicerKatalogRoutes);
+  await server.register(adminSlicerIndeksRoutes);
+
+  // Start scheduler etter at alt annet er klart, men før server.listen returnerer.
+  // Skal ikke blokkere oppstart — funksjonen er fail-soft.
+  startScheduler();
 
   try {
     await server.listen({ port: PORT, host: HOST });
     console.log(`API kjører på https://localhost:${PORT}`);
+    if (process.env.NODE_ENV !== 'production') {
+      // Logg admin-rutene ved oppstart for diagnostikk
+      const linjer = server.printRoutes({ commonPrefix: false }).split('\n')
+        .filter((l) => l.includes('/api/admin/'));
+      if (linjer.length > 0) {
+        console.log('\n[routes] /api/admin/*:');
+        linjer.forEach((l) => console.log(`  ${l.trim()}`));
+      }
+    }
   } catch (err) {
     server.log.error(err);
     process.exit(1);
