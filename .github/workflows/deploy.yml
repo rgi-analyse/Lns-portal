@@ -148,8 +148,9 @@ jobs:
           cp -r apps/worker/dist "$DEPLOY_DIR/dist"
           cp apps/worker/package.json "$DEPLOY_DIR/package.json"
           cp apps/worker/host.json "$DEPLOY_DIR/host.json"
-          # Kopier node_modules fra ROT (workspaces hoister hit)
-          cp -r node_modules "$DEPLOY_DIR/node_modules"
+          # Installer kun runtime-deps direkte i deploy-pakken (ikke fra monorepo)
+          cd "$DEPLOY_DIR"
+          npm install --production --no-package-lock
 
       - name: Verifiser deploy-pakke
         shell: bash
