@@ -7,6 +7,7 @@ import {
   erIndeksert as slicerErIndeksert,
   velgFraTreff as slicerVelgFraTreff,
 } from './slicerKatalogService';
+import { validerKpiUttrykk } from './kpiValidator';
 
 console.log('[OpenAI] Konfigurasjon:', {
   endpoint:   process.env.AZURE_OPENAI_ENDPOINT,
@@ -1494,33 +1495,37 @@ export async function chat(
                     error: `KPI "${visningsnavn_}" finnes allerede (id: ${String(eksisterende[0]['id'])}). Ingen ny KPI ble opprettet.`,
                   };
                 } else {
-                  try {
-                    const rows = await queryAzureSQL(`
-                      INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
-                      OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
-                             INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
-                      VALUES (
-                        '${viewId}', '${safeNavn}', '${safeVns}',
-                        '${safeSql}', '${safeFmt}',
-                        ${safeBesk ? `'${safeBesk}'` : 'NULL'}
-                      )
-                    `, 1);
-                    // Logg for admin-oversikt (ikke kritisk — tabellen kan mangle)
-                    queryAzureSQL(`
-                      INSERT INTO ai_kpi_foresporsler (view_id, navn, bruker_id, status)
-                      VALUES ('${viewId}', '${safeNavn}', '${(context?.entraObjectId ?? 'ukjent').replace(/'/g, "''")}', 'opprettet')
-                    `).catch(() => {});
-                    result = {
-                      success: true,
-                      kpi: rows[0],
-                      melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
-                    };
-                  } catch (insertErr) {
-                    const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+                  // Validér uttrykket statisk + prøvekjør mot viewet før INSERT
+                  const validering = await validerKpiUttrykk(sql_uttrykk_, safeSchema, safeView);
+                  if (!validering.ok) {
                     result = {
                       success: false,
-                      error: `KPI-insert feilet: ${insertMsg}. Ingen KPI ble opprettet.`,
+                      error: `KPI ble ikke opprettet: ${validering.feilmelding}`,
                     };
+                  } else {
+                    try {
+                      const rows = await queryAzureSQL(`
+                        INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
+                        OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
+                               INSERTED.sql_uttrykk, INSERTED.format, INSERTED.beskrivelse
+                        VALUES (
+                          '${viewId}', '${safeNavn}', '${safeVns}',
+                          '${safeSql}', '${safeFmt}',
+                          ${safeBesk ? `'${safeBesk}'` : 'NULL'}
+                        )
+                      `, 1);
+                      result = {
+                        success: true,
+                        kpi: rows[0],
+                        melding: `KPI "${visningsnavn_}" er opprettet for ${safeSchema}.${safeView}. Administrator kan justere SQL-uttrykket i metadata-admin.`,
+                      };
+                    } catch (insertErr) {
+                      const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+                      result = {
+                        success: false,
+                        error: `KPI-insert feilet: ${insertMsg}. Ingen KPI ble opprettet.`,
+                      };
+                    }
                   }
                 }
               }

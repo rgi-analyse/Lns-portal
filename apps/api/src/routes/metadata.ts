@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
 import { syncViewColumns, syncAllViews, discoverNewViews } from '../services/metadataSync';
 import { requireBruker, requireAdmin } from '../middleware/auth';
+import { validerKpiUttrykk } from '../services/kpiValidator';
 
 const esc = (val: string): string => val.replace(/'/g, "''").replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -465,6 +466,23 @@ export async function metadataRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: 'navn, visningsnavn og sql_uttrykk er påkrevd' });
       }
 
+      // Slå opp viewet for å kunne prøvekjøre KPI-uttrykket
+      const viewRader = await queryAzureSQL(
+        `SELECT TOP 1 schema_name, view_name FROM ai_metadata_views WHERE id = '${esc(id)}'`,
+        1,
+      );
+      if (viewRader.length === 0) {
+        return reply.status(404).send({ error: 'View ikke funnet.' });
+      }
+      const validering = await validerKpiUttrykk(
+        sql_uttrykk,
+        String(viewRader[0]['schema_name'] ?? ''),
+        String(viewRader[0]['view_name'] ?? ''),
+      );
+      if (!validering.ok) {
+        return reply.status(400).send({ error: validering.feilmelding ?? 'Ugyldig SQL-uttrykk.' });
+      }
+
       const rows = await queryAzureSQL(`
         INSERT INTO ai_metadata_kpi (view_id, navn, visningsnavn, sql_uttrykk, format, beskrivelse)
         OUTPUT INSERTED.id, INSERTED.view_id, INSERTED.navn, INSERTED.visningsnavn,
@@ -501,6 +519,28 @@ export async function metadataRoutes(fastify: FastifyInstance) {
 
       if (oppdateringer.length === 0) {
         return reply.status(400).send({ error: 'Ingen felt å oppdatere' });
+      }
+
+      // Validér nytt SQL-uttrykk hvis det endres
+      if (sql_uttrykk !== undefined) {
+        const viewRader = await queryAzureSQL(
+          `SELECT TOP 1 v.schema_name, v.view_name
+           FROM ai_metadata_views v
+           JOIN ai_metadata_kpi k ON k.view_id = v.id
+           WHERE k.id = '${esc(kpiId)}'`,
+          1,
+        );
+        if (viewRader.length === 0) {
+          return reply.status(404).send({ error: 'KPI ikke funnet.' });
+        }
+        const validering = await validerKpiUttrykk(
+          sql_uttrykk,
+          String(viewRader[0]['schema_name'] ?? ''),
+          String(viewRader[0]['view_name'] ?? ''),
+        );
+        if (!validering.ok) {
+          return reply.status(400).send({ error: validering.feilmelding ?? 'Ugyldig SQL-uttrykk.' });
+        }
       }
 
       const rows = await queryAzureSQL(`
