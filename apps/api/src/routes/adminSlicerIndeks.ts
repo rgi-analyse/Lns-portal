@@ -308,6 +308,141 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // Marker bruk av utførDax for fremtidige wizard-endepunkter (commit 2)
-  void utførDax;
+  // ── 7. GET /api/admin/rapporter-med-slicere ──────────────────────────
+  fastify.get(
+    '/api/admin/rapporter-med-slicere',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const tenant = (request as TenantRequest).tenantSlug;
+      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
+
+      const rapporter = await (request as TenantRequest).tenantPrisma.rapport.findMany({
+        where:   { erAktiv: true },
+        select: {
+          id: true, navn: true, område: true,
+          pbiReportId: true, pbiWorkspaceId: true, pbiDatasetId: true,
+        },
+        orderBy: { navn: 'asc' },
+      });
+
+      // Hent antall aktive konfig-er per rapport
+      const counts = await prisma.slicerIndeksering.groupBy({
+        by:    ['rapport_id'],
+        where: { tenant, er_aktiv: true },
+        _count: true,
+      });
+      const countPerId = new Map(counts.map((c) => [c.rapport_id, c._count]));
+
+      return reply.send(rapporter.map((r) => ({
+        id:                r.id,
+        navn:              r.navn,
+        område:            r.område,
+        pbiReportId:       r.pbiReportId,
+        pbiWorkspaceId:    r.pbiWorkspaceId,
+        pbiDatasetId:      r.pbiDatasetId,
+        antall_slicere:    null,    // ikke pre-analysert — frontend kan supplementere via PowerBIReport
+        antall_indekserte: countPerId.get(r.id) ?? 0,
+      })));
+    },
+  );
+
+  // ── 8. GET /api/admin/rapporter/:id/slicere ──────────────────────────
+  // Returnerer alle konfigurerte slicere for én rapport. UI henter
+  // ikke-konfigurerte slicere fra PowerBIReport.loadAll på frontend.
+  fastify.get<{ Params: { id: string } }>(
+    '/api/admin/rapporter/:id/slicere',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const tenant = (request as TenantRequest).tenantSlug;
+      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
+
+      // Bekreft at rapporten finnes i tenant-DB
+      const rapport = await (request as TenantRequest).tenantPrisma.rapport.findUnique({
+        where:  { id: request.params.id },
+        select: { id: true },
+      });
+      if (!rapport) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
+
+      const konfiger = await prisma.slicerIndeksering.findMany({
+        where:   { tenant, rapport_id: request.params.id },
+        orderBy: { slicer_tittel: 'asc' },
+      });
+
+      return reply.send(konfiger.map((k) => ({
+        tittel:             k.slicer_tittel,
+        type:               k.slicer_type,
+        konfig_id:          k.id,
+        allerede_indeksert: k.er_aktiv && !!k.sist_indeksert,
+        er_aktiv:           k.er_aktiv,
+        sist_indeksert:     k.sist_indeksert,
+        sist_antall_rader:  k.sist_antall_rader,
+        verdi_kolonne:      k.verdi_kolonne,
+        forelder_kolonne:   k.forelder_kolonne,
+      })));
+    },
+  );
+
+  // ── 9. GET /api/admin/datasets/:workspace_id/:dataset_id/tabeller ────
+  // Lister tabeller i et PBI-datasett via DAX INFO.TABLES (krever moderne
+  // PBI-tenant). Med ?tabell=<navn> hentes kolonner for én tabell via TOPN.
+  fastify.get<{
+    Params:      { workspace_id: string; dataset_id: string };
+    Querystring: { tabell?: string };
+  }>(
+    '/api/admin/datasets/:workspace_id/:dataset_id/tabeller',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const { workspace_id, dataset_id } = request.params;
+      const { tabell } = request.query;
+
+      // Modus 1: hent kolonner for spesifikk tabell
+      if (tabell) {
+        try {
+          const r = await utførDax({
+            workspaceId: workspace_id,
+            datasetId:   dataset_id,
+            dax:         `EVALUATE TOPN(1, '${tabell}')`,
+          });
+          if (r.rader.length === 0) {
+            return reply.send({ tabell, kolonner: [], antall_rader: 0 });
+          }
+          const kolonner = Object.keys(r.rader[0]).map((k) => {
+            const m = k.match(/\[([^\]]+)\]$/);
+            return { navn: m ? m[1] : k, fully_qualified: k };
+          });
+          return reply.send({ tabell, kolonner });
+        } catch (err) {
+          return reply.status(400).send({
+            error:  `Kunne ikke lese tabellen "${tabell}".`,
+            detail: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      // Modus 2: list alle tabeller (forsøk INFO.TABLES — fallback til feilmelding)
+      try {
+        const r = await utførDax({
+          workspaceId: workspace_id,
+          datasetId:   dataset_id,
+          dax: `EVALUATE
+SELECTCOLUMNS(
+  FILTER(INFO.TABLES(), [IsHidden] = FALSE),
+  "Name", [Name]
+)`,
+        });
+        const tabeller = r.rader
+          .map((rad) => (rad['[Name]'] ?? rad['Name'] ?? '') as string)
+          .filter((navn) => navn.length > 0)
+          .map((navn) => ({ navn }));
+        return reply.send({ tabeller });
+      } catch (err) {
+        return reply.status(400).send({
+          error:
+            'Kan ikke liste tabeller automatisk — datasettet støtter ikke INFO.TABLES(). ' +
+            'Oppgi tabellnavn via ?tabell=<navn> for å hente kolonner.',
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+  );
 }
