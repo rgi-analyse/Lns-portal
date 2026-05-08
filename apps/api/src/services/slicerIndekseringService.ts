@@ -28,8 +28,21 @@ export interface IndekseringResultat {
   feil?:            string;
 }
 
-/** Indekserer én slicer ut fra lagret konfig. Throw'er ved feil. */
+/**
+ * Indekserer én slicer ut fra lagret konfig. Throw'er ved feil.
+ *
+ * Uavhengig av utfall oppdateres `sist_kjort` og `sist_feil`-feltene:
+ *   - Suksess: sist_indeksert + sist_antall_rader + sist_kjort settes,
+ *              sist_feil nullstilles.
+ *   - Feil:    sist_kjort settes til forsøkstidspunktet, sist_feil settes
+ *              til feilmeldingen (trunkert til 500 tegn). Original feil
+ *              re-throw'es til kaller.
+ *
+ * Denne semantikken brukes av både manuell trigger fra UI og scheduler.
+ */
 export async function indekserSlicer(konfigId: string): Promise<IndekseringResultat> {
+  const startTidspunkt = new Date();
+
   const konfig = await prisma.slicerIndeksering.findUnique({ where: { id: konfigId } });
   if (!konfig) {
     throw new Error(`Konfig ${konfigId} ikke funnet i ai_slicer_indeksering`);
@@ -46,75 +59,95 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
 
   console.log(`[indeksering] start "${konfig.slicer_tittel}" (${konfig.slicer_type}) for rapport ${konfig.rapport_id}`);
 
-  // 1. DAX
-  const daxResultat = await utførDax({
-    workspaceId: konfig.workspace_id,
-    datasetId:   konfig.dataset_id,
-    dax:         konfig.dax_query,
-  });
+  try {
+    // 1. DAX
+    const daxResultat = await utførDax({
+      workspaceId: konfig.workspace_id,
+      datasetId:   konfig.dataset_id,
+      dax:         konfig.dax_query,
+    });
 
-  // 2. Transformer rader → SlicerVerdi[]
-  const verdier: SlicerVerdi[] = [];
-  for (const rad of daxResultat.rader) {
-    const rådVerdi = rad[konfig.verdi_kolonne];
-    if (rådVerdi === null || rådVerdi === undefined || rådVerdi === '') continue;
-    const verdi = String(rådVerdi);
+    // 2. Transformer rader → SlicerVerdi[]
+    const verdier: SlicerVerdi[] = [];
+    for (const rad of daxResultat.rader) {
+      const rådVerdi = rad[konfig.verdi_kolonne];
+      if (rådVerdi === null || rådVerdi === undefined || rådVerdi === '') continue;
+      const verdi = String(rådVerdi);
 
-    if (konfig.slicer_type === 'hierarchy' && konfig.forelder_kolonne) {
-      const rådForelder = rad[konfig.forelder_kolonne];
-      if (rådForelder === null || rådForelder === undefined || rådForelder === '') continue;
-      verdier.push({
-        tenant:         konfig.tenant,
-        rapport_id:     konfig.rapport_id,
-        slicer_tittel:  konfig.slicer_tittel,
-        slicer_type:    'hierarchy',
-        verdi,
-        forelder_verdi: String(rådForelder),
-      });
-    } else {
-      verdier.push({
-        tenant:        konfig.tenant,
-        rapport_id:    konfig.rapport_id,
-        slicer_tittel: konfig.slicer_tittel,
-        slicer_type:   'basic',
-        verdi,
-      });
+      if (konfig.slicer_type === 'hierarchy' && konfig.forelder_kolonne) {
+        const rådForelder = rad[konfig.forelder_kolonne];
+        if (rådForelder === null || rådForelder === undefined || rådForelder === '') continue;
+        verdier.push({
+          tenant:         konfig.tenant,
+          rapport_id:     konfig.rapport_id,
+          slicer_tittel:  konfig.slicer_tittel,
+          slicer_type:    'hierarchy',
+          verdi,
+          forelder_verdi: String(rådForelder),
+        });
+      } else {
+        verdier.push({
+          tenant:        konfig.tenant,
+          rapport_id:    konfig.rapport_id,
+          slicer_tittel: konfig.slicer_tittel,
+          slicer_type:   'basic',
+          verdi,
+        });
+      }
     }
+
+    console.log(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} av ${daxResultat.rader.length} rader klare for indeksering`);
+
+    // 3. Sikre indeks finnes
+    await sikreIndeksFinnes();
+
+    // 4. Indekser i batcher
+    const tIndeksStart = Date.now();
+    for (let i = 0; i < verdier.length; i += BATCH_STØRRELSE) {
+      const batch = verdier.slice(i, i + BATCH_STØRRELSE);
+      await indekserVerdier(batch);
+      const lastet = Math.min(i + BATCH_STØRRELSE, verdier.length);
+      console.log(`[indeksering] "${konfig.slicer_tittel}": ${lastet}/${verdier.length}`);
+    }
+    const indekseringsMs = Date.now() - tIndeksStart;
+
+    // 5. Oppdater konfig — suksess
+    await prisma.slicerIndeksering.update({
+      where: { id: konfigId },
+      data:  {
+        sist_indeksert:    startTidspunkt,
+        sist_kjort:        startTidspunkt,
+        sist_antall_rader: verdier.length,
+        sist_feil:         null,
+      },
+    });
+
+    console.log(`[indeksering] ferdig "${konfig.slicer_tittel}": DAX ${daxResultat.spørringMs}ms + indeks ${indekseringsMs}ms`);
+
+    return {
+      konfig_id:       konfigId,
+      slicer_tittel:   konfig.slicer_tittel,
+      antall_rader:    verdier.length,
+      spørrings_ms:    daxResultat.spørringMs,
+      indekserings_ms: indekseringsMs,
+    };
+  } catch (err) {
+    // Lagre feilstatus så scheduler/UI kan vise den. Best-effort —
+    // hvis selve DB-skrivingen feiler, log og kast originalfeilen videre.
+    const melding = err instanceof Error ? err.message : String(err);
+    try {
+      await prisma.slicerIndeksering.update({
+        where: { id: konfigId },
+        data: {
+          sist_kjort: startTidspunkt,
+          sist_feil:  melding.slice(0, 500),
+        },
+      });
+    } catch (lagreFeil) {
+      console.error(`[indeksering] kunne ikke lagre feilstatus for ${konfigId}:`, lagreFeil);
+    }
+    throw err;
   }
-
-  console.log(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} av ${daxResultat.rader.length} rader klare for indeksering`);
-
-  // 3. Sikre indeks finnes
-  await sikreIndeksFinnes();
-
-  // 4. Indekser i batcher
-  const tIndeksStart = Date.now();
-  for (let i = 0; i < verdier.length; i += BATCH_STØRRELSE) {
-    const batch = verdier.slice(i, i + BATCH_STØRRELSE);
-    await indekserVerdier(batch);
-    const lastet = Math.min(i + BATCH_STØRRELSE, verdier.length);
-    console.log(`[indeksering] "${konfig.slicer_tittel}": ${lastet}/${verdier.length}`);
-  }
-  const indekseringsMs = Date.now() - tIndeksStart;
-
-  // 5. Oppdater konfig
-  await prisma.slicerIndeksering.update({
-    where: { id: konfigId },
-    data:  {
-      sist_indeksert:    new Date(),
-      sist_antall_rader: verdier.length,
-    },
-  });
-
-  console.log(`[indeksering] ferdig "${konfig.slicer_tittel}": DAX ${daxResultat.spørringMs}ms + indeks ${indekseringsMs}ms`);
-
-  return {
-    konfig_id:       konfigId,
-    slicer_tittel:   konfig.slicer_tittel,
-    antall_rader:    verdier.length,
-    spørrings_ms:    daxResultat.spørringMs,
-    indekserings_ms: indekseringsMs,
-  };
 }
 
 /** Indekserer alle aktive slicere for én rapport. Hver feiler isolert. */

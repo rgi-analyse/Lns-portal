@@ -92,7 +92,9 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
         slicer_tittel:     k.slicer_tittel,
         slicer_type:       k.slicer_type,
         sist_indeksert:    k.sist_indeksert,
+        sist_kjort:        k.sist_kjort,
         sist_antall_rader: k.sist_antall_rader,
+        sist_feil:         k.sist_feil,
         er_aktiv:          k.er_aktiv,
       })).sort((a, b) => {
         // sist_indeksert DESC (null sist), så rapport_navn ASC
