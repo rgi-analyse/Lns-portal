@@ -1289,8 +1289,10 @@ export async function chat(
               history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
               continue;
             }
-            // Ekstraher viewnavn fra SQL for metadata-oppslag
-            const viewMatch = sqlQuery.match(/\bFROM\s+(ai_gold\.\w+)/i);
+            // Ekstraher viewnavn fra SQL for metadata-oppslag.
+            // \p{L}\p{N} (med /u) tillater æøå i view-navn — ASCII-only \w trunkerer
+            // f.eks. "vw_Fact_Leverandørstatistikk" til "vw_Fact_Leverand".
+            const viewMatch = sqlQuery.match(/\bFROM\s+(ai_gold\.[\p{L}\p{N}_]+)/iu);
             const viewNavn  = viewMatch?.[1] ?? null;
 
             // Hent ALLE kolonner fra viewet via INFORMATION_SCHEMA + LEFT JOIN metadata for kolonne_type

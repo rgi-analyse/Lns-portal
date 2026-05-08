@@ -211,7 +211,9 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
       // Forventer format ai_gold.vw_Navn
       const parts = viewNavn.split('.');
       if (parts.length !== 2) return reply.status(400).send({ error: 'Ugyldig viewNavn, forventet schema.view_name' });
-      const [schema, view] = parts.map(p => p.replace(/[^a-zA-Z0-9_]/g, ''));
+      // \p{L}\p{N} (med /u) bevarer æøå i view-navn — ASCII-only stripper trunkerer
+      // f.eks. "vw_Fact_Leverandørstatistikk" til "vw_Fact_Leverandrstatistikk".
+      const [schema, view] = parts.map(p => p.replace(/[^\p{L}\p{N}_]/gu, ''));
       try {
         // Prøv metadata-katalog først
         const metaRader = await queryAzureSQL(`
