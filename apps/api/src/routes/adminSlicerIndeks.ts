@@ -10,6 +10,7 @@ import { resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, requireBruker, requireAdmin } from '../middleware/auth';
 import { utførDax } from '../services/pbiQueryService';
 import { indekserSlicer } from '../services/slicerIndekseringService';
+import { hentSchedulerStatus } from '../services/slicerIndekseringScheduler';
 import { slettAlleForSlicer } from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
 
@@ -103,6 +104,18 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
         if (aT !== bT) return bT - aT;
         return (a.rapport_navn ?? '').localeCompare(b.rapport_navn ?? '');
       }));
+    },
+  );
+
+  // ── 11. GET /api/admin/slicer-indeks/scheduler-status ────────────────
+  // Må deklareres før /:id-route slik at "scheduler-status" ikke matches som id.
+  fastify.get(
+    '/api/admin/slicer-indeks/scheduler-status',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const tenant = (request as TenantRequest).tenantSlug;
+      if (!tenant) return reply.status(400).send({ error: 'Mangler tenant.' });
+      return reply.send(hentSchedulerStatus());
     },
   );
 
