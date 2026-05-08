@@ -18,6 +18,7 @@ export interface SearchQuery {
   searchText:    string;
   filter?:       string;
   top?:          number;
+  skip?:         number;
   select?:       string[];
   searchFields?: string[];
   searchMode?:   'any' | 'all';
@@ -123,6 +124,7 @@ export class SearchService {
     const respons = await klient.search(query.searchText, {
       filter:       query.filter,
       top:          query.top,
+      skip:         query.skip,
       // SDK forventer SearchFieldArray<T> men vi er agnostiske — cast til never[]
       select:       query.select as never,
       searchFields: query.searchFields as never,

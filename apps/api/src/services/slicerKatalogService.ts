@@ -109,6 +109,57 @@ function escapeOData(s: string): string {
 
 // ── Public API ─────────────────────────────────────────────────────────
 
+/**
+ * Slett alle dokumenter i synapse-slicer-katalog som matcher tenant + rapport_id +
+ * slicer_tittel. Brukes ved DELETE av en konfig slik at indeksen ikke står igjen
+ * med foreldreløse rader. Pagination brukes for å håndtere store slicere
+ * (Leverandør har 4 409 dokumenter).
+ *
+ * Returnerer antall slettede dokumenter.
+ */
+export async function slettAlleForSlicer(
+  tenant:       string,
+  rapportId:    string,
+  slicerTittel: string,
+): Promise<number> {
+  const service = getSearchService();
+  const finnes  = await service.finnesIndeks(SLICER_INDEKS_NAVN);
+  if (!finnes) return 0;
+
+  const filter =
+    `tenant eq '${escapeOData(tenant)}' and ` +
+    `rapport_id eq '${escapeOData(rapportId)}' and ` +
+    `slicer_tittel eq '${escapeOData(slicerTittel)}'`;
+
+  const ider: string[] = [];
+  let skip = 0;
+  const sideStørrelse = 1000;
+  while (true) {
+    const respons = await service.søk<{ id: string }>(SLICER_INDEKS_NAVN, {
+      searchText: '*',
+      filter,
+      top:    sideStørrelse,
+      skip,
+      select: ['id'],
+    });
+    if (respons.treff.length === 0) break;
+    ider.push(...respons.treff.map((t) => t.document.id));
+    if (respons.treff.length < sideStørrelse) break;
+    skip += sideStørrelse;
+    // Azure Search støtter maks 100 000 i skip — utenfor scope for slicer-størrelser
+  }
+
+  if (ider.length === 0) return 0;
+
+  // Slett i batcher for å holde oss under request-grense
+  const batch = 1000;
+  for (let i = 0; i < ider.length; i += batch) {
+    await service.slettDokumenter(SLICER_INDEKS_NAVN, 'id', ider.slice(i, i + batch));
+  }
+  console.log(`[slicerKatalog] slettet ${ider.length} dokument(er) for tenant=${tenant} rapport=${rapportId} slicer="${slicerTittel}"`);
+  return ider.length;
+}
+
 /** Idempotent: oppretter indeksen hvis den ikke finnes. */
 export async function sikreIndeksFinnes(): Promise<void> {
   const service = getSearchService();
