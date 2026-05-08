@@ -2333,8 +2333,55 @@ export default function RapportInteraktivPage() {
     for (const k of [...tilgjengeligeKolonner, ...dataCols]) {
       if (!merged.includes(k)) merged.push(k);
     }
-    return merged;
-  }, [aktivData, tilgjengeligeKolonner, viewKolonner]);
+    // Dedup: AI's create_report-alias ("Antall") og KPI-en ("antall") er samme
+    // måling. KPI-en vinner — den har sql_uttrykk og format-metadata, og
+    // landerer i sin egen optgroup. Uten dedup vises målingen to ganger:
+    // én gang under KPI-er og én gang under "Andre".
+    const kpiNavnLower = new Set(
+      Object.keys(kolonnTyper)
+        .filter(k => kolonnTyper[k] === 'kpi')
+        .map(k => k.toLowerCase()),
+    );
+    return merged.filter(c =>
+      kolonnTyper[c] === 'kpi' || !kpiNavnLower.has(c.toLowerCase()),
+    );
+  }, [aktivData, tilgjengeligeKolonner, viewKolonner, kolonnTyper]);
+
+  // Visningsnavn for kolonner i dropdowns: KPI-er bruker visningsnavn fra
+  // metadata, andre kolonner bruker kolonne_navn som-er.
+  const labelFor = useCallback(
+    (navn: string) => kpiVisningsnavn[navn] ?? navn,
+    [kpiVisningsnavn],
+  );
+
+  // Normaliser akse-valg etter at KPI-er er hydrert: AI-aliaset "Antall"
+  // erstattes av KPI-nøkkelen "antall" siden alleCols-dedup fjerner
+  // AI-aliaset. Uten dette ville select-elementet ha value="Antall" mens
+  // ingen option har value="Antall" — visuelt feil markert valg.
+  useEffect(() => {
+    const cfg = configRef.current;
+    if (!cfg) return;
+    const kpiNavn = Object.keys(kolonnTyper).filter(k => kolonnTyper[k] === 'kpi');
+    if (kpiNavn.length === 0) return;
+    const tilKpiNøkkel = (val: string | null | undefined): string | null => {
+      if (!val) return null;
+      const match = kpiNavn.find(k => k.toLowerCase() === val.toLowerCase());
+      return match && match !== val ? match : null;
+    };
+    const yNy   = tilKpiNøkkel(cfg.yAkse);
+    const xNy   = tilKpiNøkkel(cfg.xAkse);
+    const grpNy = tilKpiNøkkel(cfg.grupperPaa);
+    const sorNy = tilKpiNøkkel(cfg.sorterPaa);
+    if (yNy || xNy || grpNy || sorNy) {
+      setConfig(prev => prev ? {
+        ...prev,
+        yAkse:      yNy   ?? prev.yAkse,
+        xAkse:      xNy   ?? prev.xAkse,
+        grupperPaa: grpNy ?? prev.grupperPaa,
+        sorterPaa:  sorNy ?? prev.sorterPaa,
+      } : prev);
+    }
+  }, [kolonnTyper]);
 
   // Kolonner gruppert etter type (for optgroup-dropdowns)
   const kolGroups = useMemo(() => {
@@ -2780,7 +2827,7 @@ export default function RapportInteraktivPage() {
                   style={{ background:'transparent', border:'none', color:'var(--text-primary)', fontSize:12, cursor:'pointer', outline:'none', maxWidth:130 }}>
                   {tilgjengeligeKolonner
                     .filter(k => k !== (forslag.prosjektKolonne ?? ''))
-                    .map(k => <option key={k} value={k}>{k}</option>)}
+                    .map(k => <option key={k} value={k}>{labelFor(k)}</option>)}
                 </select>
                 <select value={filter.operator}
                   onChange={e => oppdaterFilterOperator(idx, e.target.value)}
@@ -3118,15 +3165,15 @@ export default function RapportInteraktivPage() {
                   }} style={selectStyle}>
                     {harTyper ? (
                       <>
-                        {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
+                        {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
                       </>
                     ) : (
-                      alleCols.map(c=><option key={c} value={c}>{c}</option>)
+                      alleCols.map(c=><option key={c} value={c}>{labelFor(c)}</option>)
                     )}
                   </select>
                 </div>
@@ -3151,15 +3198,15 @@ export default function RapportInteraktivPage() {
                   }} style={selectStyle}>
                     {harTyper ? (
                       <>
-                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
-                        {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
+                        {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}</optgroup>}
                       </>
                     ) : (
-                      alleCols.map(c=><option key={c} value={c}>{c}</option>)
+                      alleCols.map(c=><option key={c} value={c}>{labelFor(c)}</option>)
                     )}
                   </select>
                 </div>
@@ -3417,7 +3464,7 @@ export default function RapportInteraktivPage() {
                   <label style={labelStyle}>Grupper på (valgfritt)</label>
                   <select value={config.grupperPaa??''} onChange={e=>setConfig(p=>p?{...p,grupperPaa:e.target.value||null}:p)} style={selectStyle}>
                     <option value="">Ingen gruppering</option>
-                    {alleCols.map(c=><option key={c} value={c}>{c}</option>)}
+                    {alleCols.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}
                   </select>
                 </div>
               )}
@@ -3441,7 +3488,7 @@ export default function RapportInteraktivPage() {
                               );
                             }}/>
                           <span style={{ fontSize:11, fontWeight:700, fontFamily:'monospace', color:typeColor, width:14, textAlign:'center', flexShrink:0 }}>{typeIkon}</span>
-                          <span>{kol}</span>
+                          <span>{labelFor(kol)}</span>
                         </label>
                       );
                     })}
@@ -3460,7 +3507,7 @@ export default function RapportInteraktivPage() {
                 <label style={labelStyle}>Sorter etter</label>
                 <select value={config.sorterPaa??''} onChange={e=>setConfig(p=>p?{...p,sorterPaa:e.target.value||null}:p)} style={{...selectStyle, marginBottom:6}}>
                   <option value="">Ingen sortering</option>
-                  {alleCols.map(c=><option key={c} value={c}>{c}</option>)}
+                  {alleCols.map(c=><option key={c} value={c}>{labelFor(c)}</option>)}
                 </select>
                 <select value={config.sorterRetning} onChange={e=>setConfig(p=>p?{...p,sorterRetning:e.target.value}:p)} style={selectStyle}>
                   <option value="DESC">Høyest først</option>
