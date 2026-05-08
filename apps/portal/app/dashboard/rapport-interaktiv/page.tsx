@@ -2294,6 +2294,7 @@ export default function RapportInteraktivPage() {
 
   // Kolonner gruppert etter type (for optgroup-dropdowns)
   const kolGroups = useMemo(() => {
+    const kpi:         string[] = [];
     const measures:    string[] = [];
     const dimensjoner: string[] = [];
     const datoer:      string[] = [];
@@ -2301,13 +2302,14 @@ export default function RapportInteraktivPage() {
     const ukjente:     string[] = [];
     for (const col of alleCols) {
       const t = kolonnTyper[col];
-      if (t === 'measure')   measures.push(col);
+      if (t === 'kpi')       kpi.push(col);
+      else if (t === 'measure')   measures.push(col);
       else if (t === 'dato') datoer.push(col);
       else if (t === 'id')   ider.push(col);
       else if (t === 'dimensjon') dimensjoner.push(col);
       else ukjente.push(col);
     }
-    return { measures, dimensjoner, datoer, ider, ukjente };
+    return { kpi, measures, dimensjoner, datoer, ider, ukjente };
   }, [alleCols, kolonnTyper]);
 
   const harTyper = Object.keys(kolonnTyper).length > 0;
@@ -3069,6 +3071,7 @@ export default function RapportInteraktivPage() {
                         {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.ider.length>0         && <optgroup label="ID">{kolGroups.ider.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.ukjente.length>0     && <optgroup label="Andre">{kolGroups.ukjente.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                       </>
                     ) : (
@@ -3087,8 +3090,9 @@ export default function RapportInteraktivPage() {
                     const type = kolonnTyper[col];
                     setConfig(p => {
                       if (!p) return p;
-                      // Auto-switch til COUNT om valgt kolonne er dimensjon/dato/id
-                      const foreslåttAgg = (type === 'measure' || !type) ? p.aggregering : (p.aggregering === 'SUM' || p.aggregering === 'AVG' || p.aggregering === 'MEDIAN' ? 'COUNT' : p.aggregering);
+                      // Auto-switch til COUNT om valgt kolonne er dimensjon/dato/id.
+                      // KPI-er bringer egen aggregering — ingen overstyring.
+                      const foreslåttAgg = (type === 'measure' || type === 'kpi' || !type) ? p.aggregering : (p.aggregering === 'SUM' || p.aggregering === 'AVG' || p.aggregering === 'MEDIAN' ? 'COUNT' : p.aggregering);
                       // Hvis sortering pekte på gammelt yAkse, flytt den til nytt yAkse
                       const nySorterPaa = p.sorterPaa === p.yAkse ? col : p.sorterPaa;
                       return { ...p, yAkse: col, aggregering: foreslåttAgg, sorterPaa: nySorterPaa };
@@ -3096,6 +3100,7 @@ export default function RapportInteraktivPage() {
                   }} style={selectStyle}>
                     {harTyper ? (
                       <>
+                        {kolGroups.kpi.length>0         && <optgroup label="KPI-er">{kolGroups.kpi.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.measures.length>0    && <optgroup label="Mål">{kolGroups.measures.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.dimensjoner.length>0 && <optgroup label="Dimensjoner">{kolGroups.dimensjoner.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
                         {kolGroups.datoer.length>0      && <optgroup label="Dato">{kolGroups.datoer.map(c=><option key={c} value={c}>{c}</option>)}</optgroup>}
