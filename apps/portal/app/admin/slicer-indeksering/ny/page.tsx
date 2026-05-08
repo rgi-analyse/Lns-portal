@@ -116,55 +116,79 @@ function RapportVelger({
       <button
         type="button"
         onClick={() => setÅpen((v) => !v)}
-        className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-left hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full flex items-center justify-between rounded-md px-3 py-2 text-sm text-left transition-colors"
+        style={{
+          background: 'var(--glass-bg)',
+          border: '1px solid var(--glass-bg-hover)',
+          color: 'var(--text-primary)',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--glass-gold-border)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--glass-bg-hover)'; }}
       >
-        <span className={valgt ? 'text-gray-900' : 'text-gray-400'}>
+        <span style={{ color: valgt ? 'var(--text-primary)' : 'var(--text-muted)' }}>
           {valgt ? `${valgt.navn}${valgt.område ? ` — ${valgt.område}` : ''}` : 'Velg rapport…'}
         </span>
-        <ChevronDown className="w-4 h-4 text-gray-400" />
+        <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
       </button>
 
       {åpen && (
         <div
-          className="absolute top-full left-0 right-0 mt-1 z-30 rounded-lg shadow-xl bg-white border border-gray-200 overflow-hidden"
-          style={{ maxHeight: 380 }}
+          className="absolute top-full left-0 right-0 mt-1 z-30 rounded-lg overflow-hidden shadow-xl"
+          style={{
+            maxHeight: 380,
+            background: 'rgba(10,22,40,0.96)',
+            backdropFilter: 'blur(30px)',
+            WebkitBackdropFilter: 'blur(30px)',
+            border: '1px solid var(--glass-bg-hover)',
+          }}
         >
-          <div className="p-2 border-b border-gray-200 space-y-2">
+          <div className="p-2 space-y-2" style={{ borderBottom: '1px solid var(--glass-bg-hover)' }}>
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
               <input
                 autoFocus
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder={`Søk i ${rapporter.length} rapporter…`}
-                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-200 focus:outline-none focus:border-amber-400"
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md focus:outline-none transition-colors"
+                style={{
+                  background: 'var(--glass-bg)',
+                  border: '1px solid var(--glass-bg-hover)',
+                  color: 'var(--text-primary)',
+                }}
+                onFocus={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--glass-gold-border)'; }}
+                onBlur={(e) => { (e.currentTarget as HTMLInputElement).style.borderColor = 'var(--glass-bg-hover)'; }}
               />
             </div>
-            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
               <input
                 type="checkbox"
                 checked={kunUtenIndeks}
                 onChange={(e) => setKunUtenIndeks(e.target.checked)}
                 className="rounded"
+                style={{ accentColor: 'var(--gold)' }}
               />
               Vis kun rapporter uten indeksering
             </label>
           </div>
           <ul className="overflow-y-auto" style={{ maxHeight: 290 }}>
             {filtrert.length === 0 ? (
-              <li className="px-3 py-4 text-sm text-gray-400 text-center">Ingen treff</li>
+              <li className="px-3 py-4 text-sm text-center" style={{ color: 'var(--text-muted)' }}>Ingen treff</li>
             ) : filtrert.map((r) => (
               <li key={r.id}>
                 <button
                   type="button"
                   onClick={() => { onVelg(r); setÅpen(false); setFilter(''); }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 flex items-center justify-between gap-3"
+                  className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-3 transition-colors"
+                  style={{ background: 'transparent' }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-gold-bg)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium text-gray-900 truncate">{r.navn}</div>
-                    {r.område && <div className="text-xs text-gray-500 truncate">{r.område}</div>}
+                    <div className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{r.navn}</div>
+                    {r.område && <div className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{r.område}</div>}
                   </div>
-                  <div className="text-xs text-gray-500 whitespace-nowrap shrink-0">
+                  <div className="text-xs whitespace-nowrap shrink-0" style={{ color: 'var(--text-muted)' }}>
                     {r.antall_indekserte > 0 ? `${r.antall_indekserte} indeksert` : 'ingen indeksering'}
                   </div>
                 </button>
