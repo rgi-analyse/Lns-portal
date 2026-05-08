@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMsal } from '@azure/msal-react';
 import {
-  ArrowLeft, Database, Loader2, Pencil, Play, Power, RefreshCw, Trash2,
+  AlertCircle, ArrowLeft, Database, Loader2, Pencil, Play, Power, RefreshCw, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -225,6 +225,8 @@ export default function SlicerKonfigDetaljPage() {
             </Badge>
             {!konfig.er_aktiv ? (
               <Badge variant="secondary" className="bg-gray-100 text-gray-600">deaktivert</Badge>
+            ) : konfig.sist_feil ? (
+              <Badge className="bg-red-100 text-red-700 border border-red-200">feilet</Badge>
             ) : trenger ? (
               <Badge className="bg-amber-100 text-amber-700 border border-amber-200">trenger reindeks</Badge>
             ) : (
@@ -249,6 +251,36 @@ export default function SlicerKonfigDetaljPage() {
           </Button>
         </div>
       </div>
+
+      {/* Feil-alert (over stat-kortene hvis siste forsøk feilet) */}
+      {konfig.sist_feil && (
+        <div
+          className="rounded-xl p-4 mb-4 flex items-start gap-3"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.30)',
+          }}
+        >
+          <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'rgba(252,165,165,0.95)' }} />
+          <div className="flex-1 text-sm min-w-0" style={{ color: 'var(--text-primary)' }}>
+            <p className="font-medium" style={{ color: 'rgba(252,165,165,0.95)' }}>
+              Siste indeksering feilet
+            </p>
+            <p className="mt-1 text-xs whitespace-pre-wrap break-words" style={{ color: 'var(--text-secondary)' }}>
+              {konfig.sist_feil}
+            </p>
+            <Button
+              size="sm" variant="outline" className="mt-3"
+              onClick={håndterIndekser}
+              disabled={!konfig.er_aktiv || arbeider !== null}
+            >
+              {arbeider === 'indekser'
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> Forsøker…</>
+                : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Forsøk på nytt</>}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Stat-kort */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">

@@ -19,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
-import { adminApi, formaterAlder, type SlicerKonfigKort, type ForslagRespons } from './_lib';
+import { adminApi, formaterAlder, type SlicerKonfigKort, type ForslagRespons, type SchedulerStatus } from './_lib';
 
 // ── Stat-kort ──────────────────────────────────────────────────────────
 
@@ -91,6 +91,7 @@ export default function SlicerIndekseringPage() {
 
   const [konfiger, setKonfiger]   = useState<SlicerKonfigKort[] | null>(null);
   const [forslag, setForslag]     = useState<ForslagRespons | null>(null);
+  const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
   const [error, setError]         = useState<string | null>(null);
   const [meny, setMeny]           = useState<RadMeny | null>(null);
   const [slettId, setSlettId]     = useState<string | null>(null);
@@ -100,12 +101,14 @@ export default function SlicerIndekseringPage() {
     if (!entraObjectId) return;
     setError(null);
     try {
-      const [k, f] = await Promise.all([
+      const [k, f, s] = await Promise.all([
         adminApi.list(entraObjectId),
         adminApi.forslag(entraObjectId).catch(() => null),
+        adminApi.schedulerStatus(entraObjectId).catch(() => null),
       ]);
       setKonfiger(k);
       setForslag(f);
+      setScheduler(s);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ukjent feil');
     }
@@ -242,6 +245,33 @@ export default function SlicerIndekseringPage() {
         />
       </div>
 
+      {/* Feilet-konfig-banner (rød — øverst hvis det er feil) */}
+      {konfiger && konfiger.some((k) => k.er_aktiv && k.sist_feil) && (
+        <div
+          className="rounded-xl p-4 mb-6 flex items-start gap-3"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.30)',
+          }}
+        >
+          <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" style={{ color: 'rgba(252,165,165,0.95)' }} />
+          <div className="flex-1 text-sm" style={{ color: 'var(--text-primary)' }}>
+            <strong>{konfiger.filter((k) => k.er_aktiv && k.sist_feil).length} konfigurasjon(er)</strong> feilet ved siste indeksering.
+            <span style={{ color: 'var(--text-muted)' }}> Klikk en rad for å se feilmelding og prøve på nytt.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduler-status (subtil — under feil-banneret) */}
+      {scheduler && scheduler.aktiv && scheduler.neste_kjoring && (
+        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+          ⏱ Auto-indeksering aktiv — neste kjøring {new Date(scheduler.neste_kjoring).toLocaleString('nb-NO', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          })}
+        </p>
+      )}
+
       {/* Forslags-banner */}
       {forslag && forslag.rapporter_uten_konfig.length > 0 && (
         <div
@@ -347,6 +377,10 @@ export default function SlicerIndekseringPage() {
                     <TableCell>
                       {!k.er_aktiv ? (
                         <Badge variant="secondary" className="bg-gray-100 text-gray-600">deaktivert</Badge>
+                      ) : k.sist_feil ? (
+                        <span title={k.sist_feil}>
+                          <Badge className="bg-red-100 text-red-700 border border-red-200">feilet</Badge>
+                        </span>
                       ) : trenger ? (
                         <Badge className="bg-amber-100 text-amber-700 border border-amber-200">trenger reindeks</Badge>
                       ) : (

@@ -14,7 +14,9 @@ export interface SlicerKonfigKort {
   slicer_tittel:     string;
   slicer_type:       'basic' | 'hierarchy';
   sist_indeksert:    string | null;
+  sist_kjort:        string | null;
   sist_antall_rader: number | null;
+  sist_feil:         string | null;
   er_aktiv:          boolean;
 }
 
@@ -24,6 +26,7 @@ export interface SlicerKonfigDetalj extends SlicerKonfigKort {
   dax_query:        string;
   forelder_kolonne: string | null;
   verdi_kolonne:    string;
+  // tenant-feltet kommer fra serveren via {...k} men brukes ikke av UI
   opprettet:        string;
   oppdatert:        string;
 }
@@ -43,6 +46,14 @@ export interface ForslagRespons {
   merknad:               string;
   trenger_reindeksering: SlicerKonfigKort[];
   rapporter_uten_konfig: Array<{ id: string; navn: string; område: string | null }>;
+}
+
+export interface SchedulerStatus {
+  aktiv:          boolean;
+  cron_uttrykk:   string | null;
+  tidssone:       string;
+  neste_kjoring:  string | null;
+  sist_kjoring:   string | null;
 }
 
 export interface IndekseringResultat {
@@ -129,6 +140,10 @@ export const adminApi = {
   forslag: (entraObjectId: string) =>
     apiFetch('/api/admin/slicer-indeks/forslag', { headers: authHeaders(entraObjectId) })
       .then(håndter<ForslagRespons>),
+
+  schedulerStatus: (entraObjectId: string) =>
+    apiFetch('/api/admin/slicer-indeks/scheduler-status', { headers: authHeaders(entraObjectId) })
+      .then(håndter<SchedulerStatus>),
 
   hentKolonner: (entraObjectId: string, workspaceId: string, datasetId: string, tabell: string) =>
     apiFetch(
