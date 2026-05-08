@@ -119,3 +119,47 @@ jobs:
           app-name: lns-dataportal-portal
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_PORTAL }}
           package: /tmp/portal-deploy
+
+  deploy-worker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer dependencies (fra rot, monorepo workspaces)
+        run: npm install
+
+      - name: Bygg Worker
+        run: npm run build --workspace=apps/worker
+
+      - name: Lag deploy-pakke
+        run: |
+          rm -rf /tmp/worker-deploy
+          mkdir -p /tmp/worker-deploy
+          # Kopier kompilert kode
+          cp -r apps/worker/dist /tmp/worker-deploy/dist
+          cp apps/worker/package.json /tmp/worker-deploy/package.json
+          cp apps/worker/host.json /tmp/worker-deploy/host.json
+          # Kopier node_modules fra ROT (workspaces hoister hit)
+          cp -r node_modules /tmp/worker-deploy/node_modules
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Rot-innhold ===" && ls /tmp/worker-deploy/
+          echo "=== dist finnes ===" && test -d /tmp/worker-deploy/dist && echo "JA" || echo "NEI"
+          echo "=== dist/index.js finnes ===" && test -f /tmp/worker-deploy/dist/index.js && echo "JA" || echo "NEI"
+          echo "=== host.json finnes ===" && test -f /tmp/worker-deploy/host.json && echo "JA" || echo "NEI"
+          echo "=== node_modules/@azure/functions finnes ===" && test -d /tmp/worker-deploy/node_modules/@azure/functions && echo "JA" || echo "NEI"
+          echo "=== Total størrelse ===" && du -sh /tmp/worker-deploy/
+
+      - name: Deploy Worker til Azure
+        uses: Azure/functions-action@v1
+        with:
+          app-name: lns-dataportal-worker
+          package: /tmp/worker-deploy
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_WORKER }}
