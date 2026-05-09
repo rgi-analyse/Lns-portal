@@ -1,3 +1,17 @@
+# Status: Pauset
+
+Denne mappen inneholder skjelettet for en Azure Function-basert worker.
+Vi har midlertidig flyttet polling-logikken til apps/api via node-cron
+fordi Function App-deploy hadde betydelig friksjon.
+
+Koden her tjener som referanse. Hvis vi senere vil flytte tilbake til
+Azure Functions (f.eks. ved skalering eller ressursseparasjon), kan
+denne strukturen brukes igjen.
+
+Faktisk worker-logikk: apps/api/src/workers/analyseWorker.ts
+
+---
+
 # @synapse/worker
 
 Azure Functions worker for analyse-modulen.
