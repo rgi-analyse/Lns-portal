@@ -57,6 +57,25 @@ export async function kjørOrchestrator(): Promise<void> {
   const nyttForsøk = bestilling.forsokAntall + 1;
   console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.KJORER} (forsøk ${nyttForsøk})`);
 
-  // TODO Steg B3: faktisk prosessering + marker som FERDIG/FEILET.
-  // Inntil videre henger bestillingen i KJORER.
+  // SIMULER ARBEID — placeholder, erstattes med ekte logikk i Steg C-F
+  console.log(`[Orchestrator] Simulerer prosessering for ${bestilling.id}...`);
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Marker som FERDIG med placeholder-resultat. Trygt å bruke update (ikke
+  // updateMany): vi har allerede vunnet optimistic lock ovenfor.
+  await prisma.analyseBestilling.update({
+    where: { id: bestilling.id },
+    data: {
+      status:       STATUS.FERDIG,
+      ferdigDato:   new Date(),
+      tittel:       `Test-rapport for ${bestilling.analyseTypeId}`,
+      sammendrag:   'Placeholder-sammendrag — ekte AI-generert innhold kommer i Steg D.',
+      dokumentUrl:  'https://placeholder.example.com/test.docx',
+      dokumentNavn: 'test-rapport.docx',
+      tokenForbruk: 0,
+      modellBrukt:  'placeholder',
+    },
+  });
+
+  console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (placeholder)`);
 }
