@@ -53,6 +53,7 @@ import { analyseRoutes } from './routes/analyse';
 import { slicerKatalogRoutes } from './routes/slicerKatalog';
 import { adminSlicerIndeksRoutes } from './routes/adminSlicerIndeks';
 import { startScheduler } from './services/slicerIndekseringScheduler';
+import { startAnalyseWorker } from './workers/analyseWorker';
 
 // Azure App Service håndterer TLS ved sin reverse-proxy – appen kjører alltid plain HTTP.
 const server = Fastify({
@@ -136,6 +137,14 @@ async function start() {
   // Start scheduler etter at alt annet er klart, men før server.listen returnerer.
   // Skal ikke blokkere oppstart — funksjonen er fail-soft.
   startScheduler();
+
+  const analyseWorkerEnabled =
+    process.env.NODE_ENV !== 'test' &&
+    process.env.SCHEDULER_ENABLED !== 'false';
+
+  if (analyseWorkerEnabled) {
+    startAnalyseWorker();
+  }
 
   try {
     await server.listen({ port: PORT, host: HOST });
