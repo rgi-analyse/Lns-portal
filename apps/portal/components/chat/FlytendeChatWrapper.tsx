@@ -21,11 +21,6 @@ const MARG = 24;
 const KOMPAKT_GRENSE = 1024;
 const STORAGE_KEY_V1 = 'chat-widget-bounds-v1';  // gammel, slettes etter migration
 const STORAGE_KEY = 'chat-widget-bounds-v2';
-// Hysterese: senter må krysse midten med minst denne bufferen for å bytte
-// hjørne. Hindrer at marginale flyttinger snapper widget mellom hjørner.
-const SNAP_BUFFER_PX = 100;
-
-type SnapCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 interface LagredeBounds {
   width: number;
@@ -137,35 +132,6 @@ function lagreBounds(b: LagredeBounds) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(b));
   } catch {
     /* ignorer kvote-feil */
-  }
-}
-
-function nærmesteHjørne(
-  x: number, y: number, w: number, h: number,
-  vw: number, vh: number,
-  eksisterende: SnapCorner,
-  buffer: number = SNAP_BUFFER_PX,
-): SnapCorner {
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  // Hvis senter er innen buffer av midten på en akse, behold eksisterende
-  // valg på den aksen — krever at brukeren drar tydelig over for å bytte.
-  const eksTop  = eksisterende === 'top-left'  || eksisterende === 'top-right';
-  const eksLeft = eksisterende === 'top-left'  || eksisterende === 'bottom-left';
-  const top  = Math.abs(cy - vh / 2) < buffer ? eksTop  : cy < vh / 2;
-  const left = Math.abs(cx - vw / 2) < buffer ? eksLeft : cx < vw / 2;
-  if (top && left) return 'top-left';
-  if (top)         return 'top-right';
-  if (left)        return 'bottom-left';
-  return 'bottom-right';
-}
-
-function hjørneTilPosisjon(corner: SnapCorner, vw: number, vh: number, w: number, h: number) {
-  switch (corner) {
-    case 'top-left':     return { x: MARG, y: MARG };
-    case 'top-right':    return { x: Math.max(MARG, vw - w - MARG), y: MARG };
-    case 'bottom-left':  return { x: MARG, y: Math.max(MARG, vh - h - MARG) };
-    case 'bottom-right': return { x: Math.max(MARG, vw - w - MARG), y: Math.max(MARG, vh - h - MARG) };
   }
 }
 
