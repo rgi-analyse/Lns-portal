@@ -13,7 +13,7 @@ import { useLisens } from '@/components/LisensProvider';
 import { harBetaTilgang } from '@/lib/featureFlags';
 
 const PowerBIReport = dynamic(() => import('@/components/PowerBIReport'), { ssr: false });
-const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
+const FlytendeChatWrapper = dynamic(() => import('@/components/chat/FlytendeChatWrapper'), { ssr: false });
 
 interface WorkspaceKontekst {
   id:              string;
@@ -173,7 +173,7 @@ export default function RapportPage() {
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
       {lisens.chatAktivert && brukerChatAktivert === true && (
-        <AIChat
+        <FlytendeChatWrapper
           entraObjectId={entraObjectId}
           grupper={grupper}
           rapportId={rapport.id}
