@@ -117,6 +117,20 @@ function lastBounds(): LagredeBounds {
   return defaultBoundsForViewport(window.innerWidth, window.innerHeight);
 }
 
+/**
+ * Klamper x/y slik at minst min(w, 100) px av bredden og min(h, 50) px av
+ * høyden alltid er innenfor viewport. Hindrer at widget havner utilgjengelig
+ * off-screen ved skjerm-resize, eller hvis lagret pos er ugyldig.
+ */
+function validerPosisjon(x: number, y: number, w: number, h: number, vw: number, vh: number) {
+  const maxX = vw - Math.min(w, 100);
+  const maxY = vh - Math.min(h, 50);
+  return {
+    x: Math.max(0, Math.min(x, maxX)),
+    y: Math.max(0, Math.min(y, maxY)),
+  };
+}
+
 function lagreBounds(b: LagredeBounds) {
   if (typeof window === 'undefined') return;
   try {
@@ -190,6 +204,17 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     setHydrert(true);
     setMontert(true);
   }, []);
+
+  // Klamp posisjon hvis viewport endrer seg slik at widget ville havnet
+  // off-screen. Kjøres også første render etter hydration.
+  useEffect(() => {
+    if (!hydrert) return;
+    setBounds((b) => {
+      const v = validerPosisjon(b.x, b.y, b.width, b.height, viewport.w, viewport.h);
+      if (v.x === b.x && v.y === b.y) return b;
+      return { ...b, x: v.x, y: v.y };
+    });
+  }, [viewport.w, viewport.h, hydrert]);
 
   // Persister hver gang bounds endrer seg (etter mount)
   useEffect(() => {
