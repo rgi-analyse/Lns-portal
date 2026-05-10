@@ -18,12 +18,73 @@ const MIN_BREDDE = 320;
 const MIN_HØYDE = 400;
 const MARG = 24;
 const KOMPAKT_GRENSE = 1024;
+const STORAGE_KEY = 'chat-widget-bounds-v1';
 
-function defaultPosition(viewportW: number, viewportH: number, w: number, h: number) {
-  return {
-    x: Math.max(MARG, viewportW - w - MARG),
-    y: Math.max(MARG, viewportH - h - MARG),
-  };
+type SnapCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+interface LagredeBounds {
+  width: number;
+  height: number;
+  snapCorner: SnapCorner;
+  erKollapset: boolean;
+}
+
+const DEFAULT_BOUNDS: LagredeBounds = {
+  width:       DEFAULT_BREDDE,
+  height:      DEFAULT_HØYDE,
+  snapCorner:  'bottom-right',
+  erKollapset: false,
+};
+
+function lastBounds(): LagredeBounds {
+  if (typeof window === 'undefined') return DEFAULT_BOUNDS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_BOUNDS;
+    const d = JSON.parse(raw) as Partial<LagredeBounds>;
+    const validCorner = (c: unknown): c is SnapCorner =>
+      c === 'top-left' || c === 'top-right' || c === 'bottom-left' || c === 'bottom-right';
+    if (
+      typeof d.width === 'number' && d.width >= MIN_BREDDE &&
+      typeof d.height === 'number' && d.height >= MIN_HØYDE &&
+      validCorner(d.snapCorner) &&
+      typeof d.erKollapset === 'boolean'
+    ) {
+      return { width: d.width, height: d.height, snapCorner: d.snapCorner, erKollapset: d.erKollapset };
+    }
+  } catch {
+    /* ignorer korrupt storage */
+  }
+  return DEFAULT_BOUNDS;
+}
+
+function lagreBounds(b: LagredeBounds) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(b));
+  } catch {
+    /* ignorer kvote-feil */
+  }
+}
+
+function nærmesteHjørne(x: number, y: number, w: number, h: number, vw: number, vh: number): SnapCorner {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const top = cy < vh / 2;
+  const left = cx < vw / 2;
+  if (top && left) return 'top-left';
+  if (top) return 'top-right';
+  if (left) return 'bottom-left';
+  return 'bottom-right';
+}
+
+function hjørneTilPosisjon(corner: SnapCorner, vw: number, vh: number, w: number, h: number) {
+  switch (corner) {
+    case 'top-left':     return { x: MARG, y: MARG };
+    case 'top-right':    return { x: Math.max(MARG, vw - w - MARG), y: MARG };
+    case 'bottom-left':  return { x: MARG, y: Math.max(MARG, vh - h - MARG) };
+    case 'bottom-right': return { x: Math.max(MARG, vw - w - MARG), y: Math.max(MARG, vh - h - MARG) };
+  }
 }
 
 function useViewport() {
@@ -42,12 +103,27 @@ function useViewport() {
 
 export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   const viewport = useViewport();
-  const [kollapset, setKollapset] = useState(false);
-  const [bredde, setBredde] = useState(DEFAULT_BREDDE);
-  const [høyde, setHøyde] = useState(DEFAULT_HØYDE);
-  const [position, setPosition] = useState(() =>
-    defaultPosition(viewport.w, viewport.h, DEFAULT_BREDDE, DEFAULT_HØYDE),
-  );
+
+  // Init med default for å unngå hydration-mismatch — last fra localStorage
+  // etter mount.
+  const [bounds, setBounds] = useState<LagredeBounds>(DEFAULT_BOUNDS);
+  const [hydrert, setHydrert] = useState(false);
+  const { width: bredde, height: høyde, snapCorner, erKollapset: kollapset } = bounds;
+
+  const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
+
+  useEffect(() => {
+    setBounds(lastBounds());
+    setHydrert(true);
+  }, []);
+
+  // Persister hver gang bounds endrer seg (etter mount)
+  useEffect(() => {
+    if (hydrert) lagreBounds(bounds);
+  }, [bounds, hydrert]);
+
+  // Posisjon utledes fra hjørne + viewport — robust mot skjerm-endring
+  const position = hjørneTilPosisjon(snapCorner, viewport.w, viewport.h, bredde, høyde);
 
   const erKompakt = viewport.w < KOMPAKT_GRENSE;
 
@@ -173,11 +249,15 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
       minWidth={MIN_BREDDE}
       minHeight={MIN_HØYDE}
       dragHandleClassName={DRAG_HANDLE_CLASS}
-      onDragStop={(_e, d) => setPosition({ x: d.x, y: d.y })}
+      onDragStop={(_e, d) => {
+        const nyttHjørne = nærmesteHjørne(d.x, d.y, bredde, høyde, viewport.w, viewport.h);
+        setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
+      }}
       onResizeStop={(_e, _dir, ref, _delta, pos) => {
-        setBredde(ref.offsetWidth);
-        setHøyde(ref.offsetHeight);
-        setPosition(pos);
+        const nyB = ref.offsetWidth;
+        const nyH = ref.offsetHeight;
+        const nyttHjørne = nærmesteHjørne(pos.x, pos.y, nyB, nyH, viewport.w, viewport.h);
+        setBounds((b) => ({ ...b, width: nyB, height: nyH, snapCorner: nyttHjørne }));
       }}
       style={{
         background: 'rgba(12,20,38,0.98)',
