@@ -18,7 +18,8 @@ const MIN_BREDDE = 320;
 const MIN_HØYDE = 400;
 const MARG = 24;
 const KOMPAKT_GRENSE = 1024;
-const STORAGE_KEY = 'chat-widget-bounds-v1';
+const STORAGE_KEY_V1 = 'chat-widget-bounds-v1';  // gammel, slettes etter migration
+const STORAGE_KEY = 'chat-widget-bounds-v2';
 // Hysterese: senter må krysse midten med minst denne bufferen for å bytte
 // hjørne. Hindrer at marginale flyttinger snapper widget mellom hjørner.
 const SNAP_BUFFER_PX = 100;
@@ -28,37 +29,91 @@ type SnapCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 interface LagredeBounds {
   width: number;
   height: number;
-  snapCorner: SnapCorner;
+  x: number;
+  y: number;
   erKollapset: boolean;
 }
 
-const DEFAULT_BOUNDS: LagredeBounds = {
+// Konstant default for SSR (klient overskriver i useEffect basert på faktisk
+// viewport). x/y er valgt så den ligner den klassiske bottom-right-plasseringen
+// på en typisk desktop.
+const SSR_DEFAULT_BOUNDS: LagredeBounds = {
   width:       DEFAULT_BREDDE,
   height:      DEFAULT_HØYDE,
-  snapCorner:  'bottom-right',
+  x:           1920 - DEFAULT_BREDDE - MARG,
+  y:           1080 - DEFAULT_HØYDE - MARG,
   erKollapset: false,
 };
 
+function defaultBoundsForViewport(vw: number, vh: number): LagredeBounds {
+  return {
+    width:       DEFAULT_BREDDE,
+    height:      DEFAULT_HØYDE,
+    x:           Math.max(MARG, vw - DEFAULT_BREDDE - MARG),
+    y:           Math.max(MARG, vh - DEFAULT_HØYDE - MARG),
+    erKollapset: false,
+  };
+}
+
+function migrerV1TilV2(): LagredeBounds | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(STORAGE_KEY_V1);
+  if (!raw) return null;
+  try {
+    const v1 = JSON.parse(raw) as { width?: unknown; height?: unknown; snapCorner?: unknown; erKollapset?: unknown };
+    if (
+      typeof v1.width !== 'number' || v1.width < MIN_BREDDE ||
+      typeof v1.height !== 'number' || v1.height < MIN_HØYDE ||
+      typeof v1.erKollapset !== 'boolean'
+    ) return null;
+    const w = v1.width;
+    const h = v1.height;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let x = Math.max(MARG, vw - w - MARG);
+    let y = Math.max(MARG, vh - h - MARG);
+    switch (v1.snapCorner) {
+      case 'top-left':     x = MARG;                          y = MARG;                          break;
+      case 'top-right':    x = Math.max(MARG, vw - w - MARG); y = MARG;                          break;
+      case 'bottom-left':  x = MARG;                          y = Math.max(MARG, vh - h - MARG); break;
+      case 'bottom-right': x = Math.max(MARG, vw - w - MARG); y = Math.max(MARG, vh - h - MARG); break;
+      default: /* ukjent corner — bruk default */ break;
+    }
+    return { width: w, height: h, x, y, erKollapset: v1.erKollapset };
+  } catch {
+    return null;
+  }
+}
+
 function lastBounds(): LagredeBounds {
-  if (typeof window === 'undefined') return DEFAULT_BOUNDS;
+  if (typeof window === 'undefined') return SSR_DEFAULT_BOUNDS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_BOUNDS;
-    const d = JSON.parse(raw) as Partial<LagredeBounds>;
-    const validCorner = (c: unknown): c is SnapCorner =>
-      c === 'top-left' || c === 'top-right' || c === 'bottom-left' || c === 'bottom-right';
-    if (
-      typeof d.width === 'number' && d.width >= MIN_BREDDE &&
-      typeof d.height === 'number' && d.height >= MIN_HØYDE &&
-      validCorner(d.snapCorner) &&
-      typeof d.erKollapset === 'boolean'
-    ) {
-      return { width: d.width, height: d.height, snapCorner: d.snapCorner, erKollapset: d.erKollapset };
+    if (raw) {
+      const d = JSON.parse(raw) as Partial<LagredeBounds>;
+      if (
+        typeof d.width === 'number'  && d.width  >= MIN_BREDDE &&
+        typeof d.height === 'number' && d.height >= MIN_HØYDE  &&
+        typeof d.x === 'number'      &&
+        typeof d.y === 'number'      &&
+        typeof d.erKollapset === 'boolean'
+      ) {
+        return { width: d.width, height: d.height, x: d.x, y: d.y, erKollapset: d.erKollapset };
+      }
     }
   } catch {
-    /* ignorer korrupt storage */
+    /* ignorer korrupt v2-storage — fall gjennom til v1-migration */
   }
-  return DEFAULT_BOUNDS;
+  // v2 manglet eller var ugyldig — prøv migration fra v1
+  const migrert = migrerV1TilV2();
+  if (migrert) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrert));
+      localStorage.removeItem(STORAGE_KEY_V1);
+    } catch { /* ignorer */ }
+    return migrert;
+  }
+  return defaultBoundsForViewport(window.innerWidth, window.innerHeight);
 }
 
 function lagreBounds(b: LagredeBounds) {
@@ -116,24 +171,16 @@ function useViewport() {
 export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   const viewport = useViewport();
 
-  // Init med default for å unngå hydration-mismatch — last fra localStorage
-  // etter mount.
-  const [bounds, setBounds] = useState<LagredeBounds>(DEFAULT_BOUNDS);
+  // Init med SSR-default — last faktisk lagret bounds (med v1-migration) i
+  // useEffect for å unngå hydration-mismatch.
+  const [bounds, setBounds] = useState<LagredeBounds>(SSR_DEFAULT_BOUNDS);
   const [hydrert, setHydrert] = useState(false);
   // Aktiv drag/resize — vis overlay over PowerBI-iframe så mouse-events
   // ikke spises av iframen.
   const [drar, setDrar] = useState(false);
-  const { width: bredde, height: høyde, snapCorner, erKollapset: kollapset } = bounds;
+  const { width: bredde, height: høyde, x: posX, y: posY, erKollapset: kollapset } = bounds;
 
   const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
-
-  // Posisjon er egen state (ikke computed). Settes eksplisitt ved drop/
-  // resize/viewport-endring. Forced update med ny objektref ved hver onDrag-
-  // Stop sikrer at react-rnd respekterer ny kontrollert posisjon selv om
-  // hjørnet ikke endres (uten dette: widget snapper tilbake til drag-start).
-  const [position, setPosition] = useState(() =>
-    hjørneTilPosisjon(DEFAULT_BOUNDS.snapCorner, 1920, 1080, DEFAULT_BREDDE, DEFAULT_HØYDE),
-  );
 
   useEffect(() => {
     setBounds(lastBounds());
@@ -144,12 +191,6 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   useEffect(() => {
     if (hydrert) lagreBounds(bounds);
   }, [bounds, hydrert]);
-
-  // Re-snap position hvis viewport, dimensjoner eller hjørne endres
-  // (hydration, browser-resize, eller corner-bytte).
-  useEffect(() => {
-    setPosition(hjørneTilPosisjon(snapCorner, viewport.w, viewport.h, bredde, høyde));
-  }, [snapCorner, viewport.w, viewport.h, bredde, høyde]);
 
   const erKompakt = viewport.w < KOMPAKT_GRENSE;
 
@@ -336,7 +377,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
       )}
       <Rnd
         size={{ width: bredde, height: høyde }}
-        position={position}
+        position={{ x: posX, y: posY }}
         bounds="window"
         minWidth={MIN_BREDDE}
         minHeight={MIN_HØYDE}
@@ -345,25 +386,18 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         onResizeStart={() => setDrar(true)}
         onDragStop={(_e, d) => {
           setDrar(false);
-          const nyttHjørne = nærmesteHjørne(
-            d.x, d.y, bredde, høyde, viewport.w, viewport.h, snapCorner,
-          );
-          // Force update — gir alltid ny objektreferanse så Rnd snapper til
-          // hjørnet, selv om x/y er identiske med før drag.
-          setPosition(hjørneTilPosisjon(nyttHjørne, viewport.w, viewport.h, bredde, høyde));
-          if (nyttHjørne !== snapCorner) {
-            setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
-          }
+          // Fri plassering — lagre eksakt drop-posisjon, ingen snap.
+          setBounds((b) => ({ ...b, x: d.x, y: d.y }));
         }}
         onResizeStop={(_e, _dir, ref, _delta, pos) => {
           setDrar(false);
-          const nyB = ref.offsetWidth;
-          const nyH = ref.offsetHeight;
-          const nyttHjørne = nærmesteHjørne(
-            pos.x, pos.y, nyB, nyH, viewport.w, viewport.h, snapCorner,
-          );
-          setPosition(hjørneTilPosisjon(nyttHjørne, viewport.w, viewport.h, nyB, nyH));
-          setBounds((b) => ({ ...b, width: nyB, height: nyH, snapCorner: nyttHjørne }));
+          setBounds((b) => ({
+            ...b,
+            width:  ref.offsetWidth,
+            height: ref.offsetHeight,
+            x:      pos.x,
+            y:      pos.y,
+          }));
         }}
         style={{
           background: 'rgba(12,20,38,0.98)',
