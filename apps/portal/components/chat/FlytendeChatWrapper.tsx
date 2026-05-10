@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
-import { MessageCircle, Minus } from 'lucide-react';
+import { MessageCircle, MessagesSquare, Minus } from 'lucide-react';
 import type AIChatComponent from '@/components/AIChat';
 
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
@@ -153,6 +153,14 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   const erKompakt = viewport.w < KOMPAKT_GRENSE;
 
+  // Eksponer historikk-toggle i wrapper-header når brukeren har samtale-
+  // historikk aktivert. AIChat sin egen toggle ligger i AIChat-header som
+  // er skjult via hideHeader, så uten denne ville bruker miste tilgangen.
+  const harHistorikk = !!props.harSamtalehistorikk;
+  const sidebarSynlig = !!props.sidebarSynlig;
+  const onToggleSidebar = props.onToggleSidebar;
+  const visHistorikkKnapp = harHistorikk && !!onToggleSidebar;
+
   // Sirkel-knapp når kollapset
   if (kollapset) {
     return (
@@ -227,25 +235,55 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
           AI-assistent
         </span>
       </div>
-      <button
-        onClick={() => setKollapset(true)}
-        title="Minimer"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--text-muted, rgba(255,255,255,0.4))',
-          padding: '4px 8px',
-          borderRadius: 5,
-          display: 'flex',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
-      >
-        <Minus size={15} />
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        {visHistorikkKnapp && (
+          <button
+            onClick={() => onToggleSidebar?.(!sidebarSynlig)}
+            title={sidebarSynlig ? 'Skjul samtaler' : 'Vis samtaler'}
+            style={{
+              background: sidebarSynlig
+                ? 'rgba(245,166,35,0.15)'
+                : 'rgba(255,255,255,0.06)',
+              border: sidebarSynlig
+                ? '1px solid rgba(245,166,35,0.4)'
+                : '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 5,
+              color: sidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
+              cursor: 'pointer',
+              padding: '4px 7px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.15s ease',
+              // Sikrer at klikket lander på knappen, ikke en evt. drag-
+              // handle eller resize-håndtak som ligger over.
+              position: 'relative',
+              zIndex: 10,
+            }}
+          >
+            <MessagesSquare size={13} />
+          </button>
+        )}
+        <button
+          onClick={() => setKollapset(true)}
+          title="Minimer"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--text-muted, rgba(255,255,255,0.4))',
+            padding: '4px 8px',
+            borderRadius: 5,
+            display: 'flex',
+            alignItems: 'center',
+            position: 'relative',
+            zIndex: 10,
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
+        >
+          <Minus size={15} />
+        </button>
+      </div>
     </div>
   );
 
