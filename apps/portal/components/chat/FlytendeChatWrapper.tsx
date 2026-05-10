@@ -19,6 +19,9 @@ const MIN_HØYDE = 400;
 const MARG = 24;
 const KOMPAKT_GRENSE = 1024;
 const STORAGE_KEY = 'chat-widget-bounds-v1';
+// Hysterese: senter må krysse midten med minst denne bufferen for å bytte
+// hjørne. Hindrer at marginale flyttinger snapper widget mellom hjørner.
+const SNAP_BUFFER_PX = 100;
 
 type SnapCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
@@ -67,14 +70,23 @@ function lagreBounds(b: LagredeBounds) {
   }
 }
 
-function nærmesteHjørne(x: number, y: number, w: number, h: number, vw: number, vh: number): SnapCorner {
+function nærmesteHjørne(
+  x: number, y: number, w: number, h: number,
+  vw: number, vh: number,
+  eksisterende: SnapCorner,
+  buffer: number = SNAP_BUFFER_PX,
+): SnapCorner {
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const top = cy < vh / 2;
-  const left = cx < vw / 2;
+  // Hvis senter er innen buffer av midten på en akse, behold eksisterende
+  // valg på den aksen — krever at brukeren drar tydelig over for å bytte.
+  const eksTop  = eksisterende === 'top-left'  || eksisterende === 'top-right';
+  const eksLeft = eksisterende === 'top-left'  || eksisterende === 'bottom-left';
+  const top  = Math.abs(cy - vh / 2) < buffer ? eksTop  : cy < vh / 2;
+  const left = Math.abs(cx - vw / 2) < buffer ? eksLeft : cx < vw / 2;
   if (top && left) return 'top-left';
-  if (top) return 'top-right';
-  if (left) return 'bottom-left';
+  if (top)         return 'top-right';
+  if (left)        return 'bottom-left';
   return 'bottom-right';
 }
 
@@ -115,6 +127,14 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
 
+  // Posisjon er egen state (ikke computed). Settes eksplisitt ved drop/
+  // resize/viewport-endring. Forced update med ny objektref ved hver onDrag-
+  // Stop sikrer at react-rnd respekterer ny kontrollert posisjon selv om
+  // hjørnet ikke endres (uten dette: widget snapper tilbake til drag-start).
+  const [position, setPosition] = useState(() =>
+    hjørneTilPosisjon(DEFAULT_BOUNDS.snapCorner, 1920, 1080, DEFAULT_BREDDE, DEFAULT_HØYDE),
+  );
+
   useEffect(() => {
     setBounds(lastBounds());
     setHydrert(true);
@@ -125,8 +145,11 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     if (hydrert) lagreBounds(bounds);
   }, [bounds, hydrert]);
 
-  // Posisjon utledes fra hjørne + viewport — robust mot skjerm-endring
-  const position = hjørneTilPosisjon(snapCorner, viewport.w, viewport.h, bredde, høyde);
+  // Re-snap position hvis viewport, dimensjoner eller hjørne endres
+  // (hydration, browser-resize, eller corner-bytte).
+  useEffect(() => {
+    setPosition(hjørneTilPosisjon(snapCorner, viewport.w, viewport.h, bredde, høyde));
+  }, [snapCorner, viewport.w, viewport.h, bredde, høyde]);
 
   const erKompakt = viewport.w < KOMPAKT_GRENSE;
 
@@ -284,14 +307,24 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         onResizeStart={() => setDrar(true)}
         onDragStop={(_e, d) => {
           setDrar(false);
-          const nyttHjørne = nærmesteHjørne(d.x, d.y, bredde, høyde, viewport.w, viewport.h);
-          setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
+          const nyttHjørne = nærmesteHjørne(
+            d.x, d.y, bredde, høyde, viewport.w, viewport.h, snapCorner,
+          );
+          // Force update — gir alltid ny objektreferanse så Rnd snapper til
+          // hjørnet, selv om x/y er identiske med før drag.
+          setPosition(hjørneTilPosisjon(nyttHjørne, viewport.w, viewport.h, bredde, høyde));
+          if (nyttHjørne !== snapCorner) {
+            setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
+          }
         }}
         onResizeStop={(_e, _dir, ref, _delta, pos) => {
           setDrar(false);
           const nyB = ref.offsetWidth;
           const nyH = ref.offsetHeight;
-          const nyttHjørne = nærmesteHjørne(pos.x, pos.y, nyB, nyH, viewport.w, viewport.h);
+          const nyttHjørne = nærmesteHjørne(
+            pos.x, pos.y, nyB, nyH, viewport.w, viewport.h, snapCorner,
+          );
+          setPosition(hjørneTilPosisjon(nyttHjørne, viewport.w, viewport.h, nyB, nyH));
           setBounds((b) => ({ ...b, width: nyB, height: nyH, snapCorner: nyttHjørne }));
         }}
         style={{
