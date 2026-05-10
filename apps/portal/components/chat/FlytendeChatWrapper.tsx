@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
 import { MessageCircle, MessagesSquare, Minus } from 'lucide-react';
@@ -175,6 +176,8 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   // useEffect for å unngå hydration-mismatch.
   const [bounds, setBounds] = useState<LagredeBounds>(SSR_DEFAULT_BOUNDS);
   const [hydrert, setHydrert] = useState(false);
+  // Sett til true etter mount så vi trygt kan bruke document.body i portalen.
+  const [montert, setMontert] = useState(false);
   // Aktiv drag/resize — vis overlay over PowerBI-iframe så mouse-events
   // ikke spises av iframen.
   const [drar, setDrar] = useState(false);
@@ -185,6 +188,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   useEffect(() => {
     setBounds(lastBounds());
     setHydrert(true);
+    setMontert(true);
   }, []);
 
   // Persister hver gang bounds endrer seg (etter mount)
@@ -202,9 +206,18 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   const onToggleSidebar = props.onToggleSidebar;
   const visHistorikkKnapp = harHistorikk && !!onToggleSidebar;
 
+  // Wrapper ALL rendering i React Portal til document.body. Uten dette ville
+  // widget visuelt vært klippet av container med overflow:hidden i rapport-
+  // page eller dashboard-layout, og kunne ikke plasseres over header eller
+  // sidemeny. Returnerer null før mount for å unngå SSR/hydration-issues.
+  const tilPortal = (jsx: React.ReactNode): React.ReactNode => {
+    if (!montert || typeof document === 'undefined') return null;
+    return createPortal(jsx, document.body);
+  };
+
   // Sirkel-knapp når kollapset
   if (kollapset) {
-    return (
+    return tilPortal(
       <button
         onClick={() => setKollapset(false)}
         title="Åpne AI-assistent"
@@ -228,7 +241,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         }}
       >
         <MessageCircle size={24} />
-      </button>
+      </button>,
     );
   }
 
@@ -336,7 +349,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   // Kompakt-modus (<1024px): fixed bottom-right, ingen drag/resize
   if (erKompakt) {
-    return (
+    return tilPortal(
       <div
         style={{
           position: 'fixed',
@@ -356,12 +369,12 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
       >
         {header}
         {innhold}
-      </div>
+      </div>,
     );
   }
 
   // Desktop: Rnd med drag/resize fra alle hjørner og kanter
-  return (
+  return tilPortal(
     <>
       {drar && (
         <div
@@ -413,6 +426,6 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         {header}
         {innhold}
       </Rnd>
-    </>
+    </>,
   );
 }
