@@ -162,7 +162,6 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   const header = (
     <div
-      className={erKompakt ? undefined : DRAG_HANDLE_CLASS}
       style={{
         height: 36,
         display: 'flex',
@@ -171,13 +170,25 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         padding: '0 12px',
         background: 'rgba(10,18,35,0.95)',
         borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
-        cursor: erKompakt ? 'default' : 'move',
         userSelect: 'none',
         flexShrink: 0,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <MessageCircle size={14} style={{ color: 'var(--gold, #f5a623)' }} />
+      {/* Drag-handle: kun tittel-delen — knapper får ikke denne klassen
+          så klikk på dem ikke tolkes som drag-start. */}
+      <div
+        className={erKompakt ? undefined : DRAG_HANDLE_CLASS}
+        style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        8,
+          flex:       1,
+          minWidth:   0,
+          height:     '100%',
+          cursor:     erKompakt ? 'default' : 'move',
+        }}
+      >
+        <MessageCircle size={14} style={{ color: 'var(--gold, #f5a623)', flexShrink: 0 }} />
         <span
           style={{
             fontFamily: 'Barlow Condensed, sans-serif',
@@ -185,6 +196,9 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
             fontSize: 13,
             letterSpacing: '0.04em',
             color: 'var(--text-primary, #fff)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
           AI-assistent
@@ -202,6 +216,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
           borderRadius: 5,
           display: 'flex',
           alignItems: 'center',
+          flexShrink: 0,
         }}
         onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
         onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
