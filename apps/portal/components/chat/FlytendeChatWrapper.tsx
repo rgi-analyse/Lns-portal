@@ -108,6 +108,9 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   // etter mount.
   const [bounds, setBounds] = useState<LagredeBounds>(DEFAULT_BOUNDS);
   const [hydrert, setHydrert] = useState(false);
+  // Aktiv drag/resize — vis overlay over PowerBI-iframe så mouse-events
+  // ikke spises av iframen.
+  const [drar, setDrar] = useState(false);
   const { width: bredde, height: høyde, snapCorner, erKollapset: kollapset } = bounds;
 
   const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
@@ -242,36 +245,54 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   // Desktop: Rnd med drag/resize fra alle hjørner og kanter
   return (
-    <Rnd
-      size={{ width: bredde, height: høyde }}
-      position={position}
-      bounds="window"
-      minWidth={MIN_BREDDE}
-      minHeight={MIN_HØYDE}
-      dragHandleClassName={DRAG_HANDLE_CLASS}
-      onDragStop={(_e, d) => {
-        const nyttHjørne = nærmesteHjørne(d.x, d.y, bredde, høyde, viewport.w, viewport.h);
-        setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
-      }}
-      onResizeStop={(_e, _dir, ref, _delta, pos) => {
-        const nyB = ref.offsetWidth;
-        const nyH = ref.offsetHeight;
-        const nyttHjørne = nærmesteHjørne(pos.x, pos.y, nyB, nyH, viewport.w, viewport.h);
-        setBounds((b) => ({ ...b, width: nyB, height: nyH, snapCorner: nyttHjørne }));
-      }}
-      style={{
-        background: 'rgba(12,20,38,0.98)',
-        border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
-        borderRadius: 14,
-        boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        zIndex: 9998,
-      }}
-    >
-      {header}
-      {innhold}
-    </Rnd>
+    <>
+      {drar && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9997,
+            cursor: 'move',
+            background: 'transparent',
+          }}
+        />
+      )}
+      <Rnd
+        size={{ width: bredde, height: høyde }}
+        position={position}
+        bounds="window"
+        minWidth={MIN_BREDDE}
+        minHeight={MIN_HØYDE}
+        dragHandleClassName={DRAG_HANDLE_CLASS}
+        onDragStart={() => setDrar(true)}
+        onResizeStart={() => setDrar(true)}
+        onDragStop={(_e, d) => {
+          setDrar(false);
+          const nyttHjørne = nærmesteHjørne(d.x, d.y, bredde, høyde, viewport.w, viewport.h);
+          setBounds((b) => ({ ...b, snapCorner: nyttHjørne }));
+        }}
+        onResizeStop={(_e, _dir, ref, _delta, pos) => {
+          setDrar(false);
+          const nyB = ref.offsetWidth;
+          const nyH = ref.offsetHeight;
+          const nyttHjørne = nærmesteHjørne(pos.x, pos.y, nyB, nyH, viewport.w, viewport.h);
+          setBounds((b) => ({ ...b, width: nyB, height: nyH, snapCorner: nyttHjørne }));
+        }}
+        style={{
+          background: 'rgba(12,20,38,0.98)',
+          border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
+          borderRadius: 14,
+          boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          zIndex: 9998,
+        }}
+      >
+        {header}
+        {innhold}
+      </Rnd>
+    </>
   );
 }
