@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
-import { GripHorizontal, MessageCircle, Minus } from 'lucide-react';
+import { GripHorizontal, MessageCircle } from 'lucide-react';
 import type AIChatComponent from '@/components/AIChat';
 
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
@@ -289,68 +289,41 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   }
 
   // Tynn drag-stripe over AIChats native header. AIChat selv har Samtaler-
-  // toggle, organisasjonsnavn-tittel, TTS- og innstillinger-knapper. Wrapper-
-  // stripen er kun for drag + minimer (AIChats X-knapp er gated av
-  // !standaloneMode og rendres ikke i embedded modus).
+  // toggle, organisasjonsnavn-tittel, TTS-knapper og X-knapp (sistnevnte
+  // kollapser widget via onClose-callback). Wrapper-stripen er kun drag-
+  // handle.
   const header = (
     <div
+      className={erKompakt ? undefined : DRAG_HANDLE_CLASS}
+      title={erKompakt ? undefined : 'Dra for å flytte'}
       style={{
-        height: 18,
+        height: 14,
         display: 'flex',
         alignItems: 'center',
-        padding: '0 4px 0 0',
+        justifyContent: 'center',
         background: 'rgba(10,18,35,0.95)',
         borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
         userSelect: 'none',
         flexShrink: 0,
+        cursor: erKompakt ? 'default' : 'move',
+        color: 'rgba(255,255,255,0.25)',
       }}
     >
-      <div
-        className={erKompakt ? undefined : DRAG_HANDLE_CLASS}
-        title={erKompakt ? undefined : 'Dra for å flytte'}
-        style={{
-          flex:           1,
-          height:         '100%',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          cursor:         erKompakt ? 'default' : 'move',
-          color:          'rgba(255,255,255,0.25)',
-        }}
-      >
-        <GripHorizontal size={12} />
-      </div>
-      <button
-        onClick={() => setKollapset(true)}
-        title="Minimer"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--text-muted, rgba(255,255,255,0.4))',
-          padding: '0 6px',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          position: 'relative',
-          zIndex: 10,
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
-        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
-      >
-        <Minus size={13} />
-      </button>
+      <GripHorizontal size={12} />
     </div>
   );
 
-  // AIChats native header rendres nå (hideHeader fjernet) — gir brukeren
-  // Samtaler-toggle, organisasjonsnavn-tittel, TTS- og innstillinger-knapper
-  // direkte i widget. standaloneMode forblir true for at AIChat skal embedde
-  // seg i parent-container i stedet for fixed bottom-right.
+  // AIChats native header rendres med Samtaler-toggle, organisasjonsnavn,
+  // TTS-knapper og X. standaloneMode={true} embedder AIChat i vår container.
+  // onClose kobler AIChats X-knapp til kollaps — widget krymper til sirkel-
+  // ikon, state bevares (komponenten unmounteres ikke).
   const innhold = (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-      <AIChat {...props} standaloneMode={true} />
+      <AIChat
+        {...props}
+        standaloneMode={true}
+        onClose={() => setKollapset(true)}
+      />
     </div>
   );
 
