@@ -164,10 +164,11 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   // Aktiv drag/resize — vis overlay over PowerBI-iframe så mouse-events
   // ikke spises av iframen.
   const [drar, setDrar] = useState(false);
-  // Bredde widget hadde rett før sidebar ble åpnet — brukt til å restaurere
-  // ved lukking. null betyr "sidebar er ikke åpnet av oss" (initial state
-  // eller sidebar var allerede åpen ved mount).
+  // Bredde og x widget hadde rett før sidebar ble åpnet — brukt til å
+  // restaurere ved lukking. null betyr "sidebar er ikke åpnet av oss" (initial
+  // state eller sidebar var allerede åpen ved mount).
   const [widthBeforeSidebar, setWidthBeforeSidebar] = useState<number | null>(null);
+  const [xBeforeSidebar,     setXBeforeSidebar]     = useState<number | null>(null);
   const { width: bredde, height: høyde, x: posX, y: posY, erKollapset: kollapset } = bounds;
 
   const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
@@ -215,20 +216,32 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     if (gammel === undefined || gammel === sidebarSynlig) return;
 
     if (sidebarSynlig) {
-      // Åpnet: lagre nåværende bredde, utvid med SIDEBAR_WIDTH (klampt mot
-      // tilgjengelig viewport-bredde fra widget.x til høyre kant).
+      // Åpnet: chat-delen er anker — sidebar legger seg til VENSTRE for chat,
+      // så høyre kant skal forbli stille. Det betyr at x flyttes til venstre
+      // med SIDEBAR_WIDTH og width øker tilsvarende.
+      //
+      // Hvis x ikke kan flyttes så langt mot venstre (allerede nær venstre
+      // kant), klampes x til 0 og widget utvider seg det den kan mot høyre
+      // i stedet — i så fall vil chat-delen visuelt bevege seg mot høyre.
       setWidthBeforeSidebar(bredde);
-      const maxBredde = Math.max(MIN_BREDDE, viewport.w - posX - MARG);
+      setXBeforeSidebar(posX);
+
+      const desiredX = posX - SIDEBAR_WIDTH;
+      const clampedX = Math.max(0, desiredX);
+      const maxBredde = Math.max(MIN_BREDDE, viewport.w - clampedX - MARG);
       const nyBredde  = Math.min(bredde + SIDEBAR_WIDTH, maxBredde);
-      if (nyBredde !== bredde) {
-        setBounds((b) => ({ ...b, width: nyBredde }));
+
+      if (clampedX !== posX || nyBredde !== bredde) {
+        setBounds((b) => ({ ...b, x: clampedX, width: nyBredde }));
       }
     } else {
-      // Lukket: restaurer til widthBeforeSidebar hvis vi husker den.
-      if (widthBeforeSidebar !== null) {
-        const restore = widthBeforeSidebar;
+      // Lukket: restaurer både x og width til verdiene fra før åpning.
+      if (widthBeforeSidebar !== null && xBeforeSidebar !== null) {
+        const restoreW = widthBeforeSidebar;
+        const restoreX = xBeforeSidebar;
         setWidthBeforeSidebar(null);
-        setBounds((b) => ({ ...b, width: restore }));
+        setXBeforeSidebar(null);
+        setBounds((b) => ({ ...b, x: restoreX, width: restoreW }));
       }
     }
     // bredde/posX leses ved trigger, men vi vil ikke kjøre effekten på hver
@@ -434,6 +447,12 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
           setDrar(false);
           // Fri plassering — lagre eksakt drop-posisjon, ingen snap.
           setBounds((b) => ({ ...b, x: d.x, y: d.y }));
+          // Hvis sidebar er åpen, oppdater xBeforeSidebar slik at lukking
+          // legger chat-delens høyre kant der den nå står
+          // (uten-sidebar x = nåværende x + SIDEBAR_WIDTH).
+          if (sidebarSynlig && xBeforeSidebar !== null) {
+            setXBeforeSidebar(d.x + SIDEBAR_WIDTH);
+          }
         }}
         onResizeStop={(_e, _dir, ref, _delta, pos) => {
           setDrar(false);
@@ -445,11 +464,11 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
             x:      pos.x,
             y:      pos.y,
           }));
-          // Hvis sidebar er åpen og bruker resizet manuelt: oppdater hva som
-          // restaureres ved lukking, slik at chat-delen beholder ny bredde
-          // (target-bredde minus sidebar).
-          if (sidebarSynlig && widthBeforeSidebar !== null) {
+          // Hvis sidebar er åpen: oppdater hva som restaureres ved lukking,
+          // slik at chat-delen beholder sin nye bredde og posisjon.
+          if (sidebarSynlig && widthBeforeSidebar !== null && xBeforeSidebar !== null) {
             setWidthBeforeSidebar(Math.max(MIN_BREDDE, nyBredde - SIDEBAR_WIDTH));
+            setXBeforeSidebar(pos.x + SIDEBAR_WIDTH);
           }
         }}
         style={{
