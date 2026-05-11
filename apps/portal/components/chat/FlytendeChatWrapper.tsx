@@ -387,9 +387,13 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     </div>
   );
 
+  // Eksplisitt true på begge — AIChats native header (organisasjonsnavn, TTS-
+  // knapper, lukke-X) skal ALDRI vises i wrapper-kontekst; vi har egen header
+  // i wrapperen. Boolean shorthand fungerer også, men eksplisitt form er
+  // robustere mot prop-spread-rekkefølge og kompilerings-edge-cases.
   const innhold = (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-      <AIChat {...props} standaloneMode hideHeader />
+      <AIChat {...props} standaloneMode={true} hideHeader={true} />
     </div>
   );
 
