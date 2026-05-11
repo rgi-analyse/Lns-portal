@@ -115,6 +115,10 @@ interface AIChatProps {
   onClearSlicer?: (tittel: SlicerTittel) => void;
   /** Kalles når AI-svar er ferdig — brukes av ChatWidget til å trigge sidebar-refetch */
   onResponseComplete?: () => void;
+  /** Callback når brukeren klikker X-knappen i headeren. Når satt vises
+   *  X-knappen også i standaloneMode. Hvis ikke satt: X-knappen vises kun
+   *  i widget-modus (!standaloneMode) og kollapser intern open-state som før. */
+  onClose?: () => void;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -215,7 +219,7 @@ export default function AIChat({
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
   aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar, brukerNavn,
-  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer, onResponseComplete,
+  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer, onResponseComplete, onClose,
 }: AIChatProps) {
   const router = useRouter();
   const { organisasjonNavn } = useTema();
@@ -1072,9 +1076,12 @@ export default function AIChat({
               >
                 <Settings className="w-3.5 h-3.5" />
               </button>
-              {!standaloneMode && (
+              {(!standaloneMode || onClose) && (
                 <button
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    if (onClose) onClose();
+                    else setOpen(false);
+                  }}
                   className="rounded p-1 transition-colors"
                   style={{ color: 'var(--text-muted)' }}
                   onMouseEnter={(e) => {
