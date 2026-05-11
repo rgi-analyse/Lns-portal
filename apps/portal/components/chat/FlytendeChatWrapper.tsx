@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
-import { MessageCircle, MessagesSquare, Minus } from 'lucide-react';
+import { GripHorizontal, MessageCircle, Minus } from 'lucide-react';
 import type AIChatComponent from '@/components/AIChat';
 
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });
@@ -197,10 +197,9 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
 
   const erKompakt = viewport.w < KOMPAKT_GRENSE;
 
-  // Eksponer historikk-toggle i wrapper-header når brukeren har samtale-
-  // historikk aktivert. AIChat sin egen toggle ligger i AIChat-header som
-  // er skjult via hideHeader, så uten denne ville bruker miste tilgangen.
-  const harHistorikk = !!props.harSamtalehistorikk;
+  // Sidebar-synlighet kommer fra parent (rapport-page). AIChats native header
+  // har sin egen Samtaler-toggle som bruker onToggleSidebar — vi eksponerer
+  // den derfor IKKE i wrapperen for å unngå duplikat.
   const sidebarSynlig = !!props.sidebarSynlig;
 
   // Auto-utvid widget når sidebar åpnes, krymp tilbake ved lukking.
@@ -249,8 +248,6 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     // sidebarSynlig faktisk endrer seg.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidebarSynlig, hydrert]);
-  const onToggleSidebar = props.onToggleSidebar;
-  const visHistorikkKnapp = harHistorikk && !!onToggleSidebar;
 
   // Wrapper ALL rendering i React Portal til document.body. Uten dette ville
   // widget visuelt vært klippet av container med overflow:hidden i rapport-
@@ -291,109 +288,69 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
     );
   }
 
+  // Tynn drag-stripe over AIChats native header. AIChat selv har Samtaler-
+  // toggle, organisasjonsnavn-tittel, TTS- og innstillinger-knapper. Wrapper-
+  // stripen er kun for drag + minimer (AIChats X-knapp er gated av
+  // !standaloneMode og rendres ikke i embedded modus).
   const header = (
     <div
       style={{
-        height: 36,
+        height: 18,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '0 12px',
+        padding: '0 4px 0 0',
         background: 'rgba(10,18,35,0.95)',
-        borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
+        borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
         userSelect: 'none',
         flexShrink: 0,
       }}
     >
-      {/* Drag-handle: kun tittel-delen — knapper får ikke denne klassen
-          så klikk på dem ikke tolkes som drag-start. */}
       <div
         className={erKompakt ? undefined : DRAG_HANDLE_CLASS}
+        title={erKompakt ? undefined : 'Dra for å flytte'}
         style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        8,
-          flex:       1,
-          minWidth:   0,
-          height:     '100%',
-          cursor:     erKompakt ? 'default' : 'move',
+          flex:           1,
+          height:         '100%',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          cursor:         erKompakt ? 'default' : 'move',
+          color:          'rgba(255,255,255,0.25)',
         }}
       >
-        <MessageCircle size={14} style={{ color: 'var(--gold, #f5a623)', flexShrink: 0 }} />
-        <span
-          style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: '0.04em',
-            color: 'var(--text-primary, #fff)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          AI-assistent
-        </span>
+        <GripHorizontal size={12} />
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-        {visHistorikkKnapp && (
-          <button
-            onClick={() => onToggleSidebar?.(!sidebarSynlig)}
-            title={sidebarSynlig ? 'Skjul samtaler' : 'Vis samtaler'}
-            style={{
-              background: sidebarSynlig
-                ? 'rgba(245,166,35,0.15)'
-                : 'rgba(255,255,255,0.06)',
-              border: sidebarSynlig
-                ? '1px solid rgba(245,166,35,0.4)'
-                : '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 5,
-              color: sidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
-              cursor: 'pointer',
-              padding: '4px 7px',
-              display: 'flex',
-              alignItems: 'center',
-              transition: 'all 0.15s ease',
-              // Sikrer at klikket lander på knappen, ikke en evt. drag-
-              // handle eller resize-håndtak som ligger over.
-              position: 'relative',
-              zIndex: 10,
-            }}
-          >
-            <MessagesSquare size={13} />
-          </button>
-        )}
-        <button
-          onClick={() => setKollapset(true)}
-          title="Minimer"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--text-muted, rgba(255,255,255,0.4))',
-            padding: '4px 8px',
-            borderRadius: 5,
-            display: 'flex',
-            alignItems: 'center',
-            position: 'relative',
-            zIndex: 10,
-          }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
-        >
-          <Minus size={15} />
-        </button>
-      </div>
+      <button
+        onClick={() => setKollapset(true)}
+        title="Minimer"
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-muted, rgba(255,255,255,0.4))',
+          padding: '0 6px',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 10,
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary, #fff)')}
+        onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted, rgba(255,255,255,0.4))')}
+      >
+        <Minus size={13} />
+      </button>
     </div>
   );
 
-  // Eksplisitt true på begge — AIChats native header (organisasjonsnavn, TTS-
-  // knapper, lukke-X) skal ALDRI vises i wrapper-kontekst; vi har egen header
-  // i wrapperen. Boolean shorthand fungerer også, men eksplisitt form er
-  // robustere mot prop-spread-rekkefølge og kompilerings-edge-cases.
+  // AIChats native header rendres nå (hideHeader fjernet) — gir brukeren
+  // Samtaler-toggle, organisasjonsnavn-tittel, TTS- og innstillinger-knapper
+  // direkte i widget. standaloneMode forblir true for at AIChat skal embedde
+  // seg i parent-container i stedet for fixed bottom-right.
   const innhold = (
     <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-      <AIChat {...props} standaloneMode={true} hideHeader={true} />
+      <AIChat {...props} standaloneMode={true} />
     </div>
   );
 
