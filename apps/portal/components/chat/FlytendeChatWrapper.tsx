@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
@@ -21,6 +21,9 @@ const MARG = 24;
 const KOMPAKT_GRENSE = 1024;
 const STORAGE_KEY_V1 = 'chat-widget-bounds-v1';  // gammel, slettes etter migration
 const STORAGE_KEY = 'chat-widget-bounds-v2';
+// Bredde av historikk-sidebar inni AIChat når kompaktMode er aktiv. Verifisert
+// mot SamtaleHistorikkSidebar.tsx:143 (width: '220px' i kompaktMode).
+const SIDEBAR_WIDTH = 220;
 
 interface LagredeBounds {
   width: number;
@@ -161,6 +164,10 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   // Aktiv drag/resize — vis overlay over PowerBI-iframe så mouse-events
   // ikke spises av iframen.
   const [drar, setDrar] = useState(false);
+  // Bredde widget hadde rett før sidebar ble åpnet — brukt til å restaurere
+  // ved lukking. null betyr "sidebar er ikke åpnet av oss" (initial state
+  // eller sidebar var allerede åpen ved mount).
+  const [widthBeforeSidebar, setWidthBeforeSidebar] = useState<number | null>(null);
   const { width: bredde, height: høyde, x: posX, y: posY, erKollapset: kollapset } = bounds;
 
   const setKollapset = (v: boolean) => setBounds((b) => ({ ...b, erKollapset: v }));
@@ -194,6 +201,41 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
   // er skjult via hideHeader, så uten denne ville bruker miste tilgangen.
   const harHistorikk = !!props.harSamtalehistorikk;
   const sidebarSynlig = !!props.sidebarSynlig;
+
+  // Auto-utvid widget når sidebar åpnes, krymp tilbake ved lukking.
+  // Bruker forrigeSidebarSynlig-ref for å detektere overgang fra/til false.
+  // Ved første mount (ref === undefined) registreres bare gjeldende verdi
+  // uten å trigge bredde-endring — dette dekker tilfellet hvor sidebar var
+  // åpen ved forrige session og widget allerede er stor nok.
+  const forrigeSidebarSynlig = useRef<boolean | undefined>(undefined);
+  useEffect(() => {
+    if (!hydrert) return;
+    const gammel = forrigeSidebarSynlig.current;
+    forrigeSidebarSynlig.current = sidebarSynlig;
+    if (gammel === undefined || gammel === sidebarSynlig) return;
+
+    if (sidebarSynlig) {
+      // Åpnet: lagre nåværende bredde, utvid med SIDEBAR_WIDTH (klampt mot
+      // tilgjengelig viewport-bredde fra widget.x til høyre kant).
+      setWidthBeforeSidebar(bredde);
+      const maxBredde = Math.max(MIN_BREDDE, viewport.w - posX - MARG);
+      const nyBredde  = Math.min(bredde + SIDEBAR_WIDTH, maxBredde);
+      if (nyBredde !== bredde) {
+        setBounds((b) => ({ ...b, width: nyBredde }));
+      }
+    } else {
+      // Lukket: restaurer til widthBeforeSidebar hvis vi husker den.
+      if (widthBeforeSidebar !== null) {
+        const restore = widthBeforeSidebar;
+        setWidthBeforeSidebar(null);
+        setBounds((b) => ({ ...b, width: restore }));
+      }
+    }
+    // bredde/posX leses ved trigger, men vi vil ikke kjøre effekten på hver
+    // bounds-endring — derfor er de ikke i deps. Logikken er styrt av at
+    // sidebarSynlig faktisk endrer seg.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarSynlig, hydrert]);
   const onToggleSidebar = props.onToggleSidebar;
   const visHistorikkKnapp = harHistorikk && !!onToggleSidebar;
 
@@ -395,13 +437,20 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         }}
         onResizeStop={(_e, _dir, ref, _delta, pos) => {
           setDrar(false);
+          const nyBredde = ref.offsetWidth;
           setBounds((b) => ({
             ...b,
-            width:  ref.offsetWidth,
+            width:  nyBredde,
             height: ref.offsetHeight,
             x:      pos.x,
             y:      pos.y,
           }));
+          // Hvis sidebar er åpen og bruker resizet manuelt: oppdater hva som
+          // restaureres ved lukking, slik at chat-delen beholder ny bredde
+          // (target-bredde minus sidebar).
+          if (sidebarSynlig && widthBeforeSidebar !== null) {
+            setWidthBeforeSidebar(Math.max(MIN_BREDDE, nyBredde - SIDEBAR_WIDTH));
+          }
         }}
         style={{
           background: 'rgba(12,20,38,0.98)',
