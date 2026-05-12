@@ -175,9 +175,9 @@ export default function RapportPage() {
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
 
-      {/* Flytende badge — vises kun når rapporten har koblede ai_gold-views
-          slik at AI-chat kan svare på spørsmål utover det som vises i PBI.
-          Plassert top-right så den ikke kolliderer med PBI sin native header. */}
+      {/* Diskret status-indikator: gull-sparkle høyre side, rett under PBI-
+          headeren. Markerer at AI-chat har tilgang til koblede ai_gold-views
+          og kan svare på spørsmål utover det som vises i PBI. */}
       {rapport.harKobledeViews && (
         <div
           title={
@@ -187,19 +187,18 @@ export default function RapportPage() {
           }
           style={{
             position: 'absolute',
-            top: 12,
+            top: 52,
             right: 12,
             zIndex: 100,
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 12,
+            justifyContent: 'center',
             background: 'rgba(245,166,35,0.15)',
             border: '1px solid rgba(245,166,35,0.4)',
             color: '#f5a623',
-            fontSize: 12,
-            fontWeight: 500,
             cursor: 'help',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
@@ -207,7 +206,6 @@ export default function RapportPage() {
           }}
         >
           <Sparkles size={12} />
-          <span>Utvidet AI-analyse</span>
         </div>
       )}
 
