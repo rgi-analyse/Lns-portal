@@ -2354,34 +2354,18 @@ export default function RapportInteraktivPage() {
     [kpiVisningsnavn],
   );
 
-  // Normaliser akse-valg etter at KPI-er er hydrert: AI-aliaset "Antall"
-  // erstattes av KPI-nøkkelen "antall" siden alleCols-dedup fjerner
-  // AI-aliaset. Uten dette ville select-elementet ha value="Antall" mens
-  // ingen option har value="Antall" — visuelt feil markert valg.
-  useEffect(() => {
-    const cfg = configRef.current;
-    if (!cfg) return;
-    const kpiNavn = Object.keys(kolonnTyper).filter(k => kolonnTyper[k] === 'kpi');
-    if (kpiNavn.length === 0) return;
-    const tilKpiNøkkel = (val: string | null | undefined): string | null => {
-      if (!val) return null;
-      const match = kpiNavn.find(k => k.toLowerCase() === val.toLowerCase());
-      return match && match !== val ? match : null;
-    };
-    const yNy   = tilKpiNøkkel(cfg.yAkse);
-    const xNy   = tilKpiNøkkel(cfg.xAkse);
-    const grpNy = tilKpiNøkkel(cfg.grupperPaa);
-    const sorNy = tilKpiNøkkel(cfg.sorterPaa);
-    if (yNy || xNy || grpNy || sorNy) {
-      setConfig(prev => prev ? {
-        ...prev,
-        yAkse:      yNy   ?? prev.yAkse,
-        xAkse:      xNy   ?? prev.xAkse,
-        grupperPaa: grpNy ?? prev.grupperPaa,
-        sorterPaa:  sorNy ?? prev.sorterPaa,
-      } : prev);
-    }
-  }, [kolonnTyper]);
+  // ── KPI-NAVN-CASING (kritisk) ──────────────────────────────────────────────
+  // Tidligere normaliserte vi cfg.yAkse/xAkse/grupperPaa/sorterPaa til
+  // lowercase når det matchet en KPI-key i kolonnTyper (som er lowercase fra
+  // detektor). Det forårsaket SQL-feil "Invalid column name 'korttidsfravær'"
+  // fordi sorterPaa kunne peke på en KPI som ikke er en faktisk view-kolonne
+  // — ORDER BY [korttidsfravær] feiler når den KPI-en ikke er i SELECT.
+  //
+  // KPI-navn er case-sensitive identifikatorer og skal ALDRI transformeres.
+  // Aksen-state beholder original casing fra rapport-config; dropdown-mis-
+  // match (cfg.yAkse="Korttidsfravær" vs option-value="korttidsfravær")
+  // håndteres via case-insensitive matching i selve dropdown-rendering,
+  // ikke ved å mutere state.
 
   // Kolonner gruppert etter type (for optgroup-dropdowns)
   const kolGroups = useMemo(() => {
