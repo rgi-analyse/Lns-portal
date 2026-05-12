@@ -176,8 +176,9 @@ export default function RapportPage() {
       />
 
       {/* Diskret status-indikator: gull-sparkle høyre side, rett under PBI-
-          headeren. Markerer at AI-chat har tilgang til koblede ai_gold-views
-          og kan svare på spørsmål utover det som vises i PBI. */}
+          headeren. Samme visuelle palett som "+"-knappen og chat-bobla
+          (fyllt var(--gold) + mørkt symbol + skygge), men mindre i størrelse
+          siden denne er status, ikke en handlings-knapp. */}
       {rapport.harKobledeViews && (
         <div
           title={
@@ -190,22 +191,20 @@ export default function RapportPage() {
             top: 52,
             right: 12,
             zIndex: 100,
-            width: 24,
-            height: 24,
+            width: 32,
+            height: 32,
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(245,166,35,0.15)',
-            border: '1px solid rgba(245,166,35,0.4)',
-            color: '#f5a623',
+            background: 'var(--gold)',
+            color: 'var(--navy-darkest)',
+            boxShadow: '0 4px 16px var(--gold-dim)',
             cursor: 'help',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
             userSelect: 'none',
           }}
         >
-          <Sparkles size={12} />
+          <Sparkles size={14} />
         </div>
       )}
 
