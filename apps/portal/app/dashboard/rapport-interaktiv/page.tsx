@@ -316,8 +316,12 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   const erAggregert = kpiExpr ? true : (cfg.aggregering !== 'NONE' && !isMed);
 
-  // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne
-  const kombSerier = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
+  // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne.
+  // Filtrer ut serier uten navn: ny serie opprettes med tom navn-felt og vises
+  // i UI før brukeren fyller inn. Uten dette ville SQL inneholdt "AS []" som
+  // gir "An object or column name is missing or empty"-feil fra SQL Server.
+  const kombSerierAlle = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
+  const kombSerier = kombSerierAlle.filter(s => s.navn.trim() !== '');
   let ekstraSelect = '';
   if (kombSerier.length > 0) {
     // Per serie: hvis kolonnen er en KPI, bruk KPI-uttrykket direkte (samme
@@ -3428,7 +3432,10 @@ export default function RapportInteraktivPage() {
                         kolonne: kolGroups.measures[0] ?? '',
                         aggregering: config.aggregering,
                         filterKol: kolGroups.dimensjoner[0] ?? '',
-                        filterOp: '=',
+                        // "!=" med tom verdi matcher alle ikke-tomme — gir
+                        // meningsfullt totalsum-default. Bruker kan velge "="
+                        // + spesifikk verdi når de vil filtrere.
+                        filterOp: '!=',
                         filterVerdi: '',
                         visningsType: config.kombinertSerier.length === 0 ? 'stolpe' : 'linje',
                         kumulativ:    false,
