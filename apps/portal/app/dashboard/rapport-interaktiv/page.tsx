@@ -816,8 +816,19 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier, referanseLinj
     return [Math.min(...nums.map(d => d[0])), Math.max(...nums.map(d => d[1]))];
   };
 
-  const stolpeKolonner = harSerier ? stolpeSerier.map(s => s.navn) : [stolpeKol];
-  const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn)  : [linjeKol];
+  // Y-akse (stolpeKol) er PRIMÆRT måltall — alltid med som første stolpe,
+  // selv når brukeren har lagt til ekstra serier. Tidligere ble stolpeKol
+  // ignorert i nærvær av serier, så Y-akse-dropdown ble en "blind kontroll".
+  // Dedup bevarer rekkefølge og hindrer at samme kolonne vises to ganger
+  // hvis bruker har lagt til Y-akse-kolonnen som serie også.
+  const dedupBevarRekkefolge = (xs: string[]): string[] => {
+    const sett = new Set<string>();
+    return xs.filter((x) => Boolean(x) && !sett.has(x) && (sett.add(x), true));
+  };
+  const stolpeKolonner = harSerier
+    ? dedupBevarRekkefolge([stolpeKol, ...stolpeSerier.map(s => s.navn)])
+    : [stolpeKol];
+  const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn) : [linjeKol];
   const stolpeDomain   = beregnFlereKolonner(stolpeKolonner);
   const linjeDomain    = beregnFlereKolonner(linjeKolonner);
 
