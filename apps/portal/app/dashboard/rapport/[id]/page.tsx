@@ -6,7 +6,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
-import type { FilterConfig } from '@/components/AIChat';
+import type { FilterConfig, DateFilterConfig } from '@/components/AIChat';
 import type { SlicerConfig, SlicerInfo, SlicerState } from '@/lib/slicerOps';
 import { Sparkles } from 'lucide-react';
 import LagRapportModal from '@/components/LagRapportModal';
@@ -61,8 +61,9 @@ export default function RapportPage() {
   });
   const [kanLageRapport,    setKanLageRapport]    = useState(false);
   const [visLagRapportModal, setVisLagRapportModal] = useState(false);
-  const [filterConfig,  setFilterConfig]  = useState<FilterConfig | undefined>(undefined);
-  const [slicerQueue,   setSlicerQueue]   = useState<SlicerConfig[]>([]);
+  const [filterConfig,    setFilterConfig]    = useState<FilterConfig | undefined>(undefined);
+  const [dateFilterConfig, setDateFilterConfig] = useState<DateFilterConfig | undefined>(undefined);
+  const [slicerQueue,     setSlicerQueue]     = useState<SlicerConfig[]>([]);
   const [slicere,       setSlicere]       = useState<SlicerInfo[]>([]);
   const [clearSlicerTitle,  setClearSlicerTitle]  = useState<string | undefined>(undefined);
   const [activeSlicerState, setActiveSlicerState] = useState<SlicerState>({});
@@ -165,6 +166,7 @@ export default function RapportPage() {
         pbiDatasetId={rapport.pbiDatasetId}
         pbiWorkspaceId={rapport.pbiWorkspaceId}
         filterConfig={filterConfig}
+        dateFilterConfig={dateFilterConfig}
         slicerQueue={slicerQueue}
         onSlicerQueueProcessed={() => setSlicerQueue([])}
         clearSlicerTitle={clearSlicerTitle}
@@ -230,6 +232,7 @@ export default function RapportPage() {
           onSetFilter={setFilterConfig}
           onSetSlicer={(config) => setSlicerQueue(prev => [...prev, config])}
           onClearSlicer={setClearSlicerTitle}
+          onSetDateFilter={setDateFilterConfig}
           getVisualsData={() => getVisualsDataRef.current?.() ?? Promise.resolve({})}
         />
       )}

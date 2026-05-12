@@ -23,6 +23,16 @@ export interface FilterConfig {
   operator?: 'In' | 'NotIn' | 'All';
 }
 
+/** Sendt fra backend ved set_date_filter — applisere som advanced/range-filter. */
+export interface DateFilterConfig {
+  tittel: string;
+  target: { table: string; column: string };
+  /** ISO UTC for start (GreaterThanOrEqual, inklusiv). */
+  fraIso: string;
+  /** ISO UTC for slutt (LessThan, eksklusiv). */
+  tilIso: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string | null;
@@ -110,9 +120,10 @@ interface AIChatProps {
   /** Callback når sidebar toggles — brukes til å lagre preferansen i foreldre */
   onToggleSidebar?: (nyVerdi: boolean) => void;
   getVisualsData?: () => Promise<Record<string, string>>;
-  onSetFilter?:   (config: FilterConfig) => void;
-  onSetSlicer?:   (config: SlicerConfig) => void;
-  onClearSlicer?: (tittel: SlicerTittel) => void;
+  onSetFilter?:     (config: FilterConfig) => void;
+  onSetSlicer?:     (config: SlicerConfig) => void;
+  onClearSlicer?:   (tittel: SlicerTittel) => void;
+  onSetDateFilter?: (config: DateFilterConfig) => void;
   /** Kalles når AI-svar er ferdig — brukes av ChatWidget til å trigge sidebar-refetch */
   onResponseComplete?: () => void;
   /** Callback når brukeren klikker X-knappen i headeren. Når satt vises
@@ -219,7 +230,7 @@ export default function AIChat({
   activeSlicerState, availableTables, aktivSide, kanLageRapport, grupper,
   øktId, standaloneMode, hideHeader, harSamtalehistorikk = false, initialMessages,
   aktivØktId, visSidebar = false, sidebarSynlig: sidebarSynligProp, onToggleSidebar, brukerNavn,
-  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer, onResponseComplete, onClose,
+  getVisualsData, onSetFilter, onSetSlicer, onClearSlicer, onSetDateFilter, onResponseComplete, onClose,
 }: AIChatProps) {
   const router = useRouter();
   const { organisasjonNavn } = useTema();
@@ -799,7 +810,7 @@ export default function AIChat({
             content?: string;
             tool?: string;
             filterConfig?: FilterConfig;
-            config?: SlicerConfig;
+            config?: SlicerConfig | DateFilterConfig;
             tittel?: SlicerTittel;
             message?: string;
             rapportId?: string;
@@ -823,6 +834,7 @@ export default function AIChat({
               set_report_filter:   '🔧 Setter filter i rapport...',
               set_report_slicer:   '🎛️ Setter slicer i rapport...',
               clear_report_slicer: '🗑️ Nullstiller slicer...',
+              set_date_filter:     '📅 Setter datofilter...',
               create_report:       '📊 Utformer rapportforslag...',
             };
             addDisplay({ role: 'status', content: labels[chunk.tool ?? ''] ?? `⚙️ ${chunk.tool}` });
@@ -830,7 +842,10 @@ export default function AIChat({
             onSetFilter?.(chunk.filterConfig);
           } else if (chunk.type === 'slicer' && chunk.config) {
             console.log('[AIChat] kaller onSetSlicer:', chunk.config);
-            onSetSlicer?.(chunk.config);
+            onSetSlicer?.(chunk.config as SlicerConfig);
+          } else if (chunk.type === 'date_filter' && chunk.config) {
+            console.log('[AIChat] kaller onSetDateFilter:', chunk.config);
+            onSetDateFilter?.(chunk.config as DateFilterConfig);
           } else if (chunk.type === 'slicer_clear' && chunk.tittel) {
             console.log('[AIChat] kaller onClearSlicer:', chunk.tittel);
             onClearSlicer?.(chunk.tittel);

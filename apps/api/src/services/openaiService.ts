@@ -55,12 +55,22 @@ const client = new OpenAI({
   defaultHeaders: { 'api-key': process.env.AZURE_OPENAI_KEY ?? '' },
 });
 
+export interface DateFilterConfig {
+  tittel: string;
+  target: { table: string; column: string };
+  /** ISO UTC for start (GreaterThanOrEqual, inklusiv). */
+  fraIso: string;
+  /** ISO UTC for slutt (LessThan, eksklusiv — typisk dag etter brukerens "til"). */
+  tilIso: string;
+}
+
 export type SseChunk =
   | { type: 'text';                 content: string }
   | { type: 'tool_call';            tool: string; result: unknown }
   | { type: 'filter';               filterConfig: FilterConfig }
   | { type: 'slicer';               config: SlicerConfig }
   | { type: 'slicer_clear';         tittel: string }
+  | { type: 'date_filter';          config: DateFilterConfig }
   | { type: 'open_report';          rapportId: string; rapportNavn: string }
   | { type: 'query_result';         data: Record<string, unknown>[]; sql: string }
   | { type: 'rapport_forslag';      forslag: RapportForslag }
@@ -109,6 +119,11 @@ export type SlicerConfig =
 interface SlicerMeta {
   visualName: string;
   tittel:     string;
+  /** True hvis sliceren er en dato-slicer. Settes av frontend-deteksjon i
+   *  slicerOps.ts og brukes av set_date_filter-tool. */
+  erDato?:    boolean;
+  /** Target for date-range filter. Settes av frontend når erDato=true. */
+  dateTarget?: { table: string; column: string };
 }
 
 export interface BasicSlicerInfo extends SlicerMeta {
@@ -213,6 +228,40 @@ interface ValideringFeil {
 
 interface ValideringOkNivåer  { ok: true; nivåer:  HierarchyLevel[] }
 interface ValideringOkVerdier { ok: true; verdier: (string | number)[] }
+
+/**
+ * Konverter lokal Europe/Oslo-dato (YYYY-MM-DD + valgfri klokketid) til ISO UTC.
+ * Håndterer både vinter (+01:00) og sommertid (+02:00) automatisk via Intl.
+ *
+ * Eksempel:
+ *   osloLokalTilUtcIso('2026-01-01')        → '2025-12-31T23:00:00.000Z'  (vinter)
+ *   osloLokalTilUtcIso('2026-06-15')        → '2026-06-14T22:00:00.000Z'  (sommer)
+ */
+function osloLokalTilUtcIso(
+  datoIso: string,
+  hour:    number = 0,
+  minute:  number = 0,
+  second:  number = 0,
+  ms:      number = 0,
+): string {
+  const m = datoIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) throw new Error(`Ugyldig dato-format: "${datoIso}". Forventet YYYY-MM-DD.`);
+  const y  = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d  = Number(m[3]);
+
+  // Finn Oslo-offset (minutter) for gitt dato. Trikset: ta UTC-midnatt for
+  // datoen, formater timer i Oslo, sammenlign med UTC.
+  const probe = new Date(Date.UTC(y, mo, d, 12, 0, 0));
+  const osloHour = parseInt(
+    probe.toLocaleString('en-US', { timeZone: 'Europe/Oslo', hour: '2-digit', hour12: false }),
+    10,
+  );
+  const offsetMin = (osloHour - 12) * 60;  // 60 vinter, 120 sommer
+
+  const utcMs = Date.UTC(y, mo, d, hour, minute, second, ms) - offsetMin * 60_000;
+  return new Date(utcMs).toISOString();
+}
 
 /**
  * Match én basic-verdi: lokal først, så AI Search hvis sliceren er indeksert.
@@ -620,6 +669,35 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
           },
         },
         required: ['tittel'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_date_filter',
+      description:
+        'Sett dato-range på en dato-slicer (advanced/range-filter). Bruk når brukeren ber om datofilter, ' +
+        'f.eks. "vis 2026", "filtrer på januar 2026", "fra 1. januar til 31. mars 2026". ' +
+        'AI skal tolke uttrykk til konkrete ISO-datoer (YYYY-MM-DD). Backend konverterer til UTC med Europe/Oslo-tidssone og applisirer som GreaterThanOrEqual + LessThan-filter. ' +
+        'Slå opp slicer ved tittel — kun slicere med erDato=true er gyldige. Hvis flere dato-slicere finnes og brukeren er uklar, spør hvilken som menes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tittel: {
+            type: 'string',
+            description: 'Tittel på dato-sliceren (slå opp i slicere-listen, kun de med erDato=true er gyldige).',
+          },
+          fra: {
+            type: 'string',
+            description: 'Fra-dato (inklusiv) i ISO-format YYYY-MM-DD. Brukerens lokal tid (Europe/Oslo). F.eks. "2026-01-01" for 1. januar 2026.',
+          },
+          til: {
+            type: 'string',
+            description: 'Til-dato (inklusiv) i ISO-format YYYY-MM-DD. Brukerens lokal tid (Europe/Oslo). F.eks. "2026-12-31" for 31. desember 2026.',
+          },
+        },
+        required: ['tittel', 'fra', 'til'],
       },
     },
   },
@@ -1177,6 +1255,69 @@ export async function chat(
           } else {
             onChunk({ type: 'slicer_clear', tittel });
             result = { status: 'success', melding: `Slicer "${tittel}" nullstilt.` };
+          }
+        } else if (tc.name === 'set_date_filter') {
+          const tittel = args['tittel'] as string | undefined;
+          const fra    = args['fra']    as string | undefined;
+          const til    = args['til']    as string | undefined;
+          const ISO    = /^\d{4}-\d{2}-\d{2}$/;
+
+          if (!tittel || !fra || !til) {
+            result = { status: 'invalid_input', melding: 'set_date_filter krever tittel, fra og til.' };
+          } else if (!ISO.test(fra) || !ISO.test(til)) {
+            result = { status: 'invalid_input', melding: 'fra/til må være ISO-dato YYYY-MM-DD.' };
+          } else if (fra > til) {
+            result = { status: 'invalid_input', melding: `fra (${fra}) er etter til (${til}).` };
+          } else {
+            const info = context?.slicere?.find((s) => s.tittel === tittel);
+            const datoSlicere = (context?.slicere ?? []).filter((s) => s.erDato);
+            console.log(
+              `[set_date_filter] tittel="${tittel}" fra=${fra} til=${til} ` +
+              `info=${info ? `found(erDato=${info.erDato})` : '(mangler)'} ` +
+              `dato_slicere=[${datoSlicere.map((s) => s.tittel).join(', ')}]`,
+            );
+
+            if (!info) {
+              if (datoSlicere.length === 0) {
+                result = { status: 'not_found', melding: 'Denne rapporten har ikke datofilter.' };
+              } else {
+                result = {
+                  status:  'not_found',
+                  melding: `Slicer "${tittel}" finnes ikke. Tilgjengelige dato-slicere: ${datoSlicere.map((s) => s.tittel).join(', ')}.`,
+                  forslag: datoSlicere.map((s) => s.tittel),
+                };
+              }
+            } else if (!info.erDato) {
+              result = {
+                status:  'not_found',
+                melding: `Sliceren "${tittel}" er ikke en dato-slicer. Denne rapporten har ikke datofilter tilgjengelig${datoSlicere.length > 0 ? `, men disse dato-slicerne finnes: ${datoSlicere.map((s) => s.tittel).join(', ')}` : ''}.`,
+                ...(datoSlicere.length > 0 ? { forslag: datoSlicere.map((s) => s.tittel) } : {}),
+              };
+            } else if (!info.dateTarget) {
+              result = { status: 'invalid_input', melding: `Slicer "${tittel}" mangler dateTarget — kan ikke bygge filter.` };
+            } else {
+              // Bygg PBI advanced-filter:
+              //   GreaterThanOrEqual  fra (00:00 Oslo)
+              //   LessThan            (til + 1 dag, 00:00 Oslo)   ← inklusiv-slutt-trick
+              const fraUtcIso = osloLokalTilUtcIso(fra, 0, 0, 0, 0);
+              const tilDate = new Date(`${til}T00:00:00Z`);
+              const dagEtterTil = new Date(tilDate.getTime() + 24 * 60 * 60 * 1000);
+              const dagEtterTilIso = dagEtterTil.toISOString().slice(0, 10);
+              const tilUtcIso = osloLokalTilUtcIso(dagEtterTilIso, 0, 0, 0, 0);
+
+              const dateFilterConfig = {
+                tittel,
+                target: info.dateTarget,
+                fraIso: fraUtcIso,
+                tilIso: tilUtcIso,
+              };
+              console.log('[set_date_filter] sending date_filter SSE:', JSON.stringify(dateFilterConfig));
+              onChunk({ type: 'date_filter', config: dateFilterConfig });
+              result = {
+                status:  'success',
+                melding: `Datofilter "${tittel}" satt: ${fra} til ${til}.`,
+              };
+            }
           }
         } else if (tc.name === 'open_report') {
           const rapportId   = args['rapportId'] as string;

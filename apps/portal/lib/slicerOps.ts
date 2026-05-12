@@ -25,6 +25,12 @@ export type SlicerConfig =
 interface SlicerMeta {
   visualName: string;
   tittel:     SlicerTittel;
+  /** True hvis sliceren er en dato-slicer (advanced/range-filter, ISO-verdier,
+   *  eller dato-kolonne-navn). Brukes av set_date_filter-tool. */
+  erDato:     boolean;
+  /** Target for date-range filter (table + column). Settes når erDato=true.
+   *  For hierarki-slicere: første target som har en column-egenskap. */
+  dateTarget?: { table: string; column: string };
 }
 
 export interface BasicSlicerInfo extends SlicerMeta {
@@ -159,6 +165,67 @@ function fraPbiHierarchyNode(node: Record<string, unknown>): HierarchyLevel | nu
   return { verdi };
 }
 
+/**
+ * Detekter om en slicer er dato-type med 3-trinns regelsett (i prioritert
+ * rekkefølge — første match vinner):
+ *
+ *   1. Primær: eksisterende filter er advanced/range
+ *      (state.filters[0].$schema inneholder "advanced" eller filterType===0)
+ *   2. Sekundær: verdi-mønster matcher ISO-dato på minst 3 første verdier
+ *   3. Tertiær: target.column eller table-navn matcher dato-heuristikk
+ *
+ * Returnerer { erDato, dateTarget, regel }. regel er kun for logging.
+ */
+function detekterErDato(args: {
+  state:    { filters?: unknown[] } | null;
+  targets:  HierarchyTarget[];
+  verdier:  string[];
+}): { erDato: boolean; dateTarget?: { table: string; column: string }; regel: string | null } {
+  const { state, targets, verdier } = args;
+
+  // Hjelper: hent første target som har en column-egenskap (kan brukes til
+  // date-range filter mot en konkret kolonne).
+  const førsteKolonneTarget = targets.find(
+    (t): t is HierarchyTarget & { column: string } => typeof t.column === 'string',
+  );
+  const targetForRange = førsteKolonneTarget
+    ? { table: førsteKolonneTarget.table, column: førsteKolonneTarget.column }
+    : undefined;
+
+  // Regel 1: eksisterende advanced/range-filter
+  const filter0 = state?.filters?.[0] as { $schema?: unknown; filterType?: unknown } | undefined;
+  if (filter0) {
+    const schemaErAdvanced = typeof filter0.$schema === 'string' && filter0.$schema.includes('advanced');
+    const erAdvancedFilterType = filter0.filterType === 0;
+    if (schemaErAdvanced || erAdvancedFilterType) {
+      return { erDato: true, dateTarget: targetForRange, regel: 'advanced-filter' };
+    }
+  }
+
+  // Regel 2: verdi-mønster ISO-dato (sjekk første 3 ikke-tomme verdier)
+  const ikkeTomme = verdier.filter((v) => v !== '');
+  if (ikkeTomme.length >= 3) {
+    const ISO_DATO = /^\d{4}-\d{2}-\d{2}/;
+    const tre = ikkeTomme.slice(0, 3);
+    if (tre.every((v) => ISO_DATO.test(v))) {
+      return { erDato: true, dateTarget: targetForRange, regel: 'verdi-mønster' };
+    }
+  }
+
+  // Regel 3: kolonne-navn-heuristikk
+  const KOLONNE_RE = /^(date|dato|tid|periode)$/i;
+  const TABLE_RE   = /^(tid|dato|date|calendar)/i;
+  for (const t of targets) {
+    const matchKolonne = typeof t.column === 'string' && KOLONNE_RE.test(t.column);
+    const matchTable   = TABLE_RE.test(t.table);
+    if (matchKolonne || matchTable) {
+      return { erDato: true, dateTarget: targetForRange, regel: 'kolonne-navn' };
+    }
+  }
+
+  return { erDato: false, regel: null };
+}
+
 async function finnAktivSide(report: Report) {
   const pages = await report.getPages();
   return pages.find((p) => p.isActive) ?? null;
@@ -184,11 +251,12 @@ export async function loadAll(report: Report): Promise<{
 
   for (const visual of slicerVisuals) {
     let targets: HierarchyTarget[] = [];
+    let slicerState: { filters?: unknown[]; targets?: HierarchyTarget[] } | null = null;
     try {
       const state = await visual.getSlicerState();
       console.log(`[slicerOps] state for "${visual.title ?? visual.name}":`, JSON.stringify(state));
-      const t = (state as unknown as { targets?: HierarchyTarget[] }).targets;
-      targets = t ?? [];
+      slicerState = state as unknown as { filters?: unknown[]; targets?: HierarchyTarget[] };
+      targets = slicerState.targets ?? [];
     } catch { /* slicer kan være tom — fortsett */ }
 
     // Hierarki = enten flere targets, eller ett target som bruker hierarchy/hierarchyLevel-felt
@@ -212,6 +280,23 @@ export async function loadAll(report: Report): Promise<{
     const tittel = trengerHeaderSomNøkkel ? (headers[0] ?? visual.name) : tittelRaw;
 
     mapping[tittel] = visual.name;
+
+    // Detektér om sliceren er dato-type. Verdier brukes for hierarki-tilfellet
+    // også (CSV-første-kolonne kan være ISO-datoer for date-hierarkier).
+    const verdierForDeteksjon = dataLinjer.slice(0, 50)
+      .map((l) => parseCSVRad(l)[0])
+      .filter((v): v is string => v !== undefined && v !== '');
+    const datoDeteksjon = detekterErDato({
+      state:   slicerState,
+      targets,
+      verdier: verdierForDeteksjon,
+    });
+    if (datoDeteksjon.regel) {
+      console.log(
+        `[slicerOps] erDato-deteksjon "${tittel}": match via regel="${datoDeteksjon.regel}" ` +
+        `(dateTarget=${datoDeteksjon.dateTarget ? `${datoDeteksjon.dateTarget.table}.${datoDeteksjon.dateTarget.column}` : '(mangler)'})`,
+      );
+    }
 
     if (erHierarki) {
       const toppSet         = new Set<string>();
@@ -249,6 +334,8 @@ export async function loadAll(report: Report): Promise<{
         type: 'hierarchy',
         visualName: visual.name,
         tittel,
+        erDato: datoDeteksjon.erDato,
+        ...(datoDeteksjon.dateTarget ? { dateTarget: datoDeteksjon.dateTarget } : {}),
         // Bevar hele target-shapen fra PBI — kan inneholde hierarchy/hierarchyLevel for date-hierarkier.
         targets: targets.map((t) => ({ ...t })),
         toppNivåVerdier: Array.from(toppSet),
@@ -256,9 +343,7 @@ export async function loadAll(report: Report): Promise<{
         nivåTyper,
       });
     } else {
-      const verdier = dataLinjer.slice(0, 50)
-        .map((l) => parseCSVRad(l)[0])
-        .filter((v): v is string => v !== undefined && v !== '');
+      const verdier = verdierForDeteksjon;
       console.log(
         `[slicerOps] basic "${tittel}": ${verdier.length} verdier ` +
         `(første 3: ${verdier.slice(0, 3).join(' | ')}${verdier.length > 3 ? ', …' : ''})`,
@@ -267,6 +352,8 @@ export async function loadAll(report: Report): Promise<{
         type: 'basic',
         visualName: visual.name,
         tittel,
+        erDato: datoDeteksjon.erDato,
+        ...(datoDeteksjon.dateTarget ? { dateTarget: datoDeteksjon.dateTarget } : {}),
         target: targets[0]?.column
           ? { table: targets[0].table, column: targets[0].column }
           : null,
