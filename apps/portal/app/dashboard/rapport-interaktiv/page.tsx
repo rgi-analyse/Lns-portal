@@ -316,15 +316,25 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   const erAggregert = kpiExpr ? true : (cfg.aggregering !== 'NONE' && !isMed);
 
-  // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne
-  const kombSerier = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
+  // Linje-serie for kombinert chart — CASE WHEN-serier eller enkel linje-kolonne.
+  // Filtrer ut serier uten navn: ny serie opprettes med tom navn-felt og vises
+  // i UI før brukeren fyller inn. Uten dette ville SQL inneholdt "AS []" som
+  // gir "An object or column name is missing or empty"-feil fra SQL Server.
+  const kombSerierAlle = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
+  const kombSerier = kombSerierAlle.filter(s => s.navn.trim() !== '');
   let ekstraSelect = '';
   if (kombSerier.length > 0) {
-    // Generer CASE WHEN-kolonner fra definerte serier
+    // Per serie: hvis kolonnen er en KPI, bruk KPI-uttrykket direkte (samme
+    // mønster som Y-akse). Hvis vanlig måling: behold CASE WHEN-filter-
+    // aggregering basert på serie-konfigurasjonen.
     ekstraSelect = kombSerier.map(s => {
+      const sNavn = `[${s.navn.replace(/[\[\]]/g, '')}]`;
+      const kpiExprSerie = finnKpiUttrykk(s.kolonne, kpiUttrykk);
+      if (kpiExprSerie) {
+        return `, ${kpiExprSerie} AS ${sNavn}`;
+      }
       const fKol = `[${s.filterKol.replace(/[\[\]]/g, '')}]`;
       const vKol = `[${s.kolonne.replace(/[\[\]]/g, '')}]`;
-      const sNavn = `[${s.navn.replace(/[\[\]]/g, '')}]`;
       const op = s.filterOp === 'LIKE'
         ? `${fKol} LIKE '${s.filterVerdi}'`
         : `${fKol} ${s.filterOp} '${s.filterVerdi}'`;
@@ -332,22 +342,29 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
       return `, ${agg}(CASE WHEN ${op} THEN ${vKol} ELSE 0 END) AS ${sNavn}`;
     }).join('');
   } else {
-    // Fallback: enkel linje-kolonne
+    // Fallback: enkel linje-kolonne (ekstraKolonner[0]).
     const linjeKolNavn = cfg.ekstraKolonner?.[0] ?? null;
     const linjeKolEsc  = linjeKolNavn ? esc(linjeKolNavn) : null;
-    const linjeKolType = linjeKolNavn ? kolonnTyper[linjeKolNavn] : null;
-    const erNumeriskLinje = linjeKolType?.startsWith('measure');
-    const linjeAgg = erNumeriskLinje ? cfg.aggregering : 'COUNT';
-    const linjeUttrykk = linjeKolEsc
-      ? (linjeAgg === 'NONE'           ? linjeKolEsc
-        : linjeAgg === 'COUNT'          ? `COUNT(${linjeKolEsc})`
-        : linjeAgg === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
-        : linjeAgg === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
-        : linjeAgg === 'MAX'            ? `MAX(${linjeKolEsc})`
-        : linjeAgg === 'MIN'            ? `MIN(${linjeKolEsc})`
-        : `SUM(${linjeKolEsc})`)
-      : null;
-    ekstraSelect = (linjeUttrykk && linjeKolEsc) ? `, ${linjeUttrykk} AS ${linjeKolEsc}` : '';
+    if (linjeKolNavn && linjeKolEsc) {
+      // KPI som enkel-linje: bruk KPI-uttrykket direkte, ikke SUM/COUNT.
+      const kpiExprLinje = finnKpiUttrykk(linjeKolNavn, kpiUttrykk);
+      if (kpiExprLinje) {
+        ekstraSelect = `, ${kpiExprLinje} AS ${linjeKolEsc}`;
+      } else {
+        const linjeKolType = kolonnTyper[linjeKolNavn];
+        const erNumeriskLinje = linjeKolType?.startsWith('measure');
+        const linjeAgg = erNumeriskLinje ? cfg.aggregering : 'COUNT';
+        const linjeUttrykk =
+          linjeAgg === 'NONE'           ? linjeKolEsc
+          : linjeAgg === 'COUNT'          ? `COUNT(${linjeKolEsc})`
+          : linjeAgg === 'COUNT_DISTINCT' ? `COUNT(DISTINCT ${linjeKolEsc})`
+          : linjeAgg === 'AVG'            ? `AVG(CAST(${linjeKolEsc} AS FLOAT))`
+          : linjeAgg === 'MAX'            ? `MAX(${linjeKolEsc})`
+          : linjeAgg === 'MIN'            ? `MIN(${linjeKolEsc})`
+          : `SUM(${linjeKolEsc})`;
+        ekstraSelect = `, ${linjeUttrykk} AS ${linjeKolEsc}`;
+      }
+    }
   }
 
   const grpKols = grp ? `${x}, ${grp}` : x;
@@ -816,8 +833,19 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier, referanseLinj
     return [Math.min(...nums.map(d => d[0])), Math.max(...nums.map(d => d[1]))];
   };
 
-  const stolpeKolonner = harSerier ? stolpeSerier.map(s => s.navn) : [stolpeKol];
-  const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn)  : [linjeKol];
+  // Y-akse (stolpeKol) er PRIMÆRT måltall — alltid med som første stolpe,
+  // selv når brukeren har lagt til ekstra serier. Tidligere ble stolpeKol
+  // ignorert i nærvær av serier, så Y-akse-dropdown ble en "blind kontroll".
+  // Dedup bevarer rekkefølge og hindrer at samme kolonne vises to ganger
+  // hvis bruker har lagt til Y-akse-kolonnen som serie også.
+  const dedupBevarRekkefolge = (xs: string[]): string[] => {
+    const sett = new Set<string>();
+    return xs.filter((x) => Boolean(x) && !sett.has(x) && (sett.add(x), true));
+  };
+  const stolpeKolonner = harSerier
+    ? dedupBevarRekkefolge([stolpeKol, ...stolpeSerier.map(s => s.navn)])
+    : [stolpeKol];
+  const linjeKolonner  = harSerier ? linjeSerier.map(s => s.navn) : [linjeKol];
   const stolpeDomain   = beregnFlereKolonner(stolpeKolonner);
   const linjeDomain    = beregnFlereKolonner(linjeKolonner);
 
@@ -3262,18 +3290,34 @@ export default function RapportInteraktivPage() {
                         </div>
                       </div>
 
-                      {/* Kolonne som aggregeres */}
+                      {/* Kolonne som aggregeres (måling eller KPI) */}
                       <select
                         value={serie.kolonne}
                         onChange={e => {
+                          const ny = e.target.value;
                           const oppdatert = [...config.kombinertSerier];
-                          oppdatert[idx] = { ...serie, kolonne: e.target.value };
+                          // Auto-fyll serie-navn med kolonne-navn hvis tomt
+                          // — enklere å skille flere KPI-serier i samme chart.
+                          oppdatert[idx] = {
+                            ...serie,
+                            kolonne: ny,
+                            navn:    serie.navn.trim() ? serie.navn : ny,
+                          };
                           setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
                         }}
                         style={{ ...selectStyle, marginBottom: 6, fontSize: 12 }}
                       >
                         <option value="">— Velg kolonne —</option>
-                        {kolGroups.measures.map(k => <option key={k} value={k}>{k}</option>)}
+                        {kolGroups.kpi.length > 0 && (
+                          <optgroup label="KPI-er">
+                            {kolGroups.kpi.map(k => <option key={k} value={k}>{labelFor(k)}</option>)}
+                          </optgroup>
+                        )}
+                        {kolGroups.measures.length > 0 && (
+                          <optgroup label="Mål">
+                            {kolGroups.measures.map(k => <option key={k} value={k}>{k}</option>)}
+                          </optgroup>
+                        )}
                       </select>
 
                       {/* Filter: kolonne + operator + verdi */}
@@ -3388,7 +3432,10 @@ export default function RapportInteraktivPage() {
                         kolonne: kolGroups.measures[0] ?? '',
                         aggregering: config.aggregering,
                         filterKol: kolGroups.dimensjoner[0] ?? '',
-                        filterOp: '=',
+                        // "!=" med tom verdi matcher alle ikke-tomme — gir
+                        // meningsfullt totalsum-default. Bruker kan velge "="
+                        // + spesifikk verdi når de vil filtrere.
+                        filterOp: '!=',
                         filterVerdi: '',
                         visningsType: config.kombinertSerier.length === 0 ? 'stolpe' : 'linje',
                         kumulativ:    false,
@@ -3416,9 +3463,20 @@ export default function RapportInteraktivPage() {
                       style={{ ...selectStyle, fontSize: 12 }}
                     >
                       <option value="">— Ingen enkel linje —</option>
-                      {kolGroups.measures
-                        .filter(k => k !== config.xAkse && k !== config.yAkse)
-                        .map(k => <option key={k} value={k}>{k}</option>)}
+                      {kolGroups.kpi.length > 0 && (
+                        <optgroup label="KPI-er">
+                          {kolGroups.kpi
+                            .filter(k => k !== config.xAkse && k !== config.yAkse)
+                            .map(k => <option key={k} value={k}>{labelFor(k)}</option>)}
+                        </optgroup>
+                      )}
+                      {kolGroups.measures.length > 0 && (
+                        <optgroup label="Mål">
+                          {kolGroups.measures
+                            .filter(k => k !== config.xAkse && k !== config.yAkse)
+                            .map(k => <option key={k} value={k}>{k}</option>)}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
                 </div>
