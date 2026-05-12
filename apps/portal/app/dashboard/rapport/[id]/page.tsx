@@ -8,6 +8,7 @@ import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
 import type { FilterConfig } from '@/components/AIChat';
 import type { SlicerConfig, SlicerInfo, SlicerState } from '@/lib/slicerOps';
+import { Sparkles } from 'lucide-react';
 import LagRapportModal from '@/components/LagRapportModal';
 import { useLisens } from '@/components/LisensProvider';
 import { harBetaTilgang } from '@/lib/featureFlags';
@@ -25,14 +26,15 @@ interface WorkspaceKontekst {
 }
 
 interface Rapport {
-  id:             string;
-  navn:           string;
-  beskrivelse:    string | null;
-  pbiReportId:    string;
-  pbiDatasetId:   string;
-  pbiWorkspaceId: string;
-  workspaces:     Array<{ workspace: WorkspaceKontekst }>;
+  id:                 string;
+  navn:               string;
+  beskrivelse:        string | null;
+  pbiReportId:        string;
+  pbiDatasetId:       string;
+  pbiWorkspaceId:     string;
+  workspaces:         Array<{ workspace: WorkspaceKontekst }>;
   erDesignerRapport?: boolean;
+  harKobledeViews?:   boolean;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -172,6 +174,40 @@ export default function RapportPage() {
         onAktivSideChange={setAktivSide}
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
+
+      {/* Diskret status-indikator: gull-sparkle høyre side, rett under PBI-
+          headeren. Samme visuelle palett som "+"-knappen og chat-bobla
+          (fyllt var(--gold) + mørkt symbol + skygge), men mindre i størrelse
+          siden denne er status, ikke en handlings-knapp. */}
+      {rapport.harKobledeViews && (
+        <div
+          title={
+            'Denne rapporten er koblet til database-views slik at AI-chat ' +
+            'kan svare på spørsmål utover det som vises i rapporten. ' +
+            'Prøv spørsmål som krever beregninger på underliggende data.'
+          }
+          style={{
+            position: 'absolute',
+            top: 52,
+            right: 12,
+            zIndex: 100,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--gold)',
+            color: 'var(--navy-darkest)',
+            boxShadow: '0 4px 16px var(--gold-dim)',
+            cursor: 'help',
+            userSelect: 'none',
+          }}
+        >
+          <Sparkles size={14} />
+        </div>
+      )}
+
       {lisens.chatAktivert && brukerChatAktivert === true && (
         <FlytendeChatWrapper
           entraObjectId={entraObjectId}
