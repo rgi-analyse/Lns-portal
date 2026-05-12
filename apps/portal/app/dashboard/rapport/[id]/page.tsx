@@ -8,6 +8,7 @@ import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
 import type { FilterConfig } from '@/components/AIChat';
 import type { SlicerConfig, SlicerInfo, SlicerState } from '@/lib/slicerOps';
+import { Sparkles } from 'lucide-react';
 import LagRapportModal from '@/components/LagRapportModal';
 import { useLisens } from '@/components/LisensProvider';
 import { harBetaTilgang } from '@/lib/featureFlags';
@@ -25,14 +26,15 @@ interface WorkspaceKontekst {
 }
 
 interface Rapport {
-  id:             string;
-  navn:           string;
-  beskrivelse:    string | null;
-  pbiReportId:    string;
-  pbiDatasetId:   string;
-  pbiWorkspaceId: string;
-  workspaces:     Array<{ workspace: WorkspaceKontekst }>;
+  id:                 string;
+  navn:               string;
+  beskrivelse:        string | null;
+  pbiReportId:        string;
+  pbiDatasetId:       string;
+  pbiWorkspaceId:     string;
+  workspaces:         Array<{ workspace: WorkspaceKontekst }>;
   erDesignerRapport?: boolean;
+  harKobledeViews?:   boolean;
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -172,6 +174,43 @@ export default function RapportPage() {
         onAktivSideChange={setAktivSide}
         onRegisterGetVisualData={(fn) => { getVisualsDataRef.current = fn; }}
       />
+
+      {/* Flytende badge — vises kun når rapporten har koblede ai_gold-views
+          slik at AI-chat kan svare på spørsmål utover det som vises i PBI.
+          Plassert top-right så den ikke kolliderer med PBI sin native header. */}
+      {rapport.harKobledeViews && (
+        <div
+          title={
+            'Denne rapporten er koblet til database-views slik at AI-chat ' +
+            'kan svare på spørsmål utover det som vises i rapporten. ' +
+            'Prøv spørsmål som krever beregninger på underliggende data.'
+          }
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 12,
+            background: 'rgba(245,166,35,0.15)',
+            border: '1px solid rgba(245,166,35,0.4)',
+            color: '#f5a623',
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: 'help',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            userSelect: 'none',
+          }}
+        >
+          <Sparkles size={12} />
+          <span>Utvidet AI-analyse</span>
+        </div>
+      )}
+
       {lisens.chatAktivert && brukerChatAktivert === true && (
         <FlytendeChatWrapper
           entraObjectId={entraObjectId}

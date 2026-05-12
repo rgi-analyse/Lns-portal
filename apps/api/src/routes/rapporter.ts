@@ -79,7 +79,18 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           erDesignerRapport = Boolean((rows[0] as { erDesignerRapport?: unknown } | undefined)?.erDesignerRapport);
         } catch { /* kolonnen finnes ikke ennå */ }
 
-        return reply.send({ ...rapport, erDesignerRapport });
+        // Indikerer om rapporten har minst én aktiv kobling til ai_gold-views.
+        // Brukes av rapport-siden til å vise "Utvidet AI-analyse"-badge.
+        let harKobledeViews = false;
+        try {
+          const rows = await queryAzureSQL(
+            `SELECT COUNT(*) AS antall FROM ai_rapport_view_kobling WHERE rapport_id = '${id}'`,
+          );
+          const antall = Number((rows[0] as { antall?: number } | undefined)?.antall ?? 0);
+          harKobledeViews = antall > 0;
+        } catch { /* tabellen kan mangle i visse miljøer — fail-soft */ }
+
+        return reply.send({ ...rapport, erDesignerRapport, harKobledeViews });
       } catch (error) {
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke hente rapport.' });
