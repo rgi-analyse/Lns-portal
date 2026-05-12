@@ -320,11 +320,18 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
   const kombSerier = cfg.visualType === 'kombinert' ? (cfg.kombinertSerier ?? []) : [];
   let ekstraSelect = '';
   if (kombSerier.length > 0) {
-    // Generer CASE WHEN-kolonner fra definerte serier
+    // Generer SELECT-kolonner per serie. KPI-serier bruker sitt forhåndsdefinerte
+    // SQL-uttrykk (samme som Y-akse), ellers en filtrert CASE WHEN-aggregering.
     ekstraSelect = kombSerier.map(s => {
+      const sNavn = `[${s.navn.replace(/[\[\]]/g, '')}]`;
+      const kpiExprSerie = finnKpiUttrykk(s.kolonne, kpiUttrykk);
+      if (kpiExprSerie) {
+        // KPI-serie: bruk uttrykket direkte. Eventuelt filter ignoreres siden
+        // KPI-uttrykk allerede har sin egen aggregeringssemantikk.
+        return `, ${kpiExprSerie} AS ${sNavn}`;
+      }
       const fKol = `[${s.filterKol.replace(/[\[\]]/g, '')}]`;
       const vKol = `[${s.kolonne.replace(/[\[\]]/g, '')}]`;
-      const sNavn = `[${s.navn.replace(/[\[\]]/g, '')}]`;
       const op = s.filterOp === 'LIKE'
         ? `${fKol} LIKE '${s.filterVerdi}'`
         : `${fKol} ${s.filterOp} '${s.filterVerdi}'`;
@@ -3262,18 +3269,34 @@ export default function RapportInteraktivPage() {
                         </div>
                       </div>
 
-                      {/* Kolonne som aggregeres */}
+                      {/* Kolonne som aggregeres (måling eller KPI) */}
                       <select
                         value={serie.kolonne}
                         onChange={e => {
+                          const ny = e.target.value;
                           const oppdatert = [...config.kombinertSerier];
-                          oppdatert[idx] = { ...serie, kolonne: e.target.value };
+                          // Auto-fyll serie-navn med kolonne-navn hvis tom — gjør
+                          // det enklere å skille flere KPI-serier i samme chart.
+                          oppdatert[idx] = {
+                            ...serie,
+                            kolonne: ny,
+                            navn:    serie.navn.trim() ? serie.navn : ny,
+                          };
                           setConfig(p => p ? { ...p, kombinertSerier: oppdatert } : p);
                         }}
                         style={{ ...selectStyle, marginBottom: 6, fontSize: 12 }}
                       >
                         <option value="">— Velg kolonne —</option>
-                        {kolGroups.measures.map(k => <option key={k} value={k}>{k}</option>)}
+                        {kolGroups.kpi.length > 0 && (
+                          <optgroup label="KPI-er">
+                            {kolGroups.kpi.map(k => <option key={k} value={k}>{labelFor(k)}</option>)}
+                          </optgroup>
+                        )}
+                        {kolGroups.measures.length > 0 && (
+                          <optgroup label="Mål">
+                            {kolGroups.measures.map(k => <option key={k} value={k}>{k}</option>)}
+                          </optgroup>
+                        )}
                       </select>
 
                       {/* Filter: kolonne + operator + verdi */}
