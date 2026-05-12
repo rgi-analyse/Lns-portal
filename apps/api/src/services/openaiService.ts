@@ -279,25 +279,19 @@ async function matchEnBasicVerdi(
     }
   }
 
-  // 3. Ingen match lokalt og ingen unique fra AI Search.
-  //
-  // Tidligere returnerte vi not_found her, men info.verdier inneholder kun de
-  // første 50 verdiene fra Power BI (en PBI API-begrensning) — sliceren i
-  // datasettet kan ha hundrevis flere. Hvis vi har en AI Search-indeks som
-  // også ga none, var det enten et søk-edge-case (terskel, indeks-state,
-  // tokenizer) eller verdien finnes ikke.
-  //
-  // Trade-off per spec: stol på AI/bruker. Returner verdien som-er og la PBI
-  // selv avgjøre. Hvis verdien faktisk eksisterer i sliceren utenfor de 50
-  // lokale → filteret settes. Hvis verdien ikke eksisterer → sliceren endres
-  // ikke (PBI ignorerer). Konsekvens: AI får success-melding selv ved ikke-
-  // eksisterende verdi, men det er ansett bedre enn falsk not_found basert
-  // på en 50-verdier-liste som ikke er autoritativ.
-  console.log(
-    `[validator] ingen lokal match og ingen unique AI Search-treff for "${verdi}" i "${info.tittel}" — ` +
-    `stoler på AI/bruker, sender verdien direkte til PBI`,
+  // 3. Ingen match
+  const prefiks = utledPrefiks(verdi);
+  const filtrerteForslag = info.verdier.filter((v) =>
+    v.startsWith(prefiks + ' ') || v.startsWith(prefiks + '-') || v === prefiks,
   );
-  return { ok: true, verdi: String(verdi) };
+  return {
+    ok:       false,
+    kategori: 'not_found',
+    error:
+      `Verdien "${verdi}" finnes ikke i sliceren "${info.tittel}". ` +
+      `Tilgjengelige (utvalg): ${info.verdier.slice(0, 10).join(', ')}`,
+    forslag: filtrerteForslag.length > 0 ? filtrerteForslag : info.verdier.slice(0, 10),
+  };
 }
 
 /** Validerer basic-payload mot slicerInfo. */
