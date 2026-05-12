@@ -1240,13 +1240,14 @@ Tilgjengelige visualiseringstyper:
       // per Hovedprosjekt).
       const SLICER_VERDIER_GRENSE = 50;
       const slicereTekst = (slicere ?? []).map((s) => {
+        const datoTag = s.erDato ? ' [DATO-SLICER — bruk set_date_filter]' : '';
         if (s.type === 'basic') {
           const v = s.verdier.slice(0, SLICER_VERDIER_GRENSE);
           const trunkert = s.verdier.length > SLICER_VERDIER_GRENSE
             ? ` (av ${s.verdier.length} totalt)` : '';
-          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert}): ${v.join(', ')}`;
+          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert})${datoTag}: ${v.join(', ')}`;
         }
-        const linjer = [`• ${s.tittel} (hierarchy):`];
+        const linjer = [`• ${s.tittel} (hierarchy)${datoTag}:`];
         linjer.push(`    Topp-nivå: ${s.toppNivåVerdier.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
           const trunkert = barn.length > SLICER_VERDIER_GRENSE
@@ -1299,6 +1300,25 @@ VIKTIG - I denne applikasjonen finnes det IKKE rapportfiltre.
 Når brukeren sier "filter", "filtrer", "sett filter", "fjern filter", "ta bort filter" e.l. betyr det alltid SLICER.
 - For å sette slicer: bruk set_report_slicer
 - For å fjerne/nullstille slicer: bruk clear_report_slicer
+- For å sette DATOFILTER på dato-slicer: bruk set_date_filter (se egen seksjon nedenfor)
+
+REGLER FOR DATOFILTER (set_date_filter):
+1. Bruk set_date_filter for uttrykk som handler om dato-range eller dato-periode:
+   - "vis 2026"             → fra="2026-01-01", til="2026-12-31"
+   - "januar 2026"          → fra="2026-01-01", til="2026-01-31"
+   - "mars" (uten år)       → bruk inneværende år (dagens dato er gitt øverst)
+   - "fra 1. januar til 31. mars 2026" → fra="2026-01-01", til="2026-03-31"
+   - "fra 1.3.2026 til 30.4.2026"      → fra="2026-03-01", til="2026-04-30"
+2. ISO-format YYYY-MM-DD. Brukerens lokale tid (Europe/Oslo) — backend håndterer UTC-konvertering.
+3. Norske månedsnavn må tolkes: januar (01), februar (02), mars (03), april (04),
+   mai (05), juni (06), juli (07), august (08), september (09), oktober (10),
+   november (11), desember (12).
+4. Måned uten år: bruk inneværende år (dagens dato er gitt i prompten).
+5. Måned med år → første til siste dag i måneden (28/29/30/31 avhengig av måned).
+6. Slå opp tittel i slicere-listen — KUN slicere med erDato=true er gyldige for set_date_filter.
+   Hvis flere dato-slicere finnes og brukeren er uklar, spør hvilken som menes.
+   Hvis ingen dato-slicer finnes på rapporten: si det ærlig basert på backend-feilmelding.
+7. Tool-systemet returnerer samme status-kategorier som set_report_slicer (success/not_found/invalid_input).
 
 REGLER FOR Å SETTE SLICER:
 1. Slå opp sliceren i slicere-listen — bruk "type"-feltet til å velge riktig payload

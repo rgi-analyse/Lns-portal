@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { PowerBIEmbed } from 'powerbi-client-react';
 import { models, Report } from 'powerbi-client';
-import type { FilterConfig } from './AIChat';
+import type { FilterConfig, DateFilterConfig } from './AIChat';
 import * as slicerOps from '@/lib/slicerOps';
 import type {
   SlicerConfig, SlicerInfo, SlicerMapping, SlicerState,
@@ -38,6 +38,7 @@ interface PowerBIReportProps {
   pbiDatasetId?: string;        // Power BI Dataset ID
   pbiWorkspaceId?: string;      // Power BI Workspace ID (Fabric)
   filterConfig?: FilterConfig;  // AI-drevet filter
+  dateFilterConfig?: DateFilterConfig;  // AI-drevet dato-range-filter (advanced)
   slicerQueue?: SlicerConfig[];  // AI-drevet slicer-kø (støtter flere samtidige endringer)
   onSlicerQueueProcessed?: () => void;
   onSlicereLoaded?: (slicere: SlicerInfo[]) => void;
@@ -51,7 +52,7 @@ interface PowerBIReportProps {
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
-export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, slicerQueue, onSlicerQueueProcessed, clearSlicerTitle, onSlicereLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
+export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportId, pbiDatasetId, pbiWorkspaceId, filterConfig, dateFilterConfig, slicerQueue, onSlicerQueueProcessed, clearSlicerTitle, onSlicereLoaded, onActiveStateChange, onTablesLoaded, onRegisterGetVisualData, onAktivSideChange, brukerRolle }: PowerBIReportProps = {}) {
   const { entraObjectId } = usePortalAuth();
 
   // Workspace-spesifikk nøkkel for bookmark-lagring
@@ -142,7 +143,54 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     report.updateFilters(models.FiltersOperations.Replace, [filter]).catch((err) =>
       console.warn('[PowerBIReport] filter feil:', err),
     );
+    // Dato-range-filter (advanced): GreaterThanOrEqual fraIso, LessThan tilIso.
+    // Applieres på sliceren via visual.setSlicerState siden dette er et slicer-
+    // bundet filter, ikke et rapport/page-filter.
+    // (Egen useEffect — se nedenfor.)
   }, [filterConfig, report]);
+
+  // Applisere AI-drevet dato-range-filter på riktig slicer via setSlicerState.
+  // Bygger PBI advanced-filter: GreaterThanOrEqual fraIso + LessThan tilIso.
+  useEffect(() => {
+    if (!dateFilterConfig || !reportRef.current) return;
+    const { tittel, target, fraIso, tilIso } = dateFilterConfig;
+    (async () => {
+      try {
+        const visualName = slicerMappingRef.current[tittel];
+        if (!visualName) {
+          console.warn(`[PBI] date-filter: slicer "${tittel}" mangler i mapping`);
+          return;
+        }
+        const r = reportRef.current;
+        if (!r) return;
+        const pages = await r.getPages();
+        const aktiv = pages.find((p) => p.isActive);
+        if (!aktiv) return;
+        const visuals = await aktiv.getVisuals();
+        const visual  = visuals.find((v) => v.name === visualName);
+        if (!visual) {
+          console.warn(`[PBI] date-filter: visual "${visualName}" ikke funnet`);
+          return;
+        }
+        const filter = {
+          $schema:         'http://powerbi.com/product/schema#advanced',
+          target:          { table: target.table, column: target.column },
+          filterType:      models.FilterType.Advanced,
+          logicalOperator: 'And',
+          conditions: [
+            { operator: 'GreaterThanOrEqual', value: fraIso },
+            { operator: 'LessThan',           value: tilIso },
+          ],
+        };
+        console.log('[PBI] applierer date-filter:', JSON.stringify(filter));
+        await visual.setSlicerState({ filters: [filter] as unknown as models.ISlicerFilter[] });
+        const state = await slicerOps.getActiveState(r, slicerMappingRef.current, slicereRef.current);
+        onActiveStateChangeRef.current?.(state);
+      } catch (err) {
+        console.warn('[PBI] date-filter feilet:', err);
+      }
+    })();
+  }, [dateFilterConfig]);
 
   useEffect(() => {
     if (!slicerQueue || slicerQueue.length === 0 || !reportRef.current) return;
