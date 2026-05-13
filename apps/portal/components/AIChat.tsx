@@ -1184,8 +1184,8 @@ export default function AIChat({
 
           {/* Messages */}
           <div
-            className="flex-1 overflow-y-auto p-3 space-y-2 text-sm"
-            style={{ background: 'rgba(10,18,35,0.85)' }}
+            className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-2 text-sm"
+            style={{ background: 'rgba(10,18,35,0.85)', minWidth: 0 }}
           >
             {!rapportNavn && (
               <div
@@ -1265,7 +1265,7 @@ export default function AIChat({
                     return <path key={idx} d={`M${cx},${cy} L${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${large} 1 ${x2.toFixed(1)},${y2.toFixed(1)} Z`} fill={colors[idx % colors.length]} opacity={0.85} />;
                   });
                   return (
-                    <svg width={W} height={H} style={{ display: 'block' }}>
+                    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="xMidYMid meet" style={{ display: 'block', maxWidth: '100%' }}>
                       {paths}
                       {slices.map((s, idx) => (
                         <rect key={`l${idx}`} x={80 + (idx % 2) * 100} y={8 + Math.floor(idx / 2) * 18} width={8} height={8} fill={colors[idx % colors.length]} rx={1} />
@@ -1291,7 +1291,7 @@ export default function AIChat({
                     return `${x.toFixed(1)},${y.toFixed(1)}`;
                   }).join(' ');
                   return (
-                    <svg width={W} height={H} style={{ display: 'block' }}>
+                    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="xMidYMid meet" style={{ display: 'block', maxWidth: '100%' }}>
                       <polyline points={pts} fill="none" stroke="var(--gold)" strokeWidth={1.5} opacity={0.85} />
                       {preview.map((r, idx) => {
                         const x = pad + idx * barW + barW / 2;
@@ -1308,7 +1308,7 @@ export default function AIChat({
                 }
                 // bar
                 return (
-                  <svg width={W} height={H} style={{ display: 'block' }}>
+                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="xMidYMid meet" style={{ display: 'block', maxWidth: '100%' }}>
                     {preview.map((r, idx) => {
                       const bh = Math.max(1, (vals[idx] / maxVal) * barH);
                       const x  = pad + idx * barW + 1;
@@ -1328,15 +1328,17 @@ export default function AIChat({
 
               const erFraHistorikk = !f.data?.length;
               return (
-                <div key={i} className="flex justify-start">
+                <div key={i} className="flex justify-start" style={{ minWidth: 0 }}>
                   <div
                     className="w-full max-w-[95%] rounded-xl p-3 text-sm"
                     style={{
                       background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-border)',
+                      minWidth: 0,
+                      overflowWrap: 'anywhere',
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--gold)', marginBottom: 4 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--gold)', marginBottom: 4, overflowWrap: 'anywhere' }}>
                       📊 {f.tittel}
                     </div>
                     {f.beskrivelse && (
@@ -1416,15 +1418,17 @@ export default function AIChat({
             if (msg.role === 'kpi_forslag' && msg.kpiForslag && msg.kpiForslag.length > 0) {
               const viewNavn = msg.kpiViewNavn ?? null;
               return (
-                <div key={i} className="flex justify-start">
+                <div key={i} className="flex justify-start" style={{ minWidth: 0, maxWidth: '100%' }}>
                   <div
-                    className="max-w-[85%]"
+                    className="max-w-[95%]"
                     style={{
                       background: 'var(--glass-bg)',
                       border: '1px solid var(--glass-border)',
                       borderRadius: 10,
                       padding: '10px 12px',
                       fontSize: 12,
+                      minWidth: 0,
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -1439,8 +1443,8 @@ export default function AIChat({
                         const feil   = status && status !== 'lagrer' && status !== 'lagret' ? status : null;
                         const fmtBadge = `var(--gold)`;
                         return (
-                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
                               <button
                                 type="button"
                                 disabled={lagret || lagrer || !viewNavn}
@@ -1452,15 +1456,29 @@ export default function AIChat({
                                   color: lagret ? 'var(--text-muted)' : 'var(--gold)',
                                   cursor: (lagret || lagrer || !viewNavn) ? 'default' : 'pointer',
                                   fontWeight: 600,
-                                  whiteSpace: 'nowrap',
+                                  maxWidth: '100%',
+                                  overflowWrap: 'anywhere',
+                                  textAlign: 'left',
                                 }}
                               >
                                 {lagret ? '✓ Lagret' : lagrer ? 'Lagrer…' : `💾 Lagre «${kpi.visningsnavn}»`}
                               </button>
-                              <span style={{ fontSize: 10, color: fmtBadge, fontWeight: 700, fontFamily: 'monospace' }}>
+                              <span style={{ fontSize: 10, color: fmtBadge, fontWeight: 700, fontFamily: 'monospace', flexShrink: 0 }}>
                                 {kpi.format.toUpperCase()}
                               </span>
-                              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={kpi.sql_uttrykk}>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: 'var(--text-muted)',
+                                  fontFamily: 'monospace',
+                                  flex: '1 1 100%',
+                                  minWidth: 0,
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-all',
+                                  overflowWrap: 'anywhere',
+                                }}
+                                title={kpi.sql_uttrykk}
+                              >
                                 {kpi.sql_uttrykk}
                               </span>
                             </div>
