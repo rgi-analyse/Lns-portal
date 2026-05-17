@@ -1,6 +1,22 @@
 import * as sql from 'mssql';
+import { parsePrismaUrl } from '../lib/tenantPrisma';
 
 let pool: sql.ConnectionPool | null = null;
+
+// Én cachet pool per tenant-DB (databaseUrl). Analogt til clientCache i
+// tenantPrisma.ts — hindrer at hver query åpner ny tilkobling.
+const tenantPools = new Map<string, sql.ConnectionPool>();
+
+// Maskerer DB-navn for logging (ikke lekk fullt navn til konsoll/logg).
+const maskDb = (databaseUrl: string): string => {
+  try {
+    const db = parsePrismaUrl(databaseUrl).database ?? '';
+    if (db.length <= 4) return '****';
+    return `${db.slice(0, 2)}${'*'.repeat(db.length - 3)}${db.slice(-1)}`;
+  } catch {
+    return '****';
+  }
+};
 
 const parseConnectionString = (connStr: string): sql.config => {
   // Håndter sqlserver:// format
@@ -85,6 +101,36 @@ export const queryAzureSQL = async (
   }
   const result = await req.query(sqlQuery);
   return ((result.recordset as Record<string, unknown>[]) ?? []).slice(0, limit);
+};
+
+/**
+ * Som queryAzureSQL, men kobler til en spesifikk tenant-DB via dens
+ * databaseUrl (fra Tenant.databaseUrl). Pool caches per databaseUrl slik
+ * at gjentatte kall mot samme tenant gjenbruker tilkoblingen.
+ */
+export const queryAzureSQLForTenant = async (
+  databaseUrl: string,
+  sqlQuery: string,
+  params?: Record<string, any>,
+  maxRows = 1000,
+): Promise<any[]> => {
+  let p = tenantPools.get(databaseUrl);
+  if (!p) {
+    // NB: new ConnectionPool — ikke sql.connect(). sql.connect() deler én
+    // global pool i mssql; gjentatte kall med ulik config returnerer den
+    // første tilkoblingen, noe som ville brutt tenant-isolasjon.
+    p = await new sql.ConnectionPool(parsePrismaUrl(databaseUrl)).connect();
+    tenantPools.set(databaseUrl, p);
+    console.log(`[AzureSQL] Ny tenant-pool opprettet: ${maskDb(databaseUrl)}`);
+  }
+  const req = p.request();
+  if (params) {
+    for (const [key, val] of Object.entries(params)) {
+      req.input(key, val);
+    }
+  }
+  const result = await req.query(sqlQuery);
+  return ((result.recordset as any[]) ?? []).slice(0, maxRows);
 };
 
 export const executeAzureSQL = async (sqlQuery: string): Promise<number> => {

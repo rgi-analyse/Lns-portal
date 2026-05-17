@@ -2,7 +2,7 @@ import { PrismaClient } from '../generated/prisma/client';
 import { PrismaMssql } from '@prisma/adapter-mssql';
 import type { config as MssqlConfig } from 'mssql';
 
-function parsePrismaUrl(url: string): MssqlConfig {
+export function parsePrismaUrl(url: string): MssqlConfig {
   const withoutProtocol = url.replace(/^sqlserver:\/\//, '');
   const parts = withoutProtocol.split(';');
 
