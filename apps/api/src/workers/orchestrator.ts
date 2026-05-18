@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { kjørBlokkerende } from '../services/openaiService';
+import { lagGrafPng, type GrafSpec, type GrafFarger } from '../services/grafService';
+import { lastOppBlob } from '../services/blobService';
 
 // Statusverdier som matcher CHECK_ai_analyse_bestilling_status i DB
 const STATUS = {
@@ -27,6 +29,49 @@ function formaterVerdi(verdi: unknown): string {
   }
   // Strip newlines i strenger så markdown-tabellen ikke brytes
   return String(verdi).replace(/[\r\n|]/g, ' ').trim();
+}
+
+/**
+ * Mapper rapportStruktur.graf-config til GrafSpec som grafService forstår.
+ * Returnerer null hvis graf-config er ugyldig eller mangler påkrevde felt.
+ */
+function mapTilGrafSpec(graf: any): GrafSpec | null {
+  if (!graf || typeof graf !== 'object' || !graf.type) {
+    return null;
+  }
+
+  switch (graf.type) {
+    case 'bar_vertikal':
+      if (!graf.x || !graf.y) return null;
+      return {
+        type: 'bar_vertikal',
+        xKolonne: graf.x,
+        yKolonne: graf.y,
+        tittel: graf.tittel,
+        xFormat: graf.x_format,
+      };
+
+    case 'bar_horisontal':
+      if (!graf.x || !graf.y) return null;
+      return {
+        type: 'bar_horisontal',
+        xKolonne: graf.x,
+        yKolonne: graf.y,
+        tittel: graf.tittel,
+      };
+
+    case 'pie':
+      if (!graf.label || !graf.verdi) return null;
+      return {
+        type: 'pie',
+        labelKolonne: graf.label,
+        verdiKolonne: graf.verdi,
+        tittel: graf.tittel,
+      };
+
+    default:
+      return null;  // ukjent graf-type, skip
+  }
 }
 
 /**
@@ -237,9 +282,68 @@ export async function kjørOrchestrator(): Promise<void> {
 
     console.log(`[Orchestrator] AI-fase ferdig: ${Object.keys(aiSeksjoner).length} seksjoner generert (${hoppetOver.length} hoppet over), totalt ${tokenForbrukTotal} tokens`);
 
+    // STEG E: GRAF-FASE
+    console.log(`[Orchestrator] Steg E: starter graf-fase for ${bestilling.id}`);
+
+    // Hent tenant-tema (global — én rad i OrganisasjonTema)
+    const tema = await prisma.organisasjonTema.findFirst({
+      orderBy: { opprettet: 'asc' },
+    });
+
+    const grafFarger: GrafFarger = {
+      primær:     tema?.primaryColor    ?? '#F5A623',
+      bakgrunn:   tema?.backgroundColor ?? '#0a1628',
+      navy:       tema?.navyColor       ?? '#1B2A4A',
+      aksent:     tema?.accentColor     ?? '#243556',
+      tekst:      tema?.textColor       ?? '#FFFFFF',
+      tekstMuted: tema?.textMutedColor  ?? 'rgba(255,255,255,0.55)',
+    };
+
+    console.log(`[Orchestrator] Tema lastet: primær=${grafFarger.primær}, bakgrunn=${grafFarger.bakgrunn}`);
+
+    const aiGrafer: Record<string, string> = {};
+
+    for (const seksjon of sorterteSeksjoner) {
+      // Skip seksjoner uten graf-spec
+      const grafSpec = mapTilGrafSpec(seksjon.graf);
+      if (!grafSpec) {
+        continue;
+      }
+
+      // Hent data fra første query i seksjonens queries-liste
+      if (!seksjon.queries || seksjon.queries.length === 0) {
+        console.log(`[Orchestrator] Seksjon ${seksjon.id}: graf-spec finnes men ingen queries, skipper graf`);
+        continue;
+      }
+
+      const queryId = seksjon.queries[0];
+      const data = dataResultater[queryId];
+
+      if (!data || data.length === 0) {
+        console.log(`[Orchestrator] Seksjon ${seksjon.id}: graf-data tom (query ${queryId}), skipper graf`);
+        continue;
+      }
+
+      console.log(`[Orchestrator] Genererer graf for seksjon ${seksjon.id} (type: ${grafSpec.type}, ${data.length} rader)`);
+
+      // Generer PNG
+      const pngBuffer = await lagGrafPng(grafSpec, data, grafFarger);
+      console.log(`[Orchestrator] Graf ${seksjon.id}: ${pngBuffer.length} bytes`);
+
+      // Last opp til blob
+      const blobSti = `${bestilling.id}/grafer/${seksjon.id}.png`;
+      const uploadResultat = await lastOppBlob(pngBuffer, blobSti, 'image/png');
+
+      aiGrafer[seksjon.id] = uploadResultat.blobSti;
+      console.log(`[Orchestrator] Graf ${seksjon.id}: opplastet til ${uploadResultat.blobSti}`);
+    }
+
+    console.log(`[Orchestrator] Graf-fase ferdig: ${Object.keys(aiGrafer).length} grafer generert og opplastet`);
+
     // 6d. Bygg JSON for sammendrag-kolonnen
     const sammendragsObjekt = {
       seksjoner: aiSeksjoner,
+      grafer: aiGrafer,  // NY: blob-paths per seksjon
       metadata: {
         totalRaderData: totalRader,
         datakildeDetaljer: detaljer,
@@ -247,6 +351,7 @@ export async function kjørOrchestrator(): Promise<void> {
         modellBrukt: modellSomBleBrukt,
         genererte: Object.keys(aiSeksjoner),
         hoppetOver,
+        grafer: Object.keys(aiGrafer),  // NY: hvilke grafer som ble laget
       },
     };
 
