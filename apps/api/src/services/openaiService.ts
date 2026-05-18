@@ -846,6 +846,59 @@ function buildSystemPrompt(rapportKontekst?: string): string {
   ].join('\n');
 }
 
+export interface BlokkerendeResultat {
+  tekst: string;
+  promptTokens: number;
+  completionTokens: number;
+  totaltTokens: number;
+  modell: string;
+}
+
+export interface BlokkerendeOpts {
+  modell?: string;
+  temperatur?: number;
+  maksTokens?: number;
+}
+
+/**
+ * Blokkerende (ikke-streaming) AI-kall for worker-bruk. Returnerer full
+ * tekst + token-forbruk. Helt separat fra chat() (som er streaming +
+ * tool-loop og uegnet for orchestrator). Gjenbruker client-singletonen.
+ */
+export async function kjørBlokkerende(
+  systemPrompt: string,
+  brukerPrompt: string,
+  opts: BlokkerendeOpts = {},
+): Promise<BlokkerendeResultat> {
+  const modell     = opts.modell ?? process.env.AZURE_OPENAI_DEPLOYMENT ?? 'gpt-4o';
+  const temperatur = opts.temperatur ?? 0.3;
+  const maksTokens = opts.maksTokens ?? 2000;
+
+  console.log(`[OpenAI] Blokkerende kall: modell=${modell}, temp=${temperatur}, maxTokens=${maksTokens}`);
+  const start = Date.now();
+
+  const respons = await client.chat.completions.create({
+    model: modell,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user',   content: brukerPrompt },
+    ],
+    temperature: temperatur,
+    max_tokens:  maksTokens,
+    stream: false,
+  });
+
+  const latens           = Date.now() - start;
+  const tekst            = respons.choices[0]?.message?.content ?? '';
+  const promptTokens     = respons.usage?.prompt_tokens ?? 0;
+  const completionTokens = respons.usage?.completion_tokens ?? 0;
+  const totaltTokens     = respons.usage?.total_tokens ?? 0;
+
+  console.log(`[OpenAI] Ferdig: ${promptTokens}+${completionTokens}=${totaltTokens} tokens, ${latens}ms`);
+
+  return { tekst, promptTokens, completionTokens, totaltTokens, modell };
+}
+
 export async function chat(
   messages: ChatMessage[],
   rapportKontekst: string | undefined,
