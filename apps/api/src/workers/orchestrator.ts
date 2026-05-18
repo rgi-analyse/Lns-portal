@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { queryAzureSQLForTenant } from '../services/azureSqlService';
+import { kjørBlokkerende } from '../services/openaiService';
 
 // Statusverdier som matcher CHECK_ai_analyse_bestilling_status i DB
 const STATUS = {
@@ -9,6 +10,24 @@ const STATUS = {
   FEILET:     'FEILET',
   KANSELLERT: 'KANSELLERT',
 } as const;
+
+/**
+ * Formaterer en verdi for visning i markdown-tabell.
+ * Tall vises med opptil 2 desimaler (norsk format).
+ * Datoer ISO-formateres. null/undefined blir tom streng.
+ */
+function formaterVerdi(verdi: unknown): string {
+  if (verdi === null || verdi === undefined) return '';
+  if (typeof verdi === 'number') {
+    // Behold tall som tall — AI håndterer formatering selv (testet OK i D1)
+    return String(verdi);
+  }
+  if (verdi instanceof Date) {
+    return verdi.toISOString().substring(0, 10);  // YYYY-MM-DD
+  }
+  // Strip newlines i strenger så markdown-tabellen ikke brytes
+  return String(verdi).replace(/[\r\n|]/g, ' ').trim();
+}
 
 /**
  * Hovedflyt for én analyse-bestilling.
@@ -120,21 +139,132 @@ export async function kjørOrchestrator(): Promise<void> {
 
     console.log(`[Orchestrator] Datafase ferdig: ${detaljer} (totalt ${totalRader} rader)`);
 
-    // 6. Marker som FERDIG (placeholder for dokument — Word-generering kommer i Steg E/F).
+    // STEG D: AI-FASE
+    console.log(`[Orchestrator] Steg D: starter AI-fase for ${bestilling.id}`);
+
+    // 6a. Parse rapportStruktur og modellPreferanse
+    if (!analyseType.rapportStruktur) {
+      throw new Error(`Analyse-type ${bestilling.analyseTypeId} har ingen rapportStruktur definert`);
+    }
+
+    const rapportStruktur = JSON.parse(analyseType.rapportStruktur);
+    if (!Array.isArray(rapportStruktur.seksjoner)) {
+      throw new Error(`rapportStruktur mangler seksjoner-array for ${bestilling.analyseTypeId}`);
+    }
+
+    // systemPrompt fra analyseType (kan være null — bruk fallback)
+    const systemPrompt = analyseType.systemPrompt
+      ?? 'Du er en analytiker. Skriv kortfattet og presist på norsk.';
+
+    // modellPreferanse fra analyseType (kan være null — bruk defaults)
+    const modellPrefRaw = analyseType.modellPreferanse;
+    const modellPref = modellPrefRaw ? JSON.parse(modellPrefRaw) : {};
+    const aiOpts = {
+      modell: modellPref.primar,  // undefined => helperen bruker default fra env
+      temperatur: modellPref.temperatur ?? 0.3,
+      maksTokens: modellPref.maks_tokens ?? 2000,
+    };
+
+    console.log(`[Orchestrator] AI-konfig: modell=${aiOpts.modell ?? 'env-default'}, temp=${aiOpts.temperatur}, maksTokens=${aiOpts.maksTokens}`);
+
+    // 6b. Sorter seksjoner på rekkefolge
+    const sorterteSeksjoner = [...rapportStruktur.seksjoner].sort(
+      (a, b) => (a.rekkefolge ?? 999) - (b.rekkefolge ?? 999),
+    );
+
+    // 6c. Iterere seksjoner og generer AI-tekst
+    const aiSeksjoner: Record<string, string> = {};
+    const hoppetOver: string[] = [];
+    let tokenForbrukTotal = 0;
+    let modellSomBleBrukt = '';
+
+    for (const seksjon of sorterteSeksjoner) {
+      // Skipp seksjoner som kun viser grafer (ingen tekst)
+      if (seksjon.type === 'graf') {
+        console.log(`[Orchestrator] Seksjon ${seksjon.id}: skipper (kun graf, ingen tekst)`);
+        hoppetOver.push(seksjon.id);
+        continue;
+      }
+
+      console.log(`[Orchestrator] Seksjon ${seksjon.id}: bygger prompt`);
+
+      // Bygg brukerPrompt
+      let brukerPrompt: string;
+
+      if (!seksjon.queries || seksjon.queries.length === 0) {
+        // Spesialcase: seksjoner uten direkte queries (f.eks. anbefalinger)
+        // De får forrige seksjoners tekst som kontekst
+        const tidligereTekster = Object.entries(aiSeksjoner)
+          .map(([id, tekst]) => `## ${id}\n${tekst}`)
+          .join('\n\n');
+
+        brukerPrompt = `Du har tidligere skrevet disse seksjonene basert på data:\n\n${tidligereTekster}\n\n## Din oppgave nå\n${seksjon.instruks}`;
+      } else {
+        // Normal: bygg fra queries
+        const dataDeler: string[] = [];
+        for (const queryId of seksjon.queries) {
+          const rader = dataResultater[queryId];
+          if (!rader || rader.length === 0) {
+            dataDeler.push(`## ${queryId}\n(ingen data)`);
+            continue;
+          }
+
+          // Bygg markdown-tabell
+          const kolonner = Object.keys(rader[0]);
+          const header = `| ${kolonner.join(' | ')} |`;
+          const separator = `| ${kolonner.map(() => '---').join(' | ')} |`;
+          const radLinjer = rader.map(r =>
+            `| ${kolonner.map(k => formaterVerdi(r[k])).join(' | ')} |`,
+          );
+
+          dataDeler.push(`## ${queryId}\n${header}\n${separator}\n${radLinjer.join('\n')}`);
+        }
+
+        brukerPrompt = `Du har følgende data å analysere:\n\n${dataDeler.join('\n\n')}\n\n## Din oppgave\n${seksjon.instruks}`;
+      }
+
+      // Kall AI
+      const start = Date.now();
+      const resultat = await kjørBlokkerende(systemPrompt, brukerPrompt, aiOpts);
+      const latens = Date.now() - start;
+
+      console.log(`[Orchestrator] Seksjon ${seksjon.id}: ferdig (${resultat.totaltTokens} tokens, ${latens}ms)`);
+
+      aiSeksjoner[seksjon.id] = resultat.tekst;
+      tokenForbrukTotal += resultat.totaltTokens;
+      modellSomBleBrukt = resultat.modell;
+    }
+
+    console.log(`[Orchestrator] AI-fase ferdig: ${Object.keys(aiSeksjoner).length} seksjoner generert (${hoppetOver.length} hoppet over), totalt ${tokenForbrukTotal} tokens`);
+
+    // 6d. Bygg JSON for sammendrag-kolonnen
+    const sammendragsObjekt = {
+      seksjoner: aiSeksjoner,
+      metadata: {
+        totalRaderData: totalRader,
+        datakildeDetaljer: detaljer,
+        tokenForbrukTotal,
+        modellBrukt: modellSomBleBrukt,
+        genererte: Object.keys(aiSeksjoner),
+        hoppetOver,
+      },
+    };
+
+    // 6e. Marker som FERDIG.
     // Trygt å bruke update (ikke updateMany): vi har allerede vunnet optimistic lock ovenfor.
     await prisma.analyseBestilling.update({
       where: { id: bestilling.id },
       data: {
         status:       STATUS.FERDIG,
         ferdigDato:   new Date(),
-        tittel:       `Datafase fullført: ${bestilling.analyseTypeId}`,
-        sammendrag:   `Hentet ${Object.keys(dataResultater).length} datakilder, totalt ${totalRader} rader. Detaljer: ${detaljer}. AI-generering kommer i Steg D.`,
-        tokenForbruk: 0,
-        modellBrukt:  'steg-c-data-kun',
+        tittel:       `Analyse fullført: ${bestilling.analyseTypeId}`,
+        sammendrag:   JSON.stringify(sammendragsObjekt),
+        tokenForbruk: tokenForbrukTotal,
+        modellBrukt:  modellSomBleBrukt,
       },
     });
 
-    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg C — data hentet)`);
+    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg D — AI-tekst generert)`);
 
   } catch (error) {
     console.error(`[Orchestrator] Feil i datafase for ${bestilling.id}:`, error);
