@@ -1,4 +1,21 @@
 import { Resvg } from '@resvg/resvg-js';
+import { existsSync, statSync } from 'fs';
+import { join } from 'path';
+
+// Inter bygges inn i repoet (apps/api/fonts/) fordi Azure App Service Linux
+// mangler systemfonter — uten dette renderes all SVG-tekst tomt i prod.
+// resvg-js@2.6.2 har ikke fontBuffers, så vi gir filstier (fontFiles).
+// Presence-sjekk ved modul-load gjør at manglende fonter krasjer høylytt
+// ved oppstart i stedet for å rendre tom tekst i prod.
+const fontDir = join(__dirname, '..', '..', 'fonts');
+const interRegularSti = join(fontDir, 'Inter-Regular.otf');
+const interBoldSti = join(fontDir, 'Inter-Bold.otf');
+for (const sti of [interRegularSti, interBoldSti]) {
+  if (!existsSync(sti)) {
+    throw new Error(`[Graf] Font mangler: ${sti}. Sjekk at apps/api/fonts/ er med i deploy-pakken.`);
+  }
+}
+console.log(`[Graf] Fonter funnet: Inter Regular (${statSync(interRegularSti).size} bytes), Inter Bold (${statSync(interBoldSti).size} bytes)`);
 
 // ─────────────────────────────────────────────
 // Typer
@@ -84,11 +101,11 @@ function bakgrunn(farger: GrafFarger): string {
 
 function tittelSvg(tittel: string | undefined, farger: GrafFarger): string {
   if (!tittel) return '';
-  return `<text x="${W / 2}" y="48" font-family="sans-serif" font-size="28" font-weight="bold" fill="${esc(farger.tekst)}" text-anchor="middle">${esc(tittel)}</text>`;
+  return `<text x="${W / 2}" y="48" font-family="Inter, sans-serif" font-size="28" font-weight="bold" fill="${esc(farger.tekst)}" text-anchor="middle">${esc(tittel)}</text>`;
 }
 
 function tomGraf(tittel: string | undefined, farger: GrafFarger): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${bakgrunn(farger)}${tittelSvg(tittel, farger)}<text x="${W / 2}" y="${H / 2}" font-family="sans-serif" font-size="24" fill="${esc(farger.tekstMuted)}" text-anchor="middle">Ingen data</text></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${bakgrunn(farger)}${tittelSvg(tittel, farger)}<text x="${W / 2}" y="${H / 2}" font-family="Inter, sans-serif" font-size="24" fill="${esc(farger.tekstMuted)}" text-anchor="middle">Ingen data</text></svg>`;
 }
 
 // ─────────────────────────────────────────────
@@ -126,7 +143,7 @@ function lagBarVertikalSvg(
     const v = vmax - (range * i) / linjer;
     const y = yFor(v);
     deler.push(`<line x1="${padLeft}" y1="${y.toFixed(1)}" x2="${padLeft + plotW}" y2="${y.toFixed(1)}" stroke="${esc(farger.tekstMuted)}" stroke-width="1" opacity="0.25"/>`);
-    deler.push(`<text x="${padLeft - 12}" y="${(y + 5).toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.tekstMuted)}" text-anchor="end">${esc(formaterTall(v))}</text>`);
+    deler.push(`<text x="${padLeft - 12}" y="${(y + 5).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekstMuted)}" text-anchor="end">${esc(formaterTall(v))}</text>`);
   }
 
   // Null-linje tydeligere hvis negative verdier finnes
@@ -156,12 +173,12 @@ function lagBarVertikalSvg(
       labelY = zeroY + 24;
       labelFill = farger.bakgrunn;
     }
-    deler.push(`<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(labelFill)}" text-anchor="middle">${esc(formaterTall(v))}</text>`);
+    deler.push(`<text x="${cx.toFixed(1)}" y="${labelY.toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(labelFill)}" text-anchor="middle">${esc(formaterTall(v))}</text>`);
 
     // X-akse-label
     const rå = r[spec.xKolonne];
     const xLabel = spec.xFormat === 'aarmaaned' ? formaterAarMaaned(rå as string | number) : String(rå ?? '');
-    deler.push(`<text x="${cx.toFixed(1)}" y="${(H - padBottom + 28).toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.tekstMuted)}" text-anchor="middle">${esc(xLabel)}</text>`);
+    deler.push(`<text x="${cx.toFixed(1)}" y="${(H - padBottom + 28).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekstMuted)}" text-anchor="middle">${esc(xLabel)}</text>`);
   });
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">${deler.join('')}</svg>`;
@@ -207,7 +224,7 @@ function lagBarHorisontalSvg(
     // Kategori-label (venstre for aksen, høyrejustert i venstremargen)
     const kat = String(r[spec.yKolonne] ?? '');
     const katKort = kat.length > 32 ? kat.slice(0, 31) + '…' : kat;
-    deler.push(`<text x="${padLeft - 12}" y="${(cy + 5).toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="end">${esc(katKort)}</text>`);
+    deler.push(`<text x="${padLeft - 12}" y="${(cy + 5).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="end">${esc(katKort)}</text>`);
 
     // Verdi på enden av søylen. Hvis søylen er så bred at labelen ville
     // gått utenfor høyre kant, plasseres den inne i søyle-enden med mørk
@@ -216,9 +233,9 @@ function lagBarHorisontalSvg(
     const estLabelBredde = labelTekst.length * 9 + 12;
     const utenforX = padLeft + bredde + 10;
     if (utenforX + estLabelBredde > W - 4) {
-      deler.push(`<text x="${(padLeft + bredde - 10).toFixed(1)}" y="${(cy + 5).toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.bakgrunn)}" text-anchor="end">${esc(labelTekst)}</text>`);
+      deler.push(`<text x="${(padLeft + bredde - 10).toFixed(1)}" y="${(cy + 5).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.bakgrunn)}" text-anchor="end">${esc(labelTekst)}</text>`);
     } else {
-      deler.push(`<text x="${utenforX.toFixed(1)}" y="${(cy + 5).toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="start">${esc(labelTekst)}</text>`);
+      deler.push(`<text x="${utenforX.toFixed(1)}" y="${(cy + 5).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="start">${esc(labelTekst)}</text>`);
     }
   });
 
@@ -282,7 +299,7 @@ function lagPieSvg(
     const ly = cy + (r + 30) * Math.sin(vMid);
     const anker = Math.cos(vMid) >= 0 ? 'start' : 'end';
     const pst = (andel * 100).toFixed(1).replace('.', ',');
-    deler.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="${anker}">${esc(seg.navn)} (${pst} %)</text>`);
+    deler.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="${anker}">${esc(seg.navn)} (${pst} %)</text>`);
 
     v0 = v1;
   });
@@ -297,7 +314,11 @@ function lagPieSvg(
 function svgTilPng(svg: string): Buffer {
   const resvg = new Resvg(svg, {
     fitTo: { mode: 'width', value: W },
-    font: { loadSystemFonts: true },
+    font: {
+      fontFiles: [interRegularSti, interBoldSti],
+      loadSystemFonts: false,  // ikke fall tilbake til system (finnes ikke på App Service)
+      defaultFontFamily: 'Inter',
+    },
   });
   return Buffer.from(resvg.render().asPng());
 }
