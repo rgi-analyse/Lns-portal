@@ -34,15 +34,15 @@ async function main() {
   // 2. bar_horisontal — topp leverandører (blandet fortegn, langt navn, æøå)
   const barHData = [
     { Leverandør: '(ikke navngitt)', belop: 5864510.44 },
+    { Leverandør: 'Heidelberg Materials Sement Norge AS', belop: 1240800 },
+    { Leverandør: 'Leonhard Nilsen & Sønner - Eiendom AS', belop: 980500 },
     { Leverandør: 'ISS Facility Services AS', belop: 10800 },
     { Leverandør: 'Tools AS', belop: -3296.89 },
     { Leverandør: 'Sihcon AS', belop: -5997.81 },
-    { Leverandør: 'Pretec AS', belop: -6448 },
     { Leverandør: 'Ahlsell Norge AS', belop: -12450.5 },
     { Leverandør: 'Würth Norge AS', belop: -18900 },
     { Leverandør: 'Motek AS', belop: -24310.75 },
     { Leverandør: 'Brødrene Dahl AS', belop: -41200 },
-    { Leverandør: 'Onninen AS', belop: -58730.2 },
   ];
   const barHPng = await lagGrafPng(
     { type: 'bar_horisontal', xKolonne: 'belop', yKolonne: 'Leverandør', tittel: 'Topp 10 leverandører' },
