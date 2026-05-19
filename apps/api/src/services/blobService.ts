@@ -56,6 +56,25 @@ export async function lastOppBlob(
 }
 
 /**
+ * Laster ned en blob til en Buffer. Brukes i Steg F for å hente
+ * graf-PNG-er (lagret i Steg E) inn i Word-dokumentet.
+ */
+export async function lastNedBlob(blobSti: string): Promise<Buffer> {
+  const container = getContainerClient();
+  const blockBlob = container.getBlockBlobClient(blobSti);
+
+  console.log(`[Blob] Laster ned: ${blobSti}`);
+  const start = Date.now();
+
+  const buffer = await blockBlob.downloadToBuffer();
+
+  const latens = Date.now() - start;
+  console.log(`[Blob] Nedlastet OK: ${blobSti} (${buffer.length} bytes, ${latens}ms)`);
+
+  return buffer;
+}
+
+/**
  * Sletter en blob hvis den finnes. Brukes typisk ikke i prod-flyt,
  * men nyttig for testing/opprydding.
  */
