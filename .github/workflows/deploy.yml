@@ -36,6 +36,10 @@ jobs:
           rm -rf /tmp/api-deploy
           mkdir /tmp/api-deploy
           cp -r apps/api/dist /tmp/api-deploy/
+          # Fonter må følge med — grafService leser apps/api/fonts/*.otf ved
+          # modul-load. __dirname blir <approot>/dist/services i prod, og
+          # join('..','..','fonts') => <approot>/fonts. tsc kopierer ikke assets.
+          cp -r apps/api/fonts /tmp/api-deploy/
           # Lag forenklet package.json: kun start-script + dependencies (ingen build/dev)
           node -e "
             const pkg = require('./apps/api/package.json');
