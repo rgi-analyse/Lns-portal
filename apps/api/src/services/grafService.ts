@@ -195,7 +195,8 @@ function lagBarHorisontalSvg(
 ): string {
   if (data.length === 0) return tomGraf(spec.tittel, farger);
 
-  const padTop = 80, padBottom = 60, padLeft = 220, padRight = 80;
+  // padLeft romslig nok for realistiske leverandørnavn (~40 tegn @16px).
+  const padTop = 80, padBottom = 60, padLeft = 360, padRight = 80;
   const plotW = W - padLeft - padRight;
   const plotH = H - padTop - padBottom;
 
@@ -223,7 +224,7 @@ function lagBarHorisontalSvg(
 
     // Kategori-label (venstre for aksen, høyrejustert i venstremargen)
     const kat = String(r[spec.yKolonne] ?? '');
-    const katKort = kat.length > 32 ? kat.slice(0, 31) + '…' : kat;
+    const katKort = kat.length > 44 ? kat.slice(0, 43) + '…' : kat;
     deler.push(`<text x="${padLeft - 12}" y="${(cy + 5).toFixed(1)}" font-family="Inter, sans-serif" font-size="16" fill="${esc(farger.tekst)}" text-anchor="end">${esc(katKort)}</text>`);
 
     // Verdi på enden av søylen. Hvis søylen er så bred at labelen ville
