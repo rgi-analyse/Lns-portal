@@ -75,7 +75,7 @@ function inlineRuns(
 }
 
 // ── Markdown (block) → Paragraph[] ───────────────────────────────────
-function markdownTilParagraphs(md: string, temaNavy: string): Paragraph[] {
+function markdownTilParagraphs(md: string, temaNavy: string, seksjonsIndeks: number): Paragraph[] {
   const ut: Paragraph[] = [];
   let tokens: Array<Record<string, unknown>>;
   try {
@@ -110,7 +110,7 @@ function markdownTilParagraphs(md: string, temaNavy: string): Paragraph[] {
         ut.push(new Paragraph({
           spacing: { line: 276, after: 60 },
           ...(ordered
-            ? { numbering: { reference: 'num-ordered', level: 0 } }
+            ? { numbering: { reference: `numbers-${seksjonsIndeks}`, level: 0 } }
             : { bullet: { level: 0 } }),
           children: inlineRuns(item.tokens as unknown[]),
         }));
@@ -239,7 +239,7 @@ export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> 
       spacing: { before: 120, after: 200 },
       children: [new TextRun({ text: seksjon.tittel, bold: true, font: FONT, size: 36, color: primaer })],
     }));
-    innhold.push(...markdownTilParagraphs(seksjon.markdownTekst, input.temaNavy));
+    innhold.push(...markdownTilParagraphs(seksjon.markdownTekst, input.temaNavy, idx));
     if (seksjon.grafPng) {
       innhold.push(new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -278,14 +278,16 @@ export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> 
   const doc = new Document({
     features: { updateFields: true },
     styles: { default: { document: { run: { font: FONT } } } },
+    // Én numbering-instans per seksjon → hver nummererte liste starter på 1
+    // (felles instans fortsatte tellingen på tvers av seksjoner).
     numbering: {
-      config: [{
-        reference: 'num-ordered',
+      config: input.seksjoner.map((_, idx) => ({
+        reference: `numbers-${idx}`,
         levels: [{
           level: 0, format: LevelFormat.DECIMAL, text: '%1.', alignment: AlignmentType.START,
           style: { paragraph: { indent: { left: 720, hanging: 360 } } },
         }],
-      }],
+      })),
     },
     sections: [
       {
