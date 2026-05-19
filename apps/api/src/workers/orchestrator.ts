@@ -2,7 +2,8 @@ import { prisma } from '../lib/prisma';
 import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { kjørBlokkerende } from '../services/openaiService';
 import { lagGrafPng, type GrafSpec, type GrafFarger } from '../services/grafService';
-import { lastOppBlob } from '../services/blobService';
+import { lastOppBlob, lastNedBlob } from '../services/blobService';
+import { byggWordRapport, type WordSeksjon } from '../services/wordService';
 
 // Statusverdier som matcher CHECK_ai_analyse_bestilling_status i DB
 const STATUS = {
@@ -340,6 +341,60 @@ export async function kjørOrchestrator(): Promise<void> {
 
     console.log(`[Orchestrator] Graf-fase ferdig: ${Object.keys(aiGrafer).length} grafer generert og opplastet`);
 
+    // STEG F: WORD-RAPPORT
+    console.log(`[Orchestrator] Steg F: starter Word-generering for ${bestilling.id}`);
+
+    const tenantNavn = tema?.organisasjonNavn ?? 'LNS';
+
+    // Undertittel: "Prosjekt X · 1. jan – 31. mar 2026" (norsk dato-range).
+    const datoRange = (fra?: string, til?: string): string => {
+      const f = fra ? new Date(fra) : null;
+      const t = til ? new Date(til) : null;
+      const dm  = new Intl.DateTimeFormat('nb-NO', { day: 'numeric', month: 'short' });
+      const dmy = new Intl.DateTimeFormat('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' });
+      if (f && t) return `${dm.format(f)} – ${dmy.format(t)}`;
+      if (f) return dmy.format(f);
+      if (t) return dmy.format(t);
+      return '';
+    };
+    const prosjektDel = parametre.prosjekt ? `Prosjekt ${parametre.prosjekt}` : '';
+    const rangeDel = datoRange(parametre.fraDato, parametre.tilDato);
+    const undertittel = [prosjektDel, rangeDel].filter(Boolean).join(' · ') || undefined;
+
+    // Bygg seksjoner i rekkefølge — kun de som faktisk fikk AI-tekst.
+    const wordSeksjoner: WordSeksjon[] = [];
+    for (const seksjon of sorterteSeksjoner) {
+      const tekst = aiSeksjoner[seksjon.id];
+      if (!tekst) continue;
+      const grafSti = aiGrafer[seksjon.id];
+      const grafPng = grafSti ? await lastNedBlob(grafSti) : undefined;
+      wordSeksjoner.push({
+        tittel: seksjon.tittel
+          ?? (String(seksjon.id).charAt(0).toUpperCase() + String(seksjon.id).slice(1)),
+        markdownTekst: tekst,
+        grafPng,
+      });
+    }
+
+    const docxBuffer = await byggWordRapport({
+      tittel:       analyseType.navn,
+      undertittel,
+      tenantNavn,
+      generertDato: new Date(),
+      seksjoner:    wordSeksjoner,
+      temaPrimaer:  tema?.primaryColor ?? '#F5A623',
+      temaNavy:     tema?.navyColor    ?? '#1B2A4A',
+    });
+
+    const docxSti = `${bestilling.id}/rapport.docx`;
+    await lastOppBlob(
+      docxBuffer,
+      docxSti,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+    const dokumentNavn = `${analyseType.id}-${new Date().toISOString().slice(0, 10)}.docx`;
+    console.log(`[Orchestrator] Steg F ferdig: ${docxBuffer.length} bytes → ${docxSti} (${dokumentNavn})`);
+
     // 6d. Bygg JSON for sammendrag-kolonnen
     const sammendragsObjekt = {
       seksjoner: aiSeksjoner,
@@ -366,10 +421,12 @@ export async function kjørOrchestrator(): Promise<void> {
         sammendrag:   JSON.stringify(sammendragsObjekt),
         tokenForbruk: tokenForbrukTotal,
         modellBrukt:  modellSomBleBrukt,
+        dokumentUrl:  docxSti,        // blob-sti (ikke full URL — Beslutning #5)
+        dokumentNavn,
       },
     });
 
-    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg D — AI-tekst generert)`);
+    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg F — Word-rapport generert)`);
 
   } catch (error) {
     console.error(`[Orchestrator] Feil i datafase for ${bestilling.id}:`, error);

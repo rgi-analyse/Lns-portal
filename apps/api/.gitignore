@@ -6,5 +6,6 @@ node_modules
 
 certificates
 
-# Graf-test-artefakter (testGrafGenerering.ts skriver til cwd)
+# Test-artefakter (testGrafGenerering.ts / testWordRapport.ts skriver til cwd)
 *.png
+*.docx
