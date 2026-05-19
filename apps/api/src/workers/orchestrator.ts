@@ -3,7 +3,7 @@ import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { kjørBlokkerende } from '../services/openaiService';
 import { lagGrafPng, type GrafSpec, type GrafFarger } from '../services/grafService';
 import { lastOppBlob, lastNedBlob } from '../services/blobService';
-import { byggWordRapport, type WordSeksjon } from '../services/wordService';
+import { byggWordRapport, byggDokumentNavn, type WordSeksjon } from '../services/wordService';
 
 // Statusverdier som matcher CHECK_ai_analyse_bestilling_status i DB
 const STATUS = {
@@ -392,7 +392,11 @@ export async function kjørOrchestrator(): Promise<void> {
       docxSti,
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     );
-    const dokumentNavn = `${analyseType.id}-${new Date().toISOString().slice(0, 10)}.docx`;
+    const dokumentNavn = byggDokumentNavn(
+      { id: analyseType.id, navn: analyseType.navn },
+      parametre,
+      new Date(),
+    );
     console.log(`[Orchestrator] Steg F ferdig: ${docxBuffer.length} bytes → ${docxSti} (${dokumentNavn})`);
 
     // 6d. Bygg JSON for sammendrag-kolonnen

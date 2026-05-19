@@ -30,6 +30,19 @@ function hex(farge: string): string {
   return farge.replace(/^#/, '');
 }
 
+// marked@4 lagrer HTML-escaped tekst i token.text (&quot; &amp; osv.).
+// Sendt uendret til Word vises de literalt. Dekod før TextRun-bygging.
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');   // sist: ellers blir &amp;quot; → &quot; → "
+}
+
 // ── Markdown (inline) → TextRun[] ────────────────────────────────────
 // marked@4: inline-tokens ligger i token.tokens på heading/paragraph/list-item.
 function inlineRuns(
@@ -45,14 +58,14 @@ function inlineRuns(
     } else if (type === 'em') {
       runs.push(...inlineRuns(t.tokens as unknown[], { ...arv, italics: true }));
     } else if (type === 'codespan') {
-      runs.push(new TextRun({ text: String(t.text ?? ''), font: 'Consolas', size: 22, color: SVART }));
+      runs.push(new TextRun({ text: decodeHtmlEntities(String(t.text ?? '')), font: 'Consolas', size: 22, color: SVART }));
     } else if (type === 'text' && Array.isArray(t.tokens)) {
       runs.push(...inlineRuns(t.tokens as unknown[], arv));
     } else if (type === 'br') {
       runs.push(new TextRun({ break: 1 }));
     } else {
       // text / escape / ukjent inline → behold tekst (taper aldri innhold)
-      const tekst = String((t.text as string) ?? (t.raw as string) ?? '');
+      const tekst = decodeHtmlEntities(String((t.text as string) ?? (t.raw as string) ?? ''));
       if (tekst) {
         runs.push(new TextRun({ text: tekst, bold: arv.bold, italics: arv.italics, font: FONT, size: 22, color: SVART }));
       }
@@ -81,7 +94,7 @@ function markdownTilParagraphs(md: string, temaNavy: string): Paragraph[] {
         heading: depth >= 3 ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_2,
         spacing: { before: 240, after: 120 },
         children: [new TextRun({
-          text: String(tok.text ?? ''),
+          text: decodeHtmlEntities(String(tok.text ?? '')),
           bold: true, font: FONT, size, color: hex(temaNavy),
         })],
       }));
@@ -117,6 +130,57 @@ function markdownTilParagraphs(md: string, temaNavy: string): Paragraph[] {
 
 function norskDato(d: Date): string {
   return new Intl.DateTimeFormat('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+}
+
+// Filsystem-uvennlige tegn → mellomrom (blob-sti og nedlastingsnavn).
+function rensFilnavn(s: string): string {
+  return s.replace(/[/\\:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function formaterPeriode(fra?: string, til?: string): string | null {
+  if (!fra || !til) return null;
+  const fraDato = new Date(fra);
+  const tilDato = new Date(til);
+  if (isNaN(fraDato.getTime()) || isNaN(tilDato.getTime())) return null;
+
+  const fraAar = fraDato.getFullYear();
+  const tilAar = tilDato.getFullYear();
+  const fraMnd = fraDato.getMonth();   // 0-indeksert
+  const tilMnd = tilDato.getMonth();
+  const fraDag = fraDato.getDate();
+  const tilDag = tilDato.getDate();
+
+  // Kvartal: starter 1. dag, dekker akkurat 3 måneder, samme år, slutter siste dag
+  if (fraAar === tilAar && fraDag === 1 && fraMnd % 3 === 0 && tilMnd === fraMnd + 2) {
+    const sisteDagIMnd = new Date(tilAar, tilMnd + 1, 0).getDate();
+    if (tilDag === sisteDagIMnd) {
+      return `Q${Math.floor(fraMnd / 3) + 1} ${fraAar}`;
+    }
+  }
+
+  const mnd = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+  if (fraAar === tilAar) return `${mnd[fraMnd]}-${mnd[tilMnd]} ${fraAar}`;
+  return `${mnd[fraMnd]} ${fraAar} - ${mnd[tilMnd]} ${tilAar}`;
+}
+
+/**
+ * Menneskelig dokumentnavn, f.eks. "Varekostnad - Prosjekt 4200 - Q1 2026.docx".
+ * Faller tilbake til kun typenavn hvis prosjekt/periode mangler.
+ */
+export function byggDokumentNavn(
+  analyseType: { id: string; navn: string | null },
+  parametre: { prosjekt?: string; fraDato?: string; tilDato?: string } | null | undefined,
+  _generertDato: Date,
+): string {
+  let typenavn = analyseType.navn ?? analyseType.id;
+  typenavn = typenavn.charAt(0).toUpperCase() + typenavn.slice(1);
+
+  const deler: string[] = [rensFilnavn(typenavn)];
+  if (parametre?.prosjekt) deler.push(rensFilnavn(`Prosjekt ${parametre.prosjekt}`));
+  const periode = formaterPeriode(parametre?.fraDato, parametre?.tilDato);
+  if (periode) deler.push(rensFilnavn(periode));
+
+  return deler.join(' - ') + '.docx';
 }
 
 export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> {
