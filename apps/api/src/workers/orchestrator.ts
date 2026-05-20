@@ -419,9 +419,11 @@ export async function kjørOrchestrator(): Promise<void> {
     await prisma.analyseBestilling.update({
       where: { id: bestilling.id },
       data: {
+        // NB: tittel skrives IKKE — det er brukerens valgfrie felt fra POST,
+        // skal aldri overskrives av workeren. Fallback til analyseType.navn +
+        // parametre håndteres i frontend når feltet er null.
         status:       STATUS.FERDIG,
         ferdigDato:   new Date(),
-        tittel:       `Analyse fullført: ${bestilling.analyseTypeId}`,
         sammendrag:   JSON.stringify(sammendragsObjekt),
         tokenForbruk: tokenForbrukTotal,
         modellBrukt:  modellSomBleBrukt,
