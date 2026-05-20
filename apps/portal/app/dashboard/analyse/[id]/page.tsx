@@ -6,6 +6,7 @@ import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from 'lucide-r
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
+import SammendragVisning from '@/components/analyse/SammendragVisning';
 
 interface Bestilling {
   id:             string;
@@ -26,10 +27,12 @@ interface Bestilling {
   tokenForbruk:   number | null;
   modellBrukt:    string | null;
   analyseType: {
-    id:          string;
-    navn:        string;
-    ikon:        string | null;
-    beskrivelse: string | null;
+    id:               string;
+    navn:             string;
+    ikon:             string | null;
+    beskrivelse:      string | null;
+    // Inkludert kun på GET /:id (ikke i lista). Allerede JSON-parset av API.
+    rapportStruktur?: { seksjoner?: Array<{ id: string; tittel?: string; rekkefolge?: number; type?: string }> } | null;
   };
 }
 
@@ -310,19 +313,45 @@ export default function AnalyseDetaljPage() {
           </div>
         )}
 
-        {/* Sammendrag (ved FERDIG) */}
-        {bestilling.status === 'FERDIG' && bestilling.sammendrag && (
-          <div
-            className="mb-6 rounded-lg px-4 py-3 text-sm whitespace-pre-wrap"
-            style={{
-              background: 'var(--glass-bg)',
-              border:     '1px solid var(--glass-bg-hover)',
-              color:      'var(--text-primary)',
-            }}
-          >
-            {bestilling.sammendrag}
-          </div>
-        )}
+        {/* Rapportinnhold (ved FERDIG) — strukturert visning av AI-tekst + grafer */}
+        {bestilling.status === 'FERDIG' && bestilling.sammendrag && (() => {
+          // sammendrag er JSON.stringify({seksjoner, grafer, metadata}) siden Steg D/E.
+          // Faller tilbake til ren tekst for eldre bestillinger som har fritekst.
+          type Sammendrag = { seksjoner?: Record<string, string>; grafer?: Record<string, string> };
+          let parsed: Sammendrag | null = null;
+          try {
+            const p = JSON.parse(bestilling.sammendrag) as Record<string, unknown>;
+            if (p && typeof p === 'object' && ('seksjoner' in p || 'grafer' in p)) {
+              parsed = p as Sammendrag;
+            }
+          } catch { /* eldre format — håndteres under */ }
+
+          if (parsed) {
+            return (
+              <div className="mb-6">
+                <SammendragVisning
+                  bestillingId={bestilling.id}
+                  authHeaders={authHeaders}
+                  sammendrag={parsed}
+                  rapportStruktur={bestilling.analyseType.rapportStruktur ?? null}
+                />
+              </div>
+            );
+          }
+          // Fallback: eldre fritekst-sammendrag
+          return (
+            <div
+              className="mb-6 rounded-lg px-4 py-3 text-sm whitespace-pre-wrap"
+              style={{
+                background: 'var(--glass-bg)',
+                border:     '1px solid var(--glass-bg-hover)',
+                color:      'var(--text-primary)',
+              }}
+            >
+              {bestilling.sammendrag}
+            </div>
+          );
+        })()}
 
         {/* Parametre */}
         <section
