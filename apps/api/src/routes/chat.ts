@@ -3,6 +3,7 @@ import { chat, type ChatMessage, type ChatContext, type SlicerInfo, type SlicerS
 import { queryAzureSQL } from '../services/azureSqlService';
 import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { erAdmin } from '../middleware/auth';
 
 // ── Statiske regler — gjelder alltid, alle klienter ──
@@ -670,7 +671,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: ChatBody }>(
     '/api/chat',
     {
-      preHandler: [resolveTenant],
+      preHandler: [resolveTenant, requireBruker],
       schema: {
         body: {
           type: 'object',
@@ -1577,7 +1578,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
   //   (ingen param)       → alle samtaler for brukeren
   fastify.get(
     '/api/chat/samtaler',
-    { preHandler: [resolveTenant] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
@@ -1646,7 +1647,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
   // ── GET /api/chat/samtaler/:øktId — meldinger i en spesifikk samtaleøkt ──
   fastify.get(
     '/api/chat/samtaler/:øktId',
-    { preHandler: [resolveTenant] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
@@ -1686,7 +1687,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
   // ── DELETE /api/chat/samtaler/:øktId — slett en samtaleøkt ──
   fastify.delete(
     '/api/chat/samtaler/:øktId',
-    { preHandler: [resolveTenant] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
@@ -1704,7 +1705,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
   // ── PATCH /api/chat/samtaler/:øktId — oppdater tittel på en samtaleøkt ──
   fastify.patch(
     '/api/chat/samtaler/:øktId',
-    { preHandler: [resolveTenant] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
