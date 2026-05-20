@@ -753,6 +753,9 @@ export async function chatRoutes(fastify: FastifyInstance) {
 
       // Bygg chat-kontekst (brukes av search_portal_reports og create_report)
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
+      // requireBruker sikrer at bruker er innlogget og registrert. innloggetBruker.id
+      // brukes som userId i ChatHistorikk (stabil lokal UUID, ikke entraObjectId).
+      const innloggetBruker = (request as AuthRequest).bruker;
       let chatContext: ChatContext = { entraObjectId };
       if (entraObjectId) {
         try {
@@ -868,7 +871,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
       // Rydd historikk eldre enn 7 dager (fire-and-forget)
       if (entraObjectId) {
         prisma.chatHistorikk.deleteMany({
-          where: { userId: entraObjectId, tidspunkt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+          where: { userId: innloggetBruker.id, tidspunkt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
         }).catch(() => {});
       }
 
@@ -879,8 +882,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
           const iDagDato = new Date().toISOString().slice(0, 10);
           const tidligereHistorikk = await prisma.chatHistorikk.findMany({
             where: {
-              userId: entraObjectId,
-              øktId: { not: `${entraObjectId}-${iDagDato}` },
+              userId: innloggetBruker.id,
+              øktId: { not: `${innloggetBruker.id}-${iDagDato}` },
               tenantSlug,
             },
             orderBy: { tidspunkt: 'desc' },
@@ -1062,7 +1065,7 @@ Tilgjengelige visualiseringstyper:
         console.log('[Chat] global stream | øktId:', øktIdGlobal, '| chatRapportId:', chatRapportIdGlobal);
         if (entraObjectId && String(sisteBrukermelding).trim()) {
           await prisma.chatHistorikk.create({
-            data: { userId: entraObjectId, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
+            data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
           }).catch(() => {});
         }
 
@@ -1131,13 +1134,13 @@ Tilgjengelige visualiseringstyper:
         if (entraObjectId && (fullAiTekst || fangstMetadataGlobal)) {
           prisma.chatHistorikk.create({
             data: {
-              userId: entraObjectId, rolle: 'assistant',
+              userId: innloggetBruker.id, rolle: 'assistant',
               innhold: fullAiTekst.slice(0, 4000),
               øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal,
               ...(fangstMetadataGlobal ? { melding_metadata: fangstMetadataGlobal } : {}),
             },
           }).then(() => {
-            sikreTittelGenerert(entraObjectId!, øktIdGlobal, tenantSlug);
+            sikreTittelGenerert(innloggetBruker.id, øktIdGlobal, tenantSlug);
           }).catch(() => {});
         }
         return;
@@ -1486,8 +1489,8 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const chatRapportIdRapport = request.body.chatRapportId ?? null;
       console.log('[Chat] rapport stream | øktId:', øktIdRapport, '| chatRapportId:', chatRapportIdRapport);
       if (entraObjectId && String(sisteBrukermelding).trim()) {
-        await prisma.chatHistorikk.create({
-          data: { userId: entraObjectId, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
+        await prisma.chatHistorikk.create({  // rapport-stream brukermelding
+          data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
         }).catch(() => {});
       }
 
@@ -1558,13 +1561,13 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       if (entraObjectId && (fullAiTekstRapport || fangstMetadataRapport)) {
         prisma.chatHistorikk.create({
           data: {
-            userId: entraObjectId, rolle: 'assistant',
+            userId: innloggetBruker.id, rolle: 'assistant',
             innhold: fullAiTekstRapport.slice(0, 4000),
             øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport,
             ...(fangstMetadataRapport ? { melding_metadata: fangstMetadataRapport } : {}),
           },
         }).then(() => {
-          sikreTittelGenerert(entraObjectId!, øktIdRapport, tenantSlug);
+          sikreTittelGenerert(innloggetBruker.id, øktIdRapport, tenantSlug);
         }).catch(() => {});
       }
     },
@@ -1582,6 +1585,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const query = request.query as Record<string, string | undefined>;
 
@@ -1595,7 +1599,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
 
       // Hent en rad per øktId (siste rad = nyeste melding i økten)
       const rader = await prisma.chatHistorikk.findMany({
-        where: { userId: entraObjectId, tenantSlug, ...(rapportIdFilter ?? {}) },
+        where: { userId: innloggetBruker.id, tenantSlug, ...(rapportIdFilter ?? {}) },
         orderBy: { tidspunkt: 'desc' },
         select: { øktId: true, tittel: true, tidspunkt: true, rapportId: true },
       });
@@ -1626,7 +1630,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       const øktIds = samtaler.map(s => s.øktId);
       const førsteMeldingRader = øktIds.length > 0
         ? await prisma.chatHistorikk.findMany({
-            where: { userId: entraObjectId, tenantSlug, øktId: { in: øktIds }, rolle: 'user' },
+            where: { userId: innloggetBruker.id, tenantSlug, øktId: { in: øktIds }, rolle: 'user' },
             orderBy: { tidspunkt: 'asc' },
             select: { øktId: true, innhold: true },
           })
@@ -1651,11 +1655,12 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
 
       const meldinger = await prisma.chatHistorikk.findMany({
-        where: { userId: entraObjectId, øktId, tenantSlug },
+        where: { userId: innloggetBruker.id, øktId, tenantSlug },
         orderBy: { tidspunkt: 'asc' },
         select: { rolle: true, innhold: true, tidspunkt: true, rapportId: true, melding_metadata: true },
       });
@@ -1691,11 +1696,12 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
 
       await prisma.chatHistorikk.deleteMany({
-        where: { userId: entraObjectId, øktId, tenantSlug },
+        where: { userId: innloggetBruker.id, øktId, tenantSlug },
       });
 
       return reply.send({ ok: true });
@@ -1709,6 +1715,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
       if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
       const { tittel } = request.body as { tittel?: string };
@@ -1717,7 +1724,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       await prisma.$executeRawUnsafe(
         `UPDATE [ChatHistorikk] SET [tittel] = @P1 WHERE [userId] = @P2 AND [øktId] = @P3 AND [tenantSlug] = @P4`,
         tittel.slice(0, 200),
-        entraObjectId,
+        innloggetBruker.id,
         øktId,
         tenantSlug,
       );
