@@ -114,7 +114,7 @@ export async function analyseRoutes(fastify: FastifyInstance) {
         },
         include: {
           analyseType: {
-            select: { id: true, navn: true, ikon: true, beskrivelse: true },
+            select: { id: true, navn: true, ikon: true, beskrivelse: true, rapportStruktur: true },
           },
         },
       });
@@ -162,6 +162,62 @@ export async function analyseRoutes(fastify: FastifyInstance) {
       return reply
         .header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         .header('Content-Disposition', byggContentDisposition(filnavn))
+        .send(buffer);
+    },
+  );
+
+  // ── GET /api/analyse/bestillinger/:id/grafer/:seksjon ────────────────────
+  // Streamer graf-PNG fra blob for inline-visning i sammendrag-komponenten.
+  fastify.get<{ Params: { id: string; seksjon: string } }>(
+    '/api/analyse/bestillinger/:id/grafer/:seksjon',
+    { preHandler: [requireBruker, requireAnalyseTilgang] },
+    async (request, reply) => {
+      // Defense-in-depth: avvis åpenbart ugyldige seksjon-IDer før vi treffer DB/blob.
+      // Tillatte tegn matcher konvensjonen i rapportStruktur (snake_case-lignende).
+      if (!/^[a-z0-9_-]+$/i.test(request.params.seksjon)) {
+        return reply.status(400).send({ error: 'Ugyldig seksjon-id.' });
+      }
+
+      const bruker = (request as AuthRequest).bruker;
+      const tenantSlug = hentTenantSlug(request);
+
+      const b = await prisma.analyseBestilling.findFirst({
+        where:  { id: request.params.id, brukerId: bruker.id, tenantSlug },
+        select: { status: true, sammendrag: true },
+      });
+
+      if (!b) {
+        return reply.status(404).send({ error: 'Bestilling ikke funnet.' });
+      }
+      if (b.status !== 'FERDIG') {
+        return reply.status(400).send({ error: `Rapport ikke klar (status: ${b.status}).` });
+      }
+      if (!b.sammendrag) {
+        return reply.status(404).send({ error: 'Ingen rapportdata for denne bestillingen.' });
+      }
+
+      let blobSti: string | undefined;
+      try {
+        const parsed = JSON.parse(b.sammendrag) as { grafer?: Record<string, string> };
+        blobSti = parsed.grafer?.[request.params.seksjon];
+      } catch {
+        return reply.status(500).send({ error: 'Kunne ikke tolke rapportdata.' });
+      }
+      if (!blobSti) {
+        return reply.status(404).send({ error: 'Graf finnes ikke for denne seksjonen.' });
+      }
+
+      let buffer: Buffer;
+      try {
+        buffer = await lastNedBlob(blobSti);
+      } catch (err) {
+        request.log.error({ err }, '[analyse] graf-blob-nedlasting feilet');
+        return reply.status(502).send({ error: 'Kunne ikke hente graf-fil fra lager.' });
+      }
+
+      return reply
+        .header('Content-Type', 'image/png')
+        .header('Cache-Control', 'private, max-age=300')
         .send(buffer);
     },
   );
@@ -296,12 +352,22 @@ type BestillingMedType = {
   forsokAntall: number;
   tokenForbruk: number | null;
   modellBrukt: string | null;
-  analyseType: { id: string; navn: string; ikon: string | null; beskrivelse?: string | null };
+  analyseType: {
+    id: string;
+    navn: string;
+    ikon: string | null;
+    beskrivelse?: string | null;
+    rapportStruktur?: string | null;   // KUN inkludert i /:id, ikke i listen
+  };
 };
 
 function formaterBestilling(b: BestillingMedType) {
+  const analyseType = b.analyseType.rapportStruktur !== undefined
+    ? { ...b.analyseType, rapportStruktur: safeParse(b.analyseType.rapportStruktur ?? '') }
+    : b.analyseType;
   return {
     ...b,
-    parametre: safeParse(b.parametre),
+    parametre:   safeParse(b.parametre),
+    analyseType,
   };
 }
