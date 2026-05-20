@@ -31,6 +31,7 @@ interface Bruker {
   opprettet:     string;
   sistInnlogget: string | null;
   chatAktivert:  boolean;
+  harAnalyseTilgang: boolean;
 }
 
 interface GraphUser {
@@ -95,7 +96,7 @@ export default function BrukerAdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authHeaders['X-Entra-Object-Id']]);
 
-  const patch = useCallback(async (bruker: Bruker, data: Partial<Pick<Bruker, 'erAktiv' | 'rolle' | 'chatAktivert'>>) => {
+  const patch = useCallback(async (bruker: Bruker, data: Partial<Pick<Bruker, 'erAktiv' | 'rolle' | 'chatAktivert' | 'harAnalyseTilgang'>>) => {
     const snapshot = { ...bruker };
     setBrukere((prev) => prev.map((b) => (b.id === bruker.id ? { ...b, ...data } : b)));
     try {
@@ -376,6 +377,23 @@ export default function BrukerAdminPage() {
                           {!b.chatAktivert && <line x1="4" y1="4" x2="20" y2="20"/>}
                         </svg>
                         {b.chatAktivert ? 'Chat på' : 'Chat av'}
+                      </button>
+                      <button
+                        onClick={() => patch(b, { harAnalyseTilgang: !b.harAnalyseTilgang })}
+                        title={b.harAnalyseTilgang ? 'Trekk tilbake analyse-tilgang' : 'Gi analyse-tilgang'}
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded border transition-colors"
+                        style={{
+                          borderColor: b.harAnalyseTilgang ? 'var(--glass-gold-border)' : 'rgb(229,231,235)',
+                          background:  b.harAnalyseTilgang ? 'var(--glass-gold-bg)' : 'transparent',
+                          color:       b.harAnalyseTilgang ? 'var(--gold)' : 'rgb(107,114,128)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 3v18h18"/>
+                          <path d="M7 16l4-4 4 3 5-6"/>
+                          {!b.harAnalyseTilgang && <line x1="4" y1="4" x2="20" y2="20"/>}
+                        </svg>
+                        {b.harAnalyseTilgang ? 'Analyse på' : 'Analyse av'}
                       </button>
                       <button
                         onClick={() => patch(b, { erAktiv: !b.erAktiv })}

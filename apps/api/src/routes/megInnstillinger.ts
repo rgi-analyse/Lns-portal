@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
-import { prisma } from '../lib/prisma';
 
 interface TtsInnstillinger {
   stemmNavn?: string;
@@ -23,17 +22,15 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
   // GET /api/meg — returnerer innlogget brukers grunninfo (rolle m.m.)
   fastify.get('/api/meg', { preHandler: [requireBruker] }, async (request, reply) => {
     const bruker = (request as AuthRequest).bruker;
-    const profil = await prisma.userProfile.findUnique({
-      where:  { userId: bruker.id },
-      select: { harAnalyseTilgang: true },
-    });
+    // Steg I: harAnalyseTilgang er flyttet fra UserProfile til Bruker.
+    // JSON-respons-form er uendret — frontend (Sidebar) merker ingen forskjell.
     return reply.send({
       id:                bruker.id,
       rolle:             bruker.rolle,
       displayName:       bruker.displayName,
       email:             bruker.email,
       chatAktivert:      bruker.chatAktivert,
-      harAnalyseTilgang: profil?.harAnalyseTilgang ?? false,
+      harAnalyseTilgang: bruker.harAnalyseTilgang ?? false,
     });
   });
 
