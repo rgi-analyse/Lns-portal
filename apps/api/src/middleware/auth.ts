@@ -68,8 +68,10 @@ export function erAdmin(rolle: string | undefined): boolean {
 }
 
 /**
- * Krever at pålogget bruker har harAnalyseTilgang=true på UserProfile.
+ * Krever at pålogget bruker har harAnalyseTilgang=true.
  * Må brukes etter requireBruker. Returnerer 403 hvis ikke tilgang.
+ * Steg I: feltet er flyttet fra UserProfile til Bruker, så vi leser
+ * direkte fra bruker-objektet som allerede ligger på request.
  */
 export async function requireAnalyseTilgang(
   request: FastifyRequest,
@@ -79,11 +81,7 @@ export async function requireAnalyseTilgang(
   if (!bruker) {
     return reply.status(401).send({ error: 'Ikke innlogget.' });
   }
-  const profil = await prisma.userProfile.findUnique({
-    where: { userId: bruker.id },
-    select: { harAnalyseTilgang: true },
-  });
-  if (!profil?.harAnalyseTilgang) {
+  if (!bruker.harAnalyseTilgang) {
     return reply.status(403).send({ error: 'Krever analyse-tilgang.' });
   }
 }
