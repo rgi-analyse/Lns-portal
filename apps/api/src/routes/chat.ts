@@ -1060,7 +1060,7 @@ Tilgjengelige visualiseringstyper:
 
         // Bestem øktId og lagre brukermelding FØR AI-stream starter
         const iDagDatoGlobal = new Date().toISOString().slice(0, 10);
-        const øktIdGlobal = request.body.øktId ?? `${entraObjectId}-${iDagDatoGlobal}`;
+        const øktIdGlobal = request.body.øktId ?? `${innloggetBruker.id}-${iDagDatoGlobal}`;
         const chatRapportIdGlobal = request.body.chatRapportId ?? null;
         console.log('[Chat] global stream | øktId:', øktIdGlobal, '| chatRapportId:', chatRapportIdGlobal);
         if (entraObjectId && String(sisteBrukermelding).trim()) {
@@ -1484,7 +1484,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
 
       // Bestem øktId og lagre brukermelding FØR AI-stream starter
       const iDagDatoRapport = new Date().toISOString().slice(0, 10);
-      const øktIdRapport = request.body.øktId ?? `${entraObjectId}-${iDagDatoRapport}`;
+      const øktIdRapport = request.body.øktId ?? `${innloggetBruker.id}-${iDagDatoRapport}`;
       // Kun chatRapportId (portal UUID) — IKKE fallback til rapportId (PBI GUID)
       const chatRapportIdRapport = request.body.chatRapportId ?? null;
       console.log('[Chat] rapport stream | øktId:', øktIdRapport, '| chatRapportId:', chatRapportIdRapport);
