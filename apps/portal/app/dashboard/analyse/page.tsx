@@ -6,6 +6,7 @@ import { Plus, TrendingUp, Loader2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
+import { bygTittel } from '@/lib/analyseTittel';
 
 interface Bestilling {
   id:             string;
@@ -13,6 +14,7 @@ interface Bestilling {
   tittel:         string | null;
   status:         string;
   bestiltDato:    string;
+  parametre:      Record<string, unknown> | null;
   analyseType: {
     id:   string;
     navn: string;
@@ -232,7 +234,7 @@ export default function AnalyseListePage() {
                 {/* Midt */}
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
-                    {b.tittel || b.analyseType.navn}
+                    {bygTittel(b.tittel, b.analyseType.navn, b.parametre)}
                   </div>
                   <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                     <span>{b.analyseType.navn}</span>

@@ -7,6 +7,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
 import SammendragVisning from '@/components/analyse/SammendragVisning';
+import { bygTittel } from '@/lib/analyseTittel';
 
 interface Bestilling {
   id:             string;
@@ -263,7 +264,7 @@ export default function AnalyseDetaljPage() {
                 letterSpacing: '0.03em',
               }}
             >
-              {bestilling.tittel || bestilling.analyseType.navn}
+              {bygTittel(bestilling.tittel, bestilling.analyseType.navn, bestilling.parametre)}
             </h1>
             <div className="mt-1.5 flex items-center gap-2.5 flex-wrap">
               <span
