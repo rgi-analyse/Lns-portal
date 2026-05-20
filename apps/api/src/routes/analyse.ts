@@ -3,6 +3,23 @@ import crypto from 'crypto';
 import Ajv, { type ValidateFunction } from 'ajv';
 import { prisma } from '../lib/prisma';
 import { requireBruker, requireAnalyseTilgang, type AuthRequest } from '../middleware/auth';
+import { lastNedBlob } from '../services/blobService';
+
+/**
+ * RFC 5987 Content-Disposition: ASCII-fallback + UTF-8-encoded versjon
+ * for å støtte norske tegn, mellomrom og spesialtegn i filnavn.
+ */
+function byggContentDisposition(filnavn: string): string {
+  const asciiFallback = filnavn
+    .replace(/æ/g, 'ae').replace(/Æ/g, 'Ae')
+    .replace(/ø/g, 'o').replace(/Ø/g, 'O')
+    .replace(/å/g, 'a').replace(/Å/g, 'A')
+    .replace(/[^\x20-\x7E]/g, '_')
+    .replace(/"/g, "'");
+  const utf8Encoded = encodeURIComponent(filnavn)
+    .replace(/['()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${utf8Encoded}`;
+}
 
 // Ajv-instans deles mellom requests — cache compilerte validatorer per analyseTypeId
 const ajv = new Ajv({ allErrors: true, strict: false });
@@ -106,6 +123,46 @@ export async function analyseRoutes(fastify: FastifyInstance) {
         return reply.status(404).send({ error: 'Bestilling ikke funnet.' });
       }
       return reply.send(formaterBestilling(bestilling));
+    },
+  );
+
+  // ── GET /api/analyse/bestillinger/:id/rapport ────────────────────────────
+  // Streamer .docx fra blob til klient. Krever eierskap + FERDIG-status.
+  fastify.get<{ Params: { id: string } }>(
+    '/api/analyse/bestillinger/:id/rapport',
+    { preHandler: [requireBruker, requireAnalyseTilgang] },
+    async (request, reply) => {
+      const bruker = (request as AuthRequest).bruker;
+      const tenantSlug = hentTenantSlug(request);
+
+      const b = await prisma.analyseBestilling.findFirst({
+        where:  { id: request.params.id, brukerId: bruker.id, tenantSlug },
+        select: { status: true, dokumentUrl: true, dokumentNavn: true },
+      });
+
+      if (!b) {
+        return reply.status(404).send({ error: 'Bestilling ikke funnet.' });
+      }
+      if (b.status !== 'FERDIG') {
+        return reply.status(400).send({ error: `Rapport ikke klar (status: ${b.status}).` });
+      }
+      if (!b.dokumentUrl) {
+        return reply.status(404).send({ error: 'Ingen rapport generert for denne bestillingen.' });
+      }
+
+      let buffer: Buffer;
+      try {
+        buffer = await lastNedBlob(b.dokumentUrl);
+      } catch (err) {
+        request.log.error({ err }, '[analyse] blob-nedlasting feilet');
+        return reply.status(502).send({ error: 'Kunne ikke hente rapportfil fra lager.' });
+      }
+
+      const filnavn = b.dokumentNavn ?? 'rapport.docx';
+      return reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+        .header('Content-Disposition', byggContentDisposition(filnavn))
+        .send(buffer);
     },
   );
 

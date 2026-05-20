@@ -90,6 +90,8 @@ export default function AnalyseDetaljPage() {
   const [lasteStatus, setLasteStatus] = useState<'loading' | 'ok' | 'notfound' | 'forbidden' | 'error'>('loading');
   const [kansellerer, setKansellerer] = useState(false);
   const [kansellerFeil, setKansellerFeil] = useState<string | null>(null);
+  const [lasterNed, setLasterNed] = useState(false);
+  const [nedlastingFeil, setNedlastingFeil] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !entraObjectId || !id) return;
@@ -124,6 +126,37 @@ export default function AnalyseDetaljPage() {
       setKansellerFeil(err instanceof Error ? err.message : 'Ukjent feil');
     } finally {
       setKansellerer(false);
+    }
+  }
+
+  async function handleLastNed() {
+    if (!bestilling) return;
+    setNedlastingFeil(null);
+    setLasterNed(true);
+    try {
+      const r = await apiFetch(
+        `/api/analyse/bestillinger/${bestilling.id}/rapport`,
+        { headers: authHeaders },
+      );
+      if (!r.ok) {
+        const detail = await r.json().catch(() => ({}));
+        throw new Error(detail?.error ?? `Nedlasting feilet (${r.status})`);
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = bestilling.dokumentNavn ?? 'rapport.docx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      const melding = err instanceof Error ? err.message : 'Ukjent feil';
+      setNedlastingFeil(melding);
+      console.error('[Nedlasting] Feilet:', err);
+    } finally {
+      setLasterNed(false);
     }
   }
 
@@ -382,21 +415,35 @@ export default function AnalyseDetaljPage() {
 
         {/* Handlinger */}
         <div className="flex items-center gap-3 flex-wrap">
-          {bestilling.status === 'FERDIG' && (
-            <button
-              type="button"
-              disabled
-              title="Rapport-nedlasting er ikke tilgjengelig enda (kommer i senere fase)"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: 'var(--glass-gold-bg)',
-                border:     '1px solid var(--glass-gold-border)',
-                color:      'var(--gold)',
-              }}
-            >
-              <Download className="w-4 h-4" />
-              Last ned rapport
-            </button>
+          {bestilling.status === 'FERDIG' && bestilling.dokumentUrl && (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => void handleLastNed()}
+                disabled={lasterNed}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'var(--glass-gold-bg)',
+                  border:     '1px solid var(--glass-gold-border)',
+                  color:      'var(--gold)',
+                }}
+              >
+                {lasterNed ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Laster ned…
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Last ned rapport
+                  </>
+                )}
+              </button>
+              {nedlastingFeil && (
+                <p className="text-sm text-red-400">{nedlastingFeil}</p>
+              )}
+            </div>
           )}
 
           {bestilling.status === 'BESTILT' && (
