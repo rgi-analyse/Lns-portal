@@ -18,6 +18,14 @@ import { prisma } from '../lib/prisma';
 
 export const SLICER_INDEKS_NAVN = 'synapse-slicer-katalog';
 
+/**
+ * Markør i forelder_verdi-feltet for å skille topp-nivå-rader (hierarki)
+ * fra barn-rader. Indekserings­tjenesten skriver én topp-rad per DISTINCT
+ * forelder-verdi med denne markøren; matchEnTopp filtrerer mot den.
+ * Verdi: ikke-tom streng som ikke kan kollidere med ekte forelder-navn.
+ */
+export const TOPP_MARKOR = '__topp__';
+
 // retrievable er default true i SDK v13 — feltet er ikke en del av SimpleField-typen.
 // Bruk hidden: true for å unngå at et felt returneres i søkesvar.
 const indeksDefinisjon: SearchIndex = {
