@@ -311,3 +311,107 @@ export async function søk(forespørsel: SlicerSøkForespørsel): Promise<Slicer
     })),
   };
 }
+
+/**
+ * Henter komplett verdi-liste for en hierarki-slicer fra Azure Search-indeksen.
+ * Bypasser frontend-state (som kan være filtrert av PBI-søk eller kollapset).
+ *
+ * Returnerer null hvis sliceren ikke er indeksert eller indeksen er tom for
+ * denne sliceren — kaller skal da falle tilbake til frontend-state.
+ *
+ * Krever at sliceren er re-indeksert med TOPP_MARKOR-konvensjonen (jf. Steg
+ * fix/hierarki-slicer-toppniva-ai-search).
+ */
+export async function hentKompleteSlicerVerdier(
+  tenant:       string,
+  rapportId:    string,
+  slicerTittel: string,
+): Promise<{ topp: string[]; barn: Record<string, string[]> } | null> {
+  const service = getSearchService();
+  const finnes  = await service.finnesIndeks(SLICER_INDEKS_NAVN);
+  if (!finnes) return null;
+
+  const filter =
+    `tenant eq '${escapeOData(tenant)}' and ` +
+    `rapport_id eq '${escapeOData(rapportId)}' and ` +
+    `slicer_tittel eq '${escapeOData(slicerTittel)}' and ` +
+    `slicer_type eq 'hierarchy'`;
+
+  const alleRader: Array<{ verdi: string; forelder_verdi: string | null }> = [];
+  let skip = 0;
+  const sideStørrelse = 1000;
+  // Paginering: hierarki-slicere har sjelden > 1000 verdier, men vi støtter
+  // flere sider defensivt.
+  while (true) {
+    const respons = await service.søk<IndeksertDokument>(SLICER_INDEKS_NAVN, {
+      searchText: '*',
+      filter,
+      top:    sideStørrelse,
+      skip,
+      select: ['verdi', 'forelder_verdi'],
+    });
+    if (respons.treff.length === 0) break;
+    for (const t of respons.treff) {
+      alleRader.push({
+        verdi:          t.document.verdi,
+        forelder_verdi: t.document.forelder_verdi ?? null,
+      });
+    }
+    if (respons.treff.length < sideStørrelse) break;
+    skip += sideStørrelse;
+  }
+
+  if (alleRader.length === 0) return null;
+
+  const topp: string[] = [];
+  const barn: Record<string, string[]> = {};
+  for (const rad of alleRader) {
+    if (rad.forelder_verdi === TOPP_MARKOR) {
+      topp.push(rad.verdi);
+    } else if (rad.forelder_verdi !== null && rad.forelder_verdi !== '') {
+      if (!barn[rad.forelder_verdi]) barn[rad.forelder_verdi] = [];
+      barn[rad.forelder_verdi].push(rad.verdi);
+    }
+  }
+
+  return { topp, barn };
+}
+
+/**
+ * Tilsvarende for basic-slicere: returnerer komplett verdi-liste fra indeksen.
+ * Returnerer null hvis ikke indeksert eller tom.
+ */
+export async function hentKompleteBasicVerdier(
+  tenant:       string,
+  rapportId:    string,
+  slicerTittel: string,
+): Promise<string[] | null> {
+  const service = getSearchService();
+  const finnes  = await service.finnesIndeks(SLICER_INDEKS_NAVN);
+  if (!finnes) return null;
+
+  const filter =
+    `tenant eq '${escapeOData(tenant)}' and ` +
+    `rapport_id eq '${escapeOData(rapportId)}' and ` +
+    `slicer_tittel eq '${escapeOData(slicerTittel)}' and ` +
+    `slicer_type eq 'basic'`;
+
+  const verdier: string[] = [];
+  let skip = 0;
+  const sideStørrelse = 1000;
+  while (true) {
+    const respons = await service.søk<IndeksertDokument>(SLICER_INDEKS_NAVN, {
+      searchText: '*',
+      filter,
+      top:    sideStørrelse,
+      skip,
+      select: ['verdi'],
+    });
+    if (respons.treff.length === 0) break;
+    verdier.push(...respons.treff.map((t) => t.document.verdi));
+    if (respons.treff.length < sideStørrelse) break;
+    skip += sideStørrelse;
+  }
+
+  return verdier.length === 0 ? null : verdier;
+}
