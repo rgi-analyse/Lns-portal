@@ -6,6 +6,7 @@ import {
   søk as søkSlicerKatalog,
   erIndeksert as slicerErIndeksert,
   velgFraTreff as slicerVelgFraTreff,
+  TOPP_MARKOR,
 } from './slicerKatalogService';
 import { validerKpiUttrykk } from './kpiValidator';
 import { detekterKpiKandidater, type KpiForslag } from './kpiDetektor';
@@ -438,7 +439,86 @@ async function matchEnBarn(
   };
 }
 
-/** Validerer hierarki-payload. Topp-nivå er lokal-bare; barn har AI Search-fallback. */
+/**
+ * Match én topp-nivå-verdi: lokal først (kollapset PBI-state inneholder bare
+ * ekspanderte forelder-noder), så AI Search-fallback med TOPP_MARKOR-filter.
+ * Symmetrisk med matchEnBasicVerdi / matchEnBarn.
+ */
+async function matchEnTopp(
+  toppVerdi:  string | number,
+  info:       HierarchySlicerInfo,
+  tenant?:    string,
+  rapportId?: string,
+): Promise<{ ok: true; verdi: string } | ValideringFeil> {
+  // 1. Lokal eksakt/prefiks mot ekspanderte topp-noder
+  const lokal = finnBesteMatch(toppVerdi, info.toppNivåVerdier);
+  if (lokal.type === 'exact') {
+    console.log(`[validator] eksakt (topp): "${lokal.treff}" i "${info.tittel}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'prefix') {
+    console.log(`[validator] prefiks (topp): "${toppVerdi}" → "${lokal.treff}" i "${info.tittel}"`);
+    return { ok: true, verdi: lokal.treff };
+  }
+  if (lokal.type === 'ambiguous') {
+    return {
+      ok:       false,
+      kategori: 'ambiguous',
+      error:
+        `Topp-nivå-verdien "${toppVerdi}" har flere mulige lokale treff i "${info.tittel}": ` +
+        `${lokal.alle.join(', ')}. Vær mer spesifikk og bruk eksakt en av disse.`,
+      forslag:  lokal.alle,
+    };
+  }
+
+  // 2. AI Search-fallback (filter på TOPP_MARKOR — kun topp-rader)
+  if (tenant && rapportId) {
+    try {
+      const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
+      if (status.indeksert) {
+        console.log(`[validator] ingen lokal match for topp "${toppVerdi}", prøver AI Search`);
+        const respons = await søkSlicerKatalog({
+          tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
+          søketerm: String(toppVerdi),
+          forelder_verdi: TOPP_MARKOR,
+          top: 5,
+        });
+        const vurdering = slicerVelgFraTreff(respons.treff, String(toppVerdi));
+        if (vurdering.type === 'unique') {
+          console.log(`[validator] AI Search match (topp): "${toppVerdi}" → "${vurdering.treff}"`);
+          return { ok: true, verdi: vurdering.treff };
+        }
+        if (vurdering.type === 'ambiguous') {
+          const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
+          console.log(`[validator] tvetydig topp (${vurdering.alle.length} relevante etter filtrering)`);
+          return {
+            ok:       false,
+            kategori: 'ambiguous',
+            error: `Det finnes flere topp-nivå-matches for "${toppVerdi}" i "${info.tittel}":\n${liste}\nHvilken mente du?`,
+            forslag: vurdering.alle.map((t) => t.verdi),
+          };
+        }
+        console.log(`[validator] AI Search ingen relevante topp-treff for "${toppVerdi}" (alle under terskel)`);
+      } else {
+        console.log(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes for topp`);
+      }
+    } catch (err) {
+      console.warn(`[validator] AI Search feilet for topp "${toppVerdi}", faller tilbake til lokal-only:`, err);
+    }
+  }
+
+  // 3. Ingen match
+  return {
+    ok:       false,
+    kategori: 'not_found',
+    error:
+      `Topp-nivå-verdien "${toppVerdi}" finnes ikke i sliceren "${info.tittel}". ` +
+      `Tilgjengelige: ${info.toppNivåVerdier.slice(0, 10).join(', ')}`,
+    forslag: info.toppNivåVerdier,
+  };
+}
+
+/** Validerer hierarki-payload. Topp og barn har begge AI Search-fallback. */
 async function validerOgKorrigerNivåer(
   nivåer:     HierarchyLevel[],
   info:       HierarchySlicerInfo,
@@ -448,34 +528,11 @@ async function validerOgKorrigerNivåer(
   const korrigerte: HierarchyLevel[] = [];
 
   for (const node of nivåer) {
-    // Topp-nivå: lokal-bare (per Fase 2E-scope)
-    const toppMatch = finnBesteMatch(node.verdi, info.toppNivåVerdier);
-    if (toppMatch.type === 'none') {
-      return {
-        ok:       false,
-        kategori: 'not_found',
-        error:
-          `Topp-nivå-verdien "${node.verdi}" finnes ikke i sliceren "${info.tittel}". ` +
-          `Tilgjengelige: ${info.toppNivåVerdier.slice(0, 10).join(', ')}`,
-        forslag: info.toppNivåVerdier,
-      };
-    }
-    if (toppMatch.type === 'ambiguous') {
-      return {
-        ok:       false,
-        kategori: 'ambiguous',
-        error:
-          `Topp-nivå-verdien "${node.verdi}" har flere mulige treff i "${info.tittel}": ` +
-          `${toppMatch.alle.join(', ')}. Vær mer spesifikk.`,
-        forslag:  toppMatch.alle,
-      };
-    }
-    const korrigertTopp = toppMatch.treff;
-    if (toppMatch.type === 'prefix') {
-      console.log(`[validator] prefiks (topp): "${node.verdi}" → "${korrigertTopp}"`);
-    } else {
-      console.log(`[validator] eksakt (topp): "${korrigertTopp}"`);
-    }
+    // Topp-nivå: lokal-først, så AI Search-fallback (matcher kollapsede noder
+    // som ikke er rapportert av frontend-state).
+    const toppResultat = await matchEnTopp(node.verdi, info, tenant, rapportId);
+    if (!toppResultat.ok) return toppResultat;
+    const korrigertTopp = toppResultat.verdi;
 
     let korrigerteBarn: HierarchyLevel[] | undefined;
     if (node.barn && node.barn.length > 0) {
