@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { chat, type ChatMessage, type ChatContext, type SlicerInfo, type SlicerState } from '../services/openaiService';
 import { queryAzureSQL } from '../services/azureSqlService';
+import { erIndeksert as slicerErIndeksert } from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
@@ -1243,15 +1244,32 @@ Tilgjengelige visualiseringstyper:
       // slicer for å spare tokens (50 dekker 52 uker per år eller >20 prosjekter
       // per Hovedprosjekt).
       const SLICER_VERDIER_GRENSE = 50;
-      const slicereTekst = (slicere ?? []).map((s) => {
+      // Slå opp indekserings-status per slicer (én Prisma-spørring hver — OK
+      // for ~5 slicere; vurder batch hvis dette vokser). Defaulter til "nei"
+      // hvis rapportId mangler eller oppslaget feiler — trygg fallback.
+      const slicereMedStatus = await Promise.all((slicere ?? []).map(async (s) => {
+        let indeksert = false;
+        if (rapportId) {
+          try {
+            const status = await slicerErIndeksert(tenantSlug, rapportId, s.tittel);
+            indeksert = status.indeksert;
+          } catch (err) {
+            console.warn(`[Chat] slicerErIndeksert feilet for "${s.tittel}":`, err);
+          }
+        }
+        return { s, indeksert };
+      }));
+
+      const slicereTekst = slicereMedStatus.map(({ s, indeksert }) => {
         const datoTag = s.erDato ? ' [DATO-SLICER — bruk set_date_filter]' : '';
+        const idxTag = ` [indeksert: ${indeksert ? 'ja' : 'nei'}]`;
         if (s.type === 'basic') {
           const v = s.verdier.slice(0, SLICER_VERDIER_GRENSE);
           const trunkert = s.verdier.length > SLICER_VERDIER_GRENSE
             ? ` (av ${s.verdier.length} totalt)` : '';
-          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert})${datoTag}: ${v.join(', ')}`;
+          return `• ${s.tittel} (basic, ${s.kolonneType}, ${v.length} verdier${trunkert})${idxTag}${datoTag}: ${v.join(', ')}`;
         }
-        const linjer = [`• ${s.tittel} (hierarchy)${datoTag}:`];
+        const linjer = [`• ${s.tittel} (hierarchy)${idxTag}${datoTag}:`];
         linjer.push(`    Topp-nivå: ${s.toppNivåVerdier.slice(0, SLICER_VERDIER_GRENSE).join(', ')}`);
         for (const [forelder, barn] of Object.entries(s.barnPerForelder)) {
           const trunkert = barn.length > SLICER_VERDIER_GRENSE
@@ -1297,6 +1315,11 @@ Match slicer-nøkkelen mot kolonnenavn i viewet — bruk LIKE '%verdi%' om eksak
 
 SLICERE PÅ AKTIV SIDE — bruk EKSAKT verdi som vist her:
 ${slicereTekst || '(ingen slicere lastet ennå)'}
+
+VIKTIG om indekserte slicere:
+- Hvis sliceren er markert [indeksert: ja] og brukeren etterspør en verdi du IKKE ser i listen,
+  KALL set_report_slicer LIKEVEL. Backend kan finne flere verdier som ikke vises her.
+- Hvis [indeksert: nei] og verdien mangler i listen: avvis som ukjent.
 
 Aktivt slicer-state (hva som er valgt nå): ${activeSlicerState && Object.keys(activeSlicerState).length > 0 ? JSON.stringify(activeSlicerState) : '(ingen aktive filtre)'}
 
