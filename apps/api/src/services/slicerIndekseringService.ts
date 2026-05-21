@@ -14,6 +14,7 @@ import { utførDax } from './pbiQueryService';
 import {
   sikreIndeksFinnes,
   indekserVerdier,
+  TOPP_MARKOR,
   type SlicerVerdi,
 } from './slicerKatalogService';
 
@@ -69,6 +70,10 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
 
     // 2. Transformer rader → SlicerVerdi[]
     const verdier: SlicerVerdi[] = [];
+    // Hierarki: samle DISTINCT topp-nivå-verdier for å indeksere dem som
+    // egne rader med markøren TOPP_MARKOR. Lar AI Search-fallback finne
+    // kollapsede topp-noder som ikke er rapportert av frontend-state.
+    const toppNivaVerdier = new Set<string>();
     for (const rad of daxResultat.rader) {
       const rådVerdi = rad[konfig.verdi_kolonne];
       if (rådVerdi === null || rådVerdi === undefined || rådVerdi === '') continue;
@@ -77,14 +82,16 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
       if (konfig.slicer_type === 'hierarchy' && konfig.forelder_kolonne) {
         const rådForelder = rad[konfig.forelder_kolonne];
         if (rådForelder === null || rådForelder === undefined || rådForelder === '') continue;
+        const forelderVerdi = String(rådForelder);
         verdier.push({
           tenant:         konfig.tenant,
           rapport_id:     konfig.rapport_id,
           slicer_tittel:  konfig.slicer_tittel,
           slicer_type:    'hierarchy',
           verdi,
-          forelder_verdi: String(rådForelder),
+          forelder_verdi: forelderVerdi,
         });
+        toppNivaVerdier.add(forelderVerdi);
       } else {
         verdier.push({
           tenant:        konfig.tenant,
@@ -96,7 +103,23 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
       }
     }
 
-    console.log(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} av ${daxResultat.rader.length} rader klare for indeksering`);
+    // 2b. Indekser topp-nivå-rader (kun for hierarki) — bruker markør så
+    // matchEnTopp kan filtrere mot dem uten å forveksles med barn-rader.
+    if (konfig.slicer_type === 'hierarchy' && toppNivaVerdier.size > 0) {
+      for (const toppVerdi of toppNivaVerdier) {
+        verdier.push({
+          tenant:         konfig.tenant,
+          rapport_id:     konfig.rapport_id,
+          slicer_tittel:  konfig.slicer_tittel,
+          slicer_type:    'hierarchy',
+          verdi:          toppVerdi,
+          forelder_verdi: TOPP_MARKOR,
+        });
+      }
+    }
+
+    console.log(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} rader klare for indeksering` +
+      (konfig.slicer_type === 'hierarchy' ? ` (inkl. ${toppNivaVerdier.size} topp-nivå-rader)` : ''));
 
     // 3. Sikre indeks finnes
     await sikreIndeksFinnes();
