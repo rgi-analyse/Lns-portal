@@ -221,8 +221,8 @@ function finnBesteMatch(målVerdi: string | number, kandidater: string[]): Match
 
 interface ValideringFeil {
   ok:        false;
-  /** ambiguous: flere mulige treff. not_found: ingen treff. AI bruker dette til å velge respons. */
-  kategori:  'ambiguous' | 'not_found';
+  /** ambiguous: flere mulige treff. not_found: ingen treff. invalid_input: AI sendte feil payload-form (f.eks. type-mismatch). AI bruker dette til å velge respons. */
+  kategori:  'ambiguous' | 'not_found' | 'invalid_input';
   error:     string;
   forslag?:  string[];
 }
@@ -1275,7 +1275,7 @@ export async function chat(
             // ("BDO" når reell verdi er "BDO AS", eller "4600 - ikke spesifisert" når
             // reell verdi er "4600 - Sokndal") før vi sender til frontend.
             let valideringsfeil: {
-              kategori: 'ambiguous' | 'not_found';
+              kategori: 'ambiguous' | 'not_found' | 'invalid_input';
               error:    string;
               forslag?: string[];
             } | null = null;
@@ -1306,7 +1306,11 @@ export async function chat(
                   config = { ...config, verdier: validering.verdier };
                 }
               } else {
-                console.warn(`[backend] mangler basic slicer-info for "${config.tittel}" — hopper over validering`);
+                console.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte basic, slicer er ${info?.type ?? 'ukjent'}`);
+                valideringsfeil = {
+                  kategori: 'invalid_input',
+                  error: `Slicer "${config.tittel}" er av type ${info?.type ?? 'ukjent'}, men du sendte type=basic. Send riktig type.`,
+                };
               }
             } else if (config.type === 'hierarchy') {
               if (info && info.type === 'hierarchy') {
@@ -1323,7 +1327,11 @@ export async function chat(
                   config = { ...config, nivåer: validering.nivåer };
                 }
               } else {
-                console.warn(`[backend] mangler hierarki slicer-info for "${config.tittel}" — hopper over validering`);
+                console.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte hierarchy, slicer er ${info?.type ?? 'ukjent'}`);
+                valideringsfeil = {
+                  kategori: 'invalid_input',
+                  error: `Slicer "${config.tittel}" er av type ${info?.type ?? 'ukjent'}, men du sendte type=hierarchy. Send riktig type.`,
+                };
               }
             }
 
