@@ -1,7 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { chat, type ChatMessage, type ChatContext, type SlicerInfo, type SlicerState } from '../services/openaiService';
 import { queryAzureSQL } from '../services/azureSqlService';
-import { erIndeksert as slicerErIndeksert } from '../services/slicerKatalogService';
+import {
+  erIndeksert as slicerErIndeksert,
+  hentKompleteSlicerVerdier,
+  hentKompleteBasicVerdier,
+} from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
@@ -1244,21 +1248,51 @@ Tilgjengelige visualiseringstyper:
       // slicer for å spare tokens (50 dekker 52 uker per år eller >20 prosjekter
       // per Hovedprosjekt).
       const SLICER_VERDIER_GRENSE = 50;
-      // Slå opp indekserings-status per slicer (én Prisma-spørring hver — OK
-      // for ~5 slicere; vurder batch hvis dette vokser). Defaulter til "nei"
-      // hvis rapportId mangler eller oppslaget feiler — trygg fallback.
+      // Slå opp indekserings-status per slicer + overstyr verdi-lister med
+      // indeks-data for indekserte slicere. Bypasser PBI-søk/kollapset-state
+      // som ellers gjør frontend-lista incomplete (Alternativ D).
       const slicereMedStatus = await Promise.all((slicere ?? []).map(async (s) => {
         let indeksert = false;
-        if (rapportId) {
-          try {
-            const status = await slicerErIndeksert(tenantSlug, rapportId, s.tittel);
-            indeksert = status.indeksert;
-          } catch (err) {
-            console.warn(`[Chat] slicerErIndeksert feilet for "${s.tittel}":`, err);
+        if (!rapportId) return { s, indeksert };
+
+        try {
+          const status = await slicerErIndeksert(tenantSlug, rapportId, s.tittel);
+          indeksert = status.indeksert;
+        } catch (err) {
+          console.warn(`[Chat] slicerErIndeksert feilet for "${s.tittel}":`, err);
+          return { s, indeksert };
+        }
+        if (!indeksert) return { s, indeksert };
+
+        // Overstyr verdi-lister med komplett liste fra indeksen.
+        // Defensiv: hvis indeksen er tom for sliceren, behold frontend-state.
+        try {
+          if (s.type === 'hierarchy') {
+            const komplett = await hentKompleteSlicerVerdier(tenantSlug, rapportId, s.tittel);
+            if (komplett) {
+              const augmented = { ...s, toppNivåVerdier: komplett.topp, barnPerForelder: komplett.barn };
+              console.log(`[Chat] overstyrte "${s.tittel}" (hierarchy): topp ${s.toppNivåVerdier.length}→${komplett.topp.length}, forelder-noder ${Object.keys(s.barnPerForelder).length}→${Object.keys(komplett.barn).length}`);
+              return { s: augmented, indeksert };
+            }
+            console.log(`[Chat] hentKompleteSlicerVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
+          } else {
+            const komplett = await hentKompleteBasicVerdier(tenantSlug, rapportId, s.tittel);
+            if (komplett) {
+              const augmented = { ...s, verdier: komplett };
+              console.log(`[Chat] overstyrte "${s.tittel}" (basic): verdier ${s.verdier.length}→${komplett.length}`);
+              return { s: augmented, indeksert };
+            }
+            console.log(`[Chat] hentKompleteBasicVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
           }
+        } catch (err) {
+          console.warn(`[Chat] indeks-overstyring feilet for "${s.tittel}":`, err);
         }
         return { s, indeksert };
       }));
+
+      // Send augmenterte slicere til validator også (matchEnTopp/matchEnBarn
+      // sjekker info.toppNivåVerdier mot komplett indeks-liste nå).
+      chatContext = { ...chatContext, slicere: slicereMedStatus.map(({ s }) => s) };
 
       const slicereTekst = slicereMedStatus.map(({ s, indeksert }) => {
         const datoTag = s.erDato ? ' [DATO-SLICER — bruk set_date_filter]' : '';
