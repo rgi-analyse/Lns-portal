@@ -27,6 +27,7 @@ import {
   adminApi,
   type RapportMedSlicereOversikt,
   type TabellKolonne,
+  type TabellNavn,
   type OpprettBody,
 } from '../_lib';
 
@@ -217,6 +218,11 @@ export default function NyKonfigurasjonPage() {
   const [kolonner, setKolonner] = useState<TabellKolonne[] | null>(null);
   const [tabellFeil, setTabellFeil] = useState<string | null>(null);
 
+  // Tabell-dropdown (auto-utfylling fra PBI-datasettet)
+  const [tabeller, setTabeller] = useState<TabellNavn[] | null>(null);
+  const [tabellerLaster, setTabellerLaster] = useState(false);
+  const [tabellerFeil, setTabellerFeil] = useState<string | null>(null);
+
   // Submit
   const [oppretter, setOppretter] = useState(false);
 
@@ -231,6 +237,33 @@ export default function NyKonfigurasjonPage() {
   }, [entraObjectId]);
 
   useEffect(() => { lastRapporter(); }, [lastRapporter]);
+
+  // Last tabell-liste når rapport er valgt (Steg 3 entry).
+  // Defensiv: ved feil setter vi tabeller=null så UI faller tilbake til fri-tekst-input.
+  const workspaceId = form.rapport?.pbiWorkspaceId ?? '';
+  const datasetId   = form.rapport?.pbiDatasetId   ?? '';
+  useEffect(() => {
+    if (!entraObjectId || !workspaceId || !datasetId) {
+      setTabeller(null);
+      setTabellerFeil(null);
+      return;
+    }
+    let avbrutt = false;
+    setTabellerLaster(true);
+    setTabellerFeil(null);
+    adminApi.hentTabeller(entraObjectId, workspaceId, datasetId)
+      .then((r) => {
+        if (avbrutt) return;
+        setTabeller(r.tabeller);
+      })
+      .catch((err: unknown) => {
+        if (avbrutt) return;
+        setTabeller(null);
+        setTabellerFeil(err instanceof Error ? err.message : 'Ukjent feil');
+      })
+      .finally(() => { if (!avbrutt) setTabellerLaster(false); });
+    return () => { avbrutt = true; };
+  }, [entraObjectId, workspaceId, datasetId]);
 
   const oppdater = (delta: Partial<Form>) => {
     setForm((prev) => ({ ...prev, ...delta }));
@@ -444,12 +477,51 @@ export default function NyKonfigurasjonPage() {
               <Label htmlFor="tabell" style={{ color: 'var(--text-primary)' }}>
                 Tabellnavn <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="tabell"
-                placeholder='F.eks. "core Dim_Customer_LNS"'
-                value={form.tabell}
-                onChange={(e) => oppdater({ tabell: e.target.value })}
-              />
+              {/* Dropdown med tabell-liste fra PBI-datasettet. Faller tilbake
+                  til fri-tekst-input hvis listing feiler eller er tom. */}
+              {tabeller ? (
+                <select
+                  id="tabell"
+                  value={form.tabell}
+                  onChange={(e) => oppdater({ tabell: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 rounded-md border text-sm"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">Velg tabell…</option>
+                  {/* Hvis form.tabell allerede er satt men ikke i listen
+                      (manuelt skrevet inn / tabell skjult i mellomtiden),
+                      vis den øverst slik at brukeren ikke mister verdien. */}
+                  {form.tabell && !tabeller.some((t) => t.navn === form.tabell) && (
+                    <option value={form.tabell}>{form.tabell} (ikke i listen)</option>
+                  )}
+                  {tabeller.map((t) => (
+                    <option key={t.navn} value={t.navn}>{t.navn}</option>
+                  ))}
+                </select>
+              ) : tabellerLaster ? (
+                <select
+                  id="tabell"
+                  disabled
+                  value=""
+                  className="w-full mt-1 px-3 py-2 rounded-md border text-sm opacity-60"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-muted)' }}
+                >
+                  <option value="">Laster tabeller…</option>
+                </select>
+              ) : (
+                /* Fallback: API-feil eller ingen rapport valgt → fri-tekst-input */
+                <Input
+                  id="tabell"
+                  placeholder='F.eks. "core Dim_Customer_LNS"'
+                  value={form.tabell}
+                  onChange={(e) => oppdater({ tabell: e.target.value })}
+                />
+              )}
+              {tabellerFeil && (
+                <p className="text-xs mt-1" style={{ color: 'rgba(252,165,165,0.95)' }}>
+                  Kunne ikke hente tabell-liste — skriv tabellnavn manuelt. ({tabellerFeil})
+                </p>
+              )}
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 LNS-mønster: <code style={{ color: 'var(--text-secondary)' }}>core Dim_&lt;Entity&gt;_LNS</code>
                 {' '}— f.eks. core Dim_Customer_LNS, core Dim_Supplier_LNS, Dim_Prosjekt_LNS.
