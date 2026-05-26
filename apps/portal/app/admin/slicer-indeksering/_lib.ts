@@ -68,6 +68,10 @@ export interface TabellKolonne {
   fully_qualified: string;
 }
 
+export interface TabellNavn {
+  navn: string;
+}
+
 export type OpprettBody =
   | { rapport_id: string; slicer_tittel: string; slicer_type: 'basic';     tabell: string; verdi_kolonne: string }
   | { rapport_id: string; slicer_tittel: string; slicer_type: 'hierarchy'; tabell: string; verdi_kolonne: string; forelder_kolonne: string };
@@ -150,6 +154,13 @@ export const adminApi = {
       `/api/admin/datasets/${encodeURIComponent(workspaceId)}/${encodeURIComponent(datasetId)}/tabeller?tabell=${encodeURIComponent(tabell)}`,
       { headers: authHeaders(entraObjectId) },
     ).then(håndter<{ tabell: string; kolonner: TabellKolonne[]; antall_rader?: number }>),
+
+  /** Lister alle (ikke-skjulte) tabeller i et PBI-datasett. */
+  hentTabeller: (entraObjectId: string, workspaceId: string, datasetId: string) =>
+    apiFetch(
+      `/api/admin/datasets/${encodeURIComponent(workspaceId)}/${encodeURIComponent(datasetId)}/tabeller`,
+      { headers: authHeaders(entraObjectId) },
+    ).then(håndter<{ tabeller: TabellNavn[] }>),
 };
 
 // ── Formatering ────────────────────────────────────────────────────────
