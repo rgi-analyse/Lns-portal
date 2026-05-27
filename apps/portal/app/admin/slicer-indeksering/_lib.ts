@@ -165,6 +165,17 @@ export const adminApi = {
       `/api/admin/datasets/${encodeURIComponent(workspaceId)}/${encodeURIComponent(datasetId)}/tabeller`,
       { headers: authHeaders(entraObjectId) },
     ).then(håndter<{ tabeller: TabellNavn[]; kilde?: 'info_tables' | 'rest_api' }>),
+
+  /**
+   * Henter DISTINCT tabellnavn fra eksisterende slicer-konfigurasjoner for
+   * samme workspace+dataset. Brukes som forslag når INFO.TABLES og REST ikke
+   * fungerer (eldre datasett uten INFO-støtte og ikke Push API).
+   */
+  hentTabellForslag: (entraObjectId: string, workspaceId: string, datasetId: string) =>
+    apiFetch(
+      `/api/admin/datasets/${encodeURIComponent(workspaceId)}/${encodeURIComponent(datasetId)}/tabell-forslag`,
+      { headers: authHeaders(entraObjectId) },
+    ).then(håndter<{ forslag: string[] }>),
 };
 
 // ── Formatering ────────────────────────────────────────────────────────
