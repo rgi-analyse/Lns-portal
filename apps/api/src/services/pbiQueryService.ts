@@ -129,25 +129,47 @@ export async function hentTabellerViaREST(
   workspaceId: string,
   datasetId:   string,
 ): Promise<string[]> {
+  console.log(`[pbi-rest] hentTabellerViaREST starter ws=${workspaceId} ds=${datasetId}`);
+
   const tenantId     = process.env.PBI_TENANT_ID;
   const clientId     = process.env.PBI_CLIENT_ID;
   const clientSecret = process.env.PBI_CLIENT_SECRET;
 
   if (!tenantId || !clientId || !clientSecret) {
+    console.error('[pbi-rest] env-variabler mangler', {
+      hasTenantId: !!tenantId, hasClientId: !!clientId, hasClientSecret: !!clientSecret,
+    });
     throw new Error('PBI Service Principal env-variabler mangler.');
   }
 
-  const token = await getAzureToken(tenantId, clientId, clientSecret);
-  const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/tables`;
-  console.log(`[pbi-rest] hentTabellerViaREST ws=${workspaceId} ds=${datasetId}`);
+  console.log('[pbi-rest] henter token...');
+  let token: string;
+  try {
+    token = await getAzureToken(tenantId, clientId, clientSecret);
+    console.log(`[pbi-rest] token OK (length=${token.length})`);
+  } catch (err) {
+    console.error('[pbi-rest] token-utveksling feilet:', err);
+    throw err;
+  }
 
-  const respons = await fetch(url, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/tables`;
+  console.log(`[pbi-rest] GET ${url}`);
+
+  let respons: Response;
+  try {
+    respons = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    console.error(`[pbi-rest] nettverk-feil ved fetch:`, err);
+    throw err;
+  }
 
   if (!respons.ok) {
-    const detail = (await respons.text()).slice(0, 500);
+    const body = await respons.text();
+    const detail = body.slice(0, 500);
+    console.error(`[pbi-rest] HTTP ${respons.status} ${respons.statusText} — body: ${detail}`);
     throw new PbiDaxFeil(
       respons.status,
       `GET ${url}`,
@@ -156,8 +178,17 @@ export async function hentTabellerViaREST(
     );
   }
 
-  const json = await respons.json() as { value?: Array<{ name?: string }> };
-  return (json.value ?? [])
+  let json: { value?: Array<{ name?: string }> };
+  try {
+    json = await respons.json() as { value?: Array<{ name?: string }> };
+  } catch (err) {
+    console.error('[pbi-rest] kunne ikke parse JSON-respons:', err);
+    throw err;
+  }
+
+  const tabeller = (json.value ?? [])
     .map((t) => t.name ?? '')
     .filter((navn) => navn.length > 0);
+  console.log(`[pbi-rest] suksess: ${tabeller.length} tabeller (av ${json.value?.length ?? 0} rader)`);
+  return tabeller;
 }
