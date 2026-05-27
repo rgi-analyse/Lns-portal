@@ -8,7 +8,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, requireBruker, requireAdmin } from '../middleware/auth';
-import { utførDax } from '../services/pbiQueryService';
+import { utførDax, hentTabellerViaREST } from '../services/pbiQueryService';
 import { indekserSlicer } from '../services/slicerIndekseringService';
 import { hentSchedulerStatus } from '../services/slicerIndekseringScheduler';
 import { slettAlleForSlicer } from '../services/slicerKatalogService';
@@ -493,7 +493,9 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
         }
       }
 
-      // Modus 2: list alle tabeller (forsøk INFO.TABLES — fallback til feilmelding)
+      // Modus 2: list alle tabeller.
+      // To-nivå fallback: INFO.TABLES (moderne datasett, filtrerer skjulte)
+      // → PBI REST /tables (alle datasett, inkluderer skjulte).
       try {
         const r = await utførDax({
           workspaceId: workspace_id,
@@ -508,14 +510,26 @@ SELECTCOLUMNS(
           .map((rad) => (rad['[Name]'] ?? rad['Name'] ?? '') as string)
           .filter((navn) => navn.length > 0)
           .map((navn) => ({ navn }));
-        return reply.send({ tabeller });
-      } catch (err) {
-        return reply.status(400).send({
-          error:
-            'Kan ikke liste tabeller automatisk — datasettet støtter ikke INFO.TABLES(). ' +
-            'Oppgi tabellnavn via ?tabell=<navn> for å hente kolonner.',
-          detail: err instanceof Error ? err.message : String(err),
-        });
+        console.log(`[admin-tabeller] kilde=info_tables antall=${tabeller.length}`);
+        return reply.send({ tabeller, kilde: 'info_tables' as const });
+      } catch (infoErr) {
+        const infoDetail = infoErr instanceof Error ? infoErr.message : String(infoErr);
+        console.log(`[admin-tabeller] INFO.TABLES feilet, prøver REST: ${infoDetail.slice(0, 200)}`);
+
+        try {
+          const navn = await hentTabellerViaREST(workspace_id, dataset_id);
+          const tabeller = navn.map((n) => ({ navn: n }));
+          console.log(`[admin-tabeller] kilde=rest_api antall=${tabeller.length}`);
+          return reply.send({ tabeller, kilde: 'rest_api' as const });
+        } catch (restErr) {
+          const restDetail = restErr instanceof Error ? restErr.message : String(restErr);
+          return reply.status(400).send({
+            error:
+              'Kan ikke liste tabeller automatisk — både INFO.TABLES og PBI REST feilet. ' +
+              'Oppgi tabellnavn via ?tabell=<navn> for å hente kolonner.',
+            detail: { info_tables: infoDetail.slice(0, 500), rest_api: restDetail.slice(0, 500) },
+          });
+        }
       }
     },
   );

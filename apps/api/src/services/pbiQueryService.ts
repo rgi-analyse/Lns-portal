@@ -114,3 +114,50 @@ export async function utførDax(parametere: DaxParametere): Promise<DaxResultat>
 
   return { rader, spørringMs };
 }
+
+/**
+ * Lister tabeller i et PBI-datasett via Power BI REST API.
+ *
+ * Brukes som fallback når INFO.TABLES via executeQueries feiler (eldre
+ * datasett / tabular models som ikke støtter INFO-funksjonene).
+ *
+ * NB: REST-endepunktet inkluderer ALLE tabeller (også IsHidden=TRUE) — kaller
+ * må evt. filtrere selv. Endepunktet er offisielt Microsoft og krever samme
+ * SP-rettigheter som utførDax (Dataset.Read.All + workspace-medlemskap).
+ */
+export async function hentTabellerViaREST(
+  workspaceId: string,
+  datasetId:   string,
+): Promise<string[]> {
+  const tenantId     = process.env.PBI_TENANT_ID;
+  const clientId     = process.env.PBI_CLIENT_ID;
+  const clientSecret = process.env.PBI_CLIENT_SECRET;
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error('PBI Service Principal env-variabler mangler.');
+  }
+
+  const token = await getAzureToken(tenantId, clientId, clientSecret);
+  const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/tables`;
+  console.log(`[pbi-rest] hentTabellerViaREST ws=${workspaceId} ds=${datasetId}`);
+
+  const respons = await fetch(url, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!respons.ok) {
+    const detail = (await respons.text()).slice(0, 500);
+    throw new PbiDaxFeil(
+      respons.status,
+      `GET ${url}`,
+      detail,
+      `PBI REST /tables HTTP ${respons.status}: ${detail}`,
+    );
+  }
+
+  const json = await respons.json() as { value?: Array<{ name?: string }> };
+  return (json.value ?? [])
+    .map((t) => t.name ?? '')
+    .filter((navn) => navn.length > 0);
+}
