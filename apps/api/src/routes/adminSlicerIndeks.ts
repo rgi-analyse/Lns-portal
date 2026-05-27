@@ -523,6 +523,10 @@ SELECTCOLUMNS(
           return reply.send({ tabeller, kilde: 'rest_api' as const });
         } catch (restErr) {
           const restDetail = restErr instanceof Error ? restErr.message : String(restErr);
+          const restStack  = restErr instanceof Error ? restErr.stack : undefined;
+          console.error('[admin-tabeller] REST feilet:', restErr);
+          console.error('[admin-tabeller] REST detail:', restDetail);
+          if (restStack) console.error('[admin-tabeller] REST stack:', restStack);
           return reply.status(400).send({
             error:
               'Kan ikke liste tabeller automatisk — både INFO.TABLES og PBI REST feilet. ' +
