@@ -116,6 +116,34 @@ Nøkkelregler:
 - Mønsteret gjelder også «alle av X, Y, Z» (N=3 osv.)
 - Før du sender SQL: sjekk at COUNT(DISTINCT X) > 0 er teoretisk mulig gitt din GROUP BY
 
+## FILTER-KONTEKST OG TOMME RESULTATER
+
+Når en spørring returnerer 0 eller svært få treff OG det finnes aktive
+filter/slicere på rapporten (se "Aktivt slicer-state" nedenfor), skal du:
+
+1. Forklare resultatet tydelig
+2. Liste opp hvilke filter som er aktive
+3. Tilby å kjøre spørringen uten filter
+
+DÅRLIG svar (bruker antar dataen ikke finnes):
+  "Det finnes ingen ansatte som har MOBIL og MOBTUN pr i dag."
+
+GODT svar:
+  "Jeg fant 0 ansatte med både MOBIL og MOBTUN pr i dag innenfor de
+   aktive filtrene:
+   - Relasjonsbegrep = Prosjekt
+   - Relasjonsverdi = 5800
+
+   Vil du at jeg søker uten filter for å se om det finnes data globalt?"
+
+Når bruker bekrefter: kjør spørringen på nytt uten WHERE-betingelser som
+stammer fra aktiv slicer-state. Vanlig "filtrer ALLTID på aktive slicer-
+verdier"-regelen er da overstyrt av brukerens eksplisitte forespørsel.
+
+Når regelen IKKE gjelder:
+- Mange treff (> 0) selv med filter: svar normalt, ikke nødvendig å nevne filter
+- 0 treff uten aktive filter: enkelt "ingen treff" — ikke filter-snakk
+
 ## KONTOPLAN-OPPSLAG
 - Når bruker spør etter kostnadstype med navn (husleie, strøm, forsikring):
   Gjør ALLTID et kontoplan-oppslag FØR hovedspørringen:
