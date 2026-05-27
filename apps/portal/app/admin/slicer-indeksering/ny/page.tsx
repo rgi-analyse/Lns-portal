@@ -224,6 +224,12 @@ export default function NyKonfigurasjonPage() {
   const [tabellerFeil, setTabellerFeil] = useState<string | null>(null);
   const [tabellerKilde, setTabellerKilde] = useState<'info_tables' | 'rest_api' | null>(null);
 
+  // Tabell-forslag fra eksisterende konfigurasjoner (samme dataset).
+  // Vises som primær dropdown når det finnes — admin slipper å skrive
+  // manuelt for datasett der INFO.TABLES og REST ikke fungerer.
+  const [tabellForslag, setTabellForslag] = useState<string[] | null>(null);
+  const [bruksFriTekst, setBruksFriTekst] = useState(false);
+
   // Submit
   const [oppretter, setOppretter] = useState(false);
 
@@ -266,6 +272,22 @@ export default function NyKonfigurasjonPage() {
         setTabellerFeil(err instanceof Error ? err.message : 'Ukjent feil');
       })
       .finally(() => { if (!avbrutt) setTabellerLaster(false); });
+    return () => { avbrutt = true; };
+  }, [entraObjectId, workspaceId, datasetId]);
+
+  // Last forslag fra eksisterende konfig parallelt med tabell-listen.
+  // Reset bruksFriTekst når dataset endres (forrige valg gjelder ikke lenger).
+  useEffect(() => {
+    if (!entraObjectId || !workspaceId || !datasetId) {
+      setTabellForslag(null);
+      setBruksFriTekst(false);
+      return;
+    }
+    let avbrutt = false;
+    setBruksFriTekst(false);
+    adminApi.hentTabellForslag(entraObjectId, workspaceId, datasetId)
+      .then((r) => { if (!avbrutt) setTabellForslag(r.forslag); })
+      .catch(() => { if (!avbrutt) setTabellForslag(null); });
     return () => { avbrutt = true; };
   }, [entraObjectId, workspaceId, datasetId]);
 
@@ -481,9 +503,54 @@ export default function NyKonfigurasjonPage() {
               <Label htmlFor="tabell" style={{ color: 'var(--text-primary)' }}>
                 Tabellnavn <span className="text-red-500">*</span>
               </Label>
-              {/* Dropdown med tabell-liste fra PBI-datasettet. Faller tilbake
-                  til fri-tekst-input hvis listing feiler eller er tom. */}
-              {tabeller ? (
+              {/* Render-prioritet:
+                  1) forslag fra eksisterende konfig (curated, dekker eldre datasett)
+                  2) full liste fra INFO.TABLES / PBI REST (når støttet)
+                  3) fri-tekst-input (ultimate fallback) */}
+              {tabellForslag && tabellForslag.length > 0 && !bruksFriTekst ? (
+                <select
+                  id="tabell"
+                  value={form.tabell}
+                  onChange={(e) => {
+                    if (e.target.value === '__annet__') {
+                      setBruksFriTekst(true);
+                      oppdater({ tabell: '' });
+                    } else {
+                      oppdater({ tabell: e.target.value });
+                    }
+                  }}
+                  className="w-full mt-1 px-3 py-2 rounded-md border text-sm"
+                  style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">Velg tabell…</option>
+                  {form.tabell && !tabellForslag.includes(form.tabell) && (
+                    <option value={form.tabell}>{form.tabell} (manuell)</option>
+                  )}
+                  {tabellForslag.map((navn) => (
+                    <option key={navn} value={navn}>{navn}</option>
+                  ))}
+                  <option value="__annet__">Annet (skriv selv)…</option>
+                </select>
+              ) : bruksFriTekst ? (
+                <>
+                  <Input
+                    id="tabell"
+                    placeholder='F.eks. "core Dim_Customer_LNS"'
+                    value={form.tabell}
+                    onChange={(e) => oppdater({ tabell: e.target.value })}
+                  />
+                  {tabellForslag && tabellForslag.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setBruksFriTekst(false); oppdater({ tabell: '' }); }}
+                      className="text-xs mt-1 underline"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      ← Tilbake til forslag
+                    </button>
+                  )}
+                </>
+              ) : tabeller ? (
                 <select
                   id="tabell"
                   value={form.tabell}
@@ -492,9 +559,6 @@ export default function NyKonfigurasjonPage() {
                   style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Velg tabell…</option>
-                  {/* Hvis form.tabell allerede er satt men ikke i listen
-                      (manuelt skrevet inn / tabell skjult i mellomtiden),
-                      vis den øverst slik at brukeren ikke mister verdien. */}
                   {form.tabell && !tabeller.some((t) => t.navn === form.tabell) && (
                     <option value={form.tabell}>{form.tabell} (ikke i listen)</option>
                   )}
@@ -521,17 +585,22 @@ export default function NyKonfigurasjonPage() {
                   onChange={(e) => oppdater({ tabell: e.target.value })}
                 />
               )}
-              {tabellerFeil && (
+              {tabellerFeil && !(tabellForslag && tabellForslag.length > 0) && (
                 <p className="text-xs mt-1" style={{ color: 'rgba(252,165,165,0.95)' }}>
                   Kunne ikke hente tabell-liste — skriv tabellnavn manuelt. ({tabellerFeil})
                 </p>
               )}
-              {tabeller && tabellerKilde === 'info_tables' && (
+              {tabellForslag && tabellForslag.length > 0 && !bruksFriTekst && (
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Forslag basert på eksisterende konfigurasjoner ({tabellForslag.length} tabeller)
+                </p>
+              )}
+              {!bruksFriTekst && (!tabellForslag || tabellForslag.length === 0) && tabeller && tabellerKilde === 'info_tables' && (
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                   Hentet via INFO.TABLES ({tabeller.length} tabeller)
                 </p>
               )}
-              {tabeller && tabellerKilde === 'rest_api' && (
+              {!bruksFriTekst && (!tabellForslag || tabellForslag.length === 0) && tabeller && tabellerKilde === 'rest_api' && (
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                   Hentet via Power BI REST API ({tabeller.length} tabeller, inkluderer skjulte)
                 </p>

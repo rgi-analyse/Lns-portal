@@ -537,4 +537,48 @@ SELECTCOLUMNS(
       }
     },
   );
+
+  // ── 10. GET /api/admin/datasets/:workspace_id/:dataset_id/tabell-forslag ──
+  // Hent DISTINCT tabellnavn fra eksisterende ai_slicer_indeksering-konfig
+  // for samme workspace+dataset. Brukes som forslag-liste i admin-UI når
+  // INFO.TABLES og PBI REST ikke kan liste tabeller (eldre datasett).
+  fastify.get<{ Params: { workspace_id: string; dataset_id: string } }>(
+    '/api/admin/datasets/:workspace_id/:dataset_id/tabell-forslag',
+    { preHandler: PRE },
+    async (request, reply) => {
+      const { workspace_id, dataset_id } = request.params;
+      const konfiger = await prisma.slicerIndeksering.findMany({
+        where:  { workspace_id, dataset_id },
+        select: { dax_query: true },
+      });
+
+      const navn = new Set<string>();
+      for (const k of konfiger) {
+        for (const t of trekkUtTabellnavnFraDax(k.dax_query)) {
+          navn.add(t);
+        }
+      }
+      const forslag = [...navn].sort((a, b) => a.localeCompare(b, 'nb'));
+      console.log(`[admin-tabell-forslag] ws=${workspace_id} ds=${dataset_id} konfiger=${konfiger.length} forslag=${forslag.length}`);
+      return reply.send({ forslag });
+    },
+  );
+}
+
+/**
+ * Trekker ut DAX-tabellnavn fra en spørring. Fanger både apostrof-quoted
+ * (`'Hovedprosjekt'[X]`) og unquoted (`Tabell[X]`) referanser. Duplikater
+ * filtreres på kall-siden via Set.
+ */
+function trekkUtTabellnavnFraDax(dax: string): string[] {
+  const navn = new Set<string>();
+  // Apostrof-quoted: 'X'[ eller 'X''s'[  (DAX bruker doble apostrofer for escape)
+  for (const m of dax.matchAll(/'((?:[^']|'')+)'\[/g)) {
+    navn.add(m[1].replace(/''/g, "'"));
+  }
+  // Unquoted: word-tegn etterfulgt av [
+  for (const m of dax.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*)\[/g)) {
+    navn.add(m[1]);
+  }
+  return [...navn];
 }
