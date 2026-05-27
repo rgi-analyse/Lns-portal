@@ -155,12 +155,16 @@ export const adminApi = {
       { headers: authHeaders(entraObjectId) },
     ).then(håndter<{ tabell: string; kolonner: TabellKolonne[]; antall_rader?: number }>),
 
-  /** Lister alle (ikke-skjulte) tabeller i et PBI-datasett. */
+  /**
+   * Lister tabeller i et PBI-datasett. Backend bruker først INFO.TABLES
+   * (filtrerer skjulte), faller tilbake til PBI REST hvis datasettet ikke
+   * støtter det. `kilde` indikerer hvilken metode som ble brukt.
+   */
   hentTabeller: (entraObjectId: string, workspaceId: string, datasetId: string) =>
     apiFetch(
       `/api/admin/datasets/${encodeURIComponent(workspaceId)}/${encodeURIComponent(datasetId)}/tabeller`,
       { headers: authHeaders(entraObjectId) },
-    ).then(håndter<{ tabeller: TabellNavn[] }>),
+    ).then(håndter<{ tabeller: TabellNavn[]; kilde?: 'info_tables' | 'rest_api' }>),
 };
 
 // ── Formatering ────────────────────────────────────────────────────────

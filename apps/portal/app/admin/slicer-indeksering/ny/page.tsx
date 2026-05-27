@@ -222,6 +222,7 @@ export default function NyKonfigurasjonPage() {
   const [tabeller, setTabeller] = useState<TabellNavn[] | null>(null);
   const [tabellerLaster, setTabellerLaster] = useState(false);
   const [tabellerFeil, setTabellerFeil] = useState<string | null>(null);
+  const [tabellerKilde, setTabellerKilde] = useState<'info_tables' | 'rest_api' | null>(null);
 
   // Submit
   const [oppretter, setOppretter] = useState(false);
@@ -246,15 +247,18 @@ export default function NyKonfigurasjonPage() {
     if (!entraObjectId || !workspaceId || !datasetId) {
       setTabeller(null);
       setTabellerFeil(null);
+      setTabellerKilde(null);
       return;
     }
     let avbrutt = false;
     setTabellerLaster(true);
     setTabellerFeil(null);
+    setTabellerKilde(null);
     adminApi.hentTabeller(entraObjectId, workspaceId, datasetId)
       .then((r) => {
         if (avbrutt) return;
         setTabeller(r.tabeller);
+        setTabellerKilde(r.kilde ?? null);
       })
       .catch((err: unknown) => {
         if (avbrutt) return;
@@ -520,6 +524,16 @@ export default function NyKonfigurasjonPage() {
               {tabellerFeil && (
                 <p className="text-xs mt-1" style={{ color: 'rgba(252,165,165,0.95)' }}>
                   Kunne ikke hente tabell-liste — skriv tabellnavn manuelt. ({tabellerFeil})
+                </p>
+              )}
+              {tabeller && tabellerKilde === 'info_tables' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Hentet via INFO.TABLES ({tabeller.length} tabeller)
+                </p>
+              )}
+              {tabeller && tabellerKilde === 'rest_api' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Hentet via Power BI REST API ({tabeller.length} tabeller, inkluderer skjulte)
                 </p>
               )}
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
