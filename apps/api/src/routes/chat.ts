@@ -89,6 +89,33 @@ transaksjoner som ønskes.
 - Ved tom resultat: prøv bredere søk før du konkluderer med "ingen data"
 - Prosjekter kan refereres som tall ("1000"), navn ("Hemsil"), eller kombinasjon ("P1000" = 1000)
 
+## INTERSECTION-MØNSTER — «både X og Y»
+
+Når bruker spør om entiteter som må ha ALLE av flere spesifiserte verdier
+(én rad per verdi per entitet), bruk dette mønsteret:
+
+KORREKT:
+  SELECT Ansattnr, Ansattnavn
+  FROM ai_gold.vw_Fact_ansattRelasjoner
+  WHERE [Relasjonsverdi] IN ('MOBIL', 'MOBTUN')
+    AND [Fra_dato] <= GETDATE() AND [Til_dato] >= GETDATE()
+  GROUP BY Ansattnr, Ansattnavn
+  HAVING COUNT(DISTINCT [Relasjonsverdi]) = 2
+
+FEIL (gir ALDRI resultat):
+  SELECT Ansattnr, Ansattnavn, [Relasjonsverdi]
+  FROM ai_gold.vw_Fact_ansattRelasjoner
+  WHERE [Relasjonsverdi] IN ('MOBIL', 'MOBTUN')
+  GROUP BY Ansattnr, Ansattnavn, [Relasjonsverdi]   ← inkluderer filter-kolonne
+  HAVING COUNT(DISTINCT [Relasjonsverdi]) > 1       ← alltid 1 per gruppe → 0 rader
+
+Nøkkelregler:
+- GROUP BY skal IKKE inneholde kolonnen du teller distinkte verdier av
+- HAVING COUNT(DISTINCT X) = N hvor N er antall verdier brukeren spør om
+- IKKE bruk HAVING COUNT(DISTINCT X) > 1 (gir tvetydig resultat ved 2+ verdier)
+- Mønsteret gjelder også «alle av X, Y, Z» (N=3 osv.)
+- Før du sender SQL: sjekk at COUNT(DISTINCT X) > 0 er teoretisk mulig gitt din GROUP BY
+
 ## KONTOPLAN-OPPSLAG
 - Når bruker spør etter kostnadstype med navn (husleie, strøm, forsikring):
   Gjør ALLTID et kontoplan-oppslag FØR hovedspørringen:
