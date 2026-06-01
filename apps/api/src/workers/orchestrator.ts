@@ -3,7 +3,7 @@ import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { kjørBlokkerende } from '../services/openaiService';
 import { lagGrafPng, type GrafSpec, type GrafFarger } from '../services/grafService';
 import { lastOppBlob, lastNedBlob } from '../services/blobService';
-import { byggWordRapport, byggDokumentNavn, type WordSeksjon } from '../services/wordService';
+import { byggWordRapport, byggDokumentNavn, type WordSeksjon, type TabellData, type TabellRad } from '../services/wordService';
 
 // Statusverdier som matcher CHECK_ai_analyse_bestilling_status i DB
 const STATUS = {
@@ -73,6 +73,45 @@ function mapTilGrafSpec(graf: any): GrafSpec | null {
     default:
       return null;  // ukjent graf-type, skip
   }
+}
+
+/**
+ * Bygger TabellData for type='resultatoppstilling' fra query-rader.
+ *
+ * Forventet shape per rad: { kategori: string, belop_maaned: number,
+ * hovedtype: 'inntekt' | 'kostnad' }. Returnerer en TabellData med
+ * inntekt-rader først (med pluss-flagg), så kostnad-rader, så Sum
+ * kostnader og Resultat (begge bold, Sum med skillelinje over).
+ *
+ * Tallene er fasit — beregnes determinis­tisk fra queryen, ikke fra AI-tekst.
+ */
+function byggResultatoppstilling(rader: Record<string, unknown>[]): TabellData {
+  const ut: TabellRad[] = [];
+  const inntektRader = rader.filter((r) => String(r.hovedtype) === 'inntekt');
+  const kostnadRader = rader.filter((r) => String(r.hovedtype) === 'kostnad');
+
+  for (const r of inntektRader) {
+    ut.push({
+      label: String(r.kategori ?? ''),
+      belop: Number(r.belop_maaned ?? 0),
+      pluss: true,
+    });
+  }
+  for (const r of kostnadRader) {
+    ut.push({
+      label: String(r.kategori ?? ''),
+      belop: Number(r.belop_maaned ?? 0),
+    });
+  }
+
+  const sumKostnader = kostnadRader.reduce((s, r) => s + Number(r.belop_maaned ?? 0), 0);
+  // Resultat = inntekt + sum kostnader (kostnader er allerede negative i data).
+  const resultat = inntektRader.reduce((s, r) => s + Number(r.belop_maaned ?? 0), 0) + sumKostnader;
+
+  ut.push({ label: 'Sum kostnader', belop: sumKostnader, uthevet: true, skillelinjeFor: true });
+  ut.push({ label: 'Resultat',      belop: resultat,     uthevet: true });
+
+  return { rader: ut };
 }
 
 /**
@@ -341,6 +380,40 @@ export async function kjørOrchestrator(): Promise<void> {
 
     console.log(`[Orchestrator] Graf-fase ferdig: ${Object.keys(aiGrafer).length} grafer generert og opplastet`);
 
+    // TABELL-FASE: bygg deterministiske tabeller fra queries (rapportStruktur.seksjoner[].tabell)
+    // Tabellene er fasit (ikke fra AI-tekst) — orchestrator eier summene.
+    const aiTabeller: Record<string, TabellData> = {};
+    for (const seksjon of sorterteSeksjoner) {
+      const tabellConfig = seksjon.tabell;
+      if (!tabellConfig || typeof tabellConfig !== 'object') continue;
+
+      const kilde = tabellConfig.kilde as string | undefined;
+      const tabellType = tabellConfig.type as string | undefined;
+      if (!kilde || !tabellType) {
+        console.log(`[Orchestrator] Tabell ${seksjon.id}: mangler kilde eller type, skipper`);
+        continue;
+      }
+
+      const rader = dataResultater[kilde];
+      if (!rader || rader.length === 0) {
+        console.log(`[Orchestrator] Tabell ${seksjon.id}: ingen data i kilde "${kilde}", skipper`);
+        continue;
+      }
+
+      let tabellData: TabellData | null = null;
+      if (tabellType === 'resultatoppstilling') {
+        tabellData = byggResultatoppstilling(rader);
+      } else {
+        console.log(`[Orchestrator] Tabell ${seksjon.id}: ukjent type "${tabellType}", skipper`);
+        continue;
+      }
+
+      aiTabeller[seksjon.id] = tabellData;
+      console.log(`[Orchestrator] Tabell ${seksjon.id}: ${tabellData.rader.length} rader bygget fra "${kilde}"`);
+    }
+
+    console.log(`[Orchestrator] Tabell-fase ferdig: ${Object.keys(aiTabeller).length} tabeller bygget`);
+
     // STEG F: WORD-RAPPORT
     console.log(`[Orchestrator] Steg F: starter Word-generering for ${bestilling.id}`);
 
@@ -361,20 +434,20 @@ export async function kjørOrchestrator(): Promise<void> {
     const rangeDel = datoRange(parametre.fraDato, parametre.tilDato);
     const undertittel = [prosjektDel, rangeDel].filter(Boolean).join(' · ') || undefined;
 
-    // Bygg seksjoner i rekkefølge — ta med alle som har tekst ELLER graf.
-    // Graf-only-seksjoner (type='graf' uten AI-tekst) får tom markdown og
-    // kun H1 + bilde i Word — wordService håndterer tom tekst defensivt.
+    // Bygg seksjoner i rekkefølge — ta med alle som har tekst, graf ELLER tabell.
     const wordSeksjoner: WordSeksjon[] = [];
     for (const seksjon of sorterteSeksjoner) {
-      const tekst   = aiSeksjoner[seksjon.id];
-      const grafSti = aiGrafer[seksjon.id];
-      if (!tekst && !grafSti) continue;
+      const tekst      = aiSeksjoner[seksjon.id];
+      const grafSti    = aiGrafer[seksjon.id];
+      const tabellData = aiTabeller[seksjon.id];
+      if (!tekst && !grafSti && !tabellData) continue;
       const grafPng = grafSti ? await lastNedBlob(grafSti) : undefined;
       wordSeksjoner.push({
         tittel: seksjon.tittel
           ?? (String(seksjon.id).charAt(0).toUpperCase() + String(seksjon.id).slice(1)),
         markdownTekst: tekst ?? '',
         grafPng,
+        tabellData,
       });
     }
 
@@ -404,7 +477,8 @@ export async function kjørOrchestrator(): Promise<void> {
     // 6d. Bygg JSON for sammendrag-kolonnen
     const sammendragsObjekt = {
       seksjoner: aiSeksjoner,
-      grafer: aiGrafer,  // NY: blob-paths per seksjon
+      grafer: aiGrafer,
+      tabeller: aiTabeller,             // NY: deterministiske tabeller per seksjon (for frontend-paritet)
       metadata: {
         totalRaderData: totalRader,
         datakildeDetaljer: detaljer,
@@ -412,7 +486,8 @@ export async function kjørOrchestrator(): Promise<void> {
         modellBrukt: modellSomBleBrukt,
         genererte: Object.keys(aiSeksjoner),
         hoppetOver,
-        grafer: Object.keys(aiGrafer),  // NY: hvilke grafer som ble laget
+        grafer: Object.keys(aiGrafer),
+        tabeller: Object.keys(aiTabeller),   // NY: hvilke tabeller som ble bygget
       },
     };
 
