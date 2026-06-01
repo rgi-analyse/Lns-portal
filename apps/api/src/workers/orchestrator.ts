@@ -78,38 +78,65 @@ function mapTilGrafSpec(graf: any): GrafSpec | null {
 /**
  * Bygger TabellData for type='resultatoppstilling' fra query-rader.
  *
- * Forventet shape per rad: { kategori: string, belop_maaned: number,
- * hovedtype: 'inntekt' | 'kostnad' }. Returnerer en TabellData med
- * inntekt-rader først (med pluss-flagg), så kostnad-rader, så Sum
- * kostnader og Resultat (begge bold, Sum med skillelinje over).
+ * Forventet shape per rad: { kategori_id: string, kategori: string,
+ * belop_maaned: number } (queryen er ORDER BY kategori_id). Klassifisering:
+ * Inntekt = kategori_id === '1_inntekter'; Kostnad = alle øvrige. Beløpene
+ * har allerede fortegn fra queryen — IKKE neger, IKKE abs.
  *
- * Tallene er fasit — beregnes determinis­tisk fra queryen, ikke fra AI-tekst.
+ * Returnerer alle kategorirader i query-rekkefølge, etterfulgt av Sum
+ * kostnader (Σ rader der kategori_id ≠ '1_inntekter') og Resultat
+ * (Inntekter + Sum kostnader). Tallene er fasit — bygges deterministisk
+ * fra queryen, ikke fra AI-tekst.
+ *
+ * Feiler høylytt hvis ingen rad har kategori_id === '1_inntekter' eller
+ * belop_maaned ikke er numerisk — en stille 0,00 er verre enn en feil.
  */
+const INNTEKT_KATEGORI_ID = '1_inntekter';
+
 function byggResultatoppstilling(rader: Record<string, unknown>[]): TabellData {
+  // Sanity: alle rader må ha numerisk belop_maaned
+  for (const r of rader) {
+    const v = r.belop_maaned;
+    if (v === undefined || v === null || typeof Number(v) !== 'number' || isNaN(Number(v))) {
+      const kolonner = rader.length > 0 ? Object.keys(rader[0]).join(', ') : '(tom)';
+      throw new Error(
+        `resultatoppstilling: belop_maaned mangler eller er ikke-numerisk i en rad. ` +
+        `Faktiske kolonner: [${kolonner}]. Sjekk at queryen returnerer belop_maaned.`,
+      );
+    }
+  }
+
+  // Må finnes minst én inntekt-rad — ellers er det noe galt med queryen/klassifiseringen
+  const harInntekt = rader.some((r) => String(r.kategori_id) === INNTEKT_KATEGORI_ID);
+  if (!harInntekt) {
+    const kolonner = rader.length > 0 ? Object.keys(rader[0]).join(', ') : '(tom)';
+    const kategoriIder = rader.map((r) => String(r.kategori_id ?? '(mangler)')).join(', ');
+    throw new Error(
+      `resultatoppstilling: ingen rad har kategori_id === '${INNTEKT_KATEGORI_ID}'. ` +
+      `Faktiske kolonner: [${kolonner}]. kategori_id-verdier funnet: [${kategoriIder}]. ` +
+      `Sjekk at queryen klassifiserer inntekter korrekt.`,
+    );
+  }
+
   const ut: TabellRad[] = [];
-  const inntektRader = rader.filter((r) => String(r.hovedtype) === 'inntekt');
-  const kostnadRader = rader.filter((r) => String(r.hovedtype) === 'kostnad');
+  let sumKostnader = 0;
+  let sumInntekter = 0;
 
-  for (const r of inntektRader) {
+  // Iterer i query-rekkefølgen (allerede ORDER BY kategori_id). Én rad per kategori.
+  for (const r of rader) {
+    const erInntekt = String(r.kategori_id) === INNTEKT_KATEGORI_ID;
+    const belop = Number(r.belop_maaned);
     ut.push({
       label: String(r.kategori ?? ''),
-      belop: Number(r.belop_maaned ?? 0),
-      pluss: true,
+      belop,                          // belop_maaned brukes rått — har allerede fortegn
+      ...(erInntekt ? { pluss: true } : {}),
     });
-  }
-  for (const r of kostnadRader) {
-    ut.push({
-      label: String(r.kategori ?? ''),
-      belop: Number(r.belop_maaned ?? 0),
-    });
+    if (erInntekt) sumInntekter += belop;
+    else           sumKostnader += belop;
   }
 
-  const sumKostnader = kostnadRader.reduce((s, r) => s + Number(r.belop_maaned ?? 0), 0);
-  // Resultat = inntekt + sum kostnader (kostnader er allerede negative i data).
-  const resultat = inntektRader.reduce((s, r) => s + Number(r.belop_maaned ?? 0), 0) + sumKostnader;
-
-  ut.push({ label: 'Sum kostnader', belop: sumKostnader, uthevet: true, skillelinjeFor: true });
-  ut.push({ label: 'Resultat',      belop: resultat,     uthevet: true });
+  ut.push({ label: 'Sum kostnader', belop: sumKostnader,                uthevet: true, skillelinjeFor: true });
+  ut.push({ label: 'Resultat',      belop: sumInntekter + sumKostnader, uthevet: true });
 
   return { rader: ut };
 }
