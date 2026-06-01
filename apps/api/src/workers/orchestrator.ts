@@ -361,17 +361,19 @@ export async function kjørOrchestrator(): Promise<void> {
     const rangeDel = datoRange(parametre.fraDato, parametre.tilDato);
     const undertittel = [prosjektDel, rangeDel].filter(Boolean).join(' · ') || undefined;
 
-    // Bygg seksjoner i rekkefølge — kun de som faktisk fikk AI-tekst.
+    // Bygg seksjoner i rekkefølge — ta med alle som har tekst ELLER graf.
+    // Graf-only-seksjoner (type='graf' uten AI-tekst) får tom markdown og
+    // kun H1 + bilde i Word — wordService håndterer tom tekst defensivt.
     const wordSeksjoner: WordSeksjon[] = [];
     for (const seksjon of sorterteSeksjoner) {
-      const tekst = aiSeksjoner[seksjon.id];
-      if (!tekst) continue;
+      const tekst   = aiSeksjoner[seksjon.id];
       const grafSti = aiGrafer[seksjon.id];
+      if (!tekst && !grafSti) continue;
       const grafPng = grafSti ? await lastNedBlob(grafSti) : undefined;
       wordSeksjoner.push({
         tittel: seksjon.tittel
           ?? (String(seksjon.id).charAt(0).toUpperCase() + String(seksjon.id).slice(1)),
-        markdownTekst: tekst,
+        markdownTekst: tekst ?? '',
         grafPng,
       });
     }
