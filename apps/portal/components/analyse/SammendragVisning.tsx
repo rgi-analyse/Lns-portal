@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import RapportGraf from './RapportGraf';
+import ResultatTabell, { type TabellData } from './ResultatTabell';
 
 interface RapportSeksjon {
   id: string;
@@ -17,10 +18,11 @@ interface RapportStruktur {
 interface Props {
   bestillingId: string;
   authHeaders: Record<string, string>;
-  // Parsed sammendrag-JSON fra orchestrator (Steg D/E)
+  // Parsed sammendrag-JSON fra orchestrator (Steg D/E + tabell-fase)
   sammendrag: {
     seksjoner?: Record<string, string>;
     grafer?: Record<string, string>;
+    tabeller?: Record<string, TabellData>;
   };
   // Parsed rapportStruktur (fra analyseType.rapportStruktur)
   rapportStruktur: RapportStruktur | null;
@@ -62,6 +64,7 @@ export default function SammendragVisning({
 }: Props) {
   const seksjoner = sammendrag.seksjoner ?? {};
   const grafer = sammendrag.grafer ?? {};
+  const tabeller = sammendrag.tabeller ?? {};
 
   // Sorter etter rekkefolge fra struktur. Hvis struktur mangler, fall tilbake
   // til id-rekkefølgen i seksjoner (innsettingsorden fra orchestrator).
@@ -76,8 +79,9 @@ export default function SammendragVisning({
       {sorterte.map(seksjon => {
         const tekst = seksjoner[seksjon.id];
         const harGraf = Boolean(grafer[seksjon.id]);
-        // Skjul seksjoner som verken har tekst eller graf (defensiv).
-        if (!tekst && !harGraf) return null;
+        const tabell = tabeller[seksjon.id];
+        // Skjul seksjoner som verken har tekst, tabell eller graf (defensiv).
+        if (!tekst && !harGraf && !tabell) return null;
 
         const tittel = seksjon.tittel
           ?? (seksjon.id.charAt(0).toUpperCase() + seksjon.id.slice(1));
@@ -97,6 +101,9 @@ export default function SammendragVisning({
             </h2>
             {tekst && (
               <ReactMarkdown components={md}>{tekst}</ReactMarkdown>
+            )}
+            {tabell && (
+              <ResultatTabell data={tabell} />
             )}
             {harGraf && (
               <RapportGraf
