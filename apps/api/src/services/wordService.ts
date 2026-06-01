@@ -2,13 +2,27 @@ import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   TableOfContents, ImageRun, Footer, PageNumber, PageBreak,
   LevelFormat, TabStopType, BorderStyle,
+  Table, TableRow, TableCell, WidthType, ShadingType,
 } from 'docx';
 import { marked } from 'marked';
+
+export interface TabellRad {
+  label:           string;
+  belop:           number;       // raw tall, formatteres ved render
+  pluss?:          boolean;      // vis eksplisitt + ved positiv (kun inntekt)
+  uthevet?:        boolean;      // bold (Sum kostnader, Resultat)
+  skillelinjeFor?: boolean;      // tegn skillelinje OVER denne raden
+}
+
+export interface TabellData {
+  rader: TabellRad[];
+}
 
 export interface WordSeksjon {
   tittel: string;          // H1-tekst (menneskelig seksjonsnavn)
   markdownTekst: string;   // AI-tekst (sammendrag.seksjoner[id])
   grafPng?: Buffer;        // valgfri innebygd graf (allerede nedlastet)
+  tabellData?: TabellData; // valgfri resultat-oppstilling (sammendrag.tabeller[id])
 }
 
 export interface WordRapportInput {
@@ -183,6 +197,73 @@ export function byggDokumentNavn(
   return deler.join(' - ') + '.docx';
 }
 
+/**
+ * Norsk tallformat med 2 desimaler (mellomrom som tusenskille, komma som
+ * desimal). Negative verdier får en-dash (U+2212) som typografisk minus.
+ */
+function formaterBelopNok(n: number, plussTegn = false): string {
+  const abs = Math.abs(n).toLocaleString('nb-NO', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+  if (n < 0) return `−${abs}`;
+  if (plussTegn && n > 0) return `+${abs}`;
+  return abs;
+}
+
+/**
+ * Bygger en docx-tabell for resultat-oppstilling: 2 kolonner (label venstre,
+ * beløp høyrejustert), skillelinje over rader som har skillelinjeFor=true,
+ * bold på rader med uthevet=true. Cell-margins eksplisitt (docx-skill-regel).
+ */
+function lagResultatTabell(data: TabellData, temaNavy: string): Table {
+  const tomBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const cellMargins = { top: 80, bottom: 80, left: 120, right: 120 };
+  const KOL_BREDDE = 4500;     // DXA, 2 kolonner à ~3.1 cm = ca. 1/2-bredde A4 minus marger
+
+  const rows = data.rader.map((rad) => {
+    const skilleBorder = rad.skillelinjeFor
+      ? { style: BorderStyle.SINGLE, size: 8, color: hex(temaNavy) }
+      : tomBorder;
+
+    const labelRun = new TextRun({
+      text: rad.label,
+      font: FONT, size: 22, color: SVART, bold: rad.uthevet,
+    });
+    const belopRun = new TextRun({
+      text: formaterBelopNok(rad.belop, rad.pluss),
+      font: FONT, size: 22, color: SVART, bold: rad.uthevet,
+    });
+
+    return new TableRow({
+      children: [
+        new TableCell({
+          width: { size: KOL_BREDDE, type: WidthType.DXA },
+          margins: cellMargins,
+          shading: { fill: 'auto', type: ShadingType.CLEAR, color: 'auto' },
+          borders: { top: skilleBorder, bottom: tomBorder, left: tomBorder, right: tomBorder },
+          children: [new Paragraph({ children: [labelRun] })],
+        }),
+        new TableCell({
+          width: { size: KOL_BREDDE, type: WidthType.DXA },
+          margins: cellMargins,
+          shading: { fill: 'auto', type: ShadingType.CLEAR, color: 'auto' },
+          borders: { top: skilleBorder, bottom: tomBorder, left: tomBorder, right: tomBorder },
+          children: [new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [belopRun],
+          })],
+        }),
+      ],
+    });
+  });
+
+  return new Table({
+    width: { size: KOL_BREDDE * 2, type: WidthType.DXA },
+    columnWidths: [KOL_BREDDE, KOL_BREDDE],
+    rows,
+  });
+}
+
 export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> {
   const primaer = hex(input.temaPrimaer);
   const navy = hex(input.temaNavy);
@@ -218,7 +299,7 @@ export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> 
   }));
 
   // ── Innhold ──────────────────────────────────────────────
-  const innhold: (Paragraph | TableOfContents)[] = [
+  const innhold: (Paragraph | TableOfContents | Table)[] = [
     new Paragraph({
       heading: HeadingLevel.HEADING_1,
       spacing: { after: 240 },
@@ -240,6 +321,11 @@ export async function byggWordRapport(input: WordRapportInput): Promise<Buffer> 
       children: [new TextRun({ text: seksjon.tittel, bold: true, font: FONT, size: 36, color: primaer })],
     }));
     innhold.push(...markdownTilParagraphs(seksjon.markdownTekst, input.temaNavy, idx));
+    if (seksjon.tabellData) {
+      innhold.push(new Paragraph({ spacing: { before: 120 } }));
+      innhold.push(lagResultatTabell(seksjon.tabellData, input.temaNavy));
+      innhold.push(new Paragraph({ spacing: { after: 120 } }));
+    }
     if (seksjon.grafPng) {
       innhold.push(new Paragraph({
         alignment: AlignmentType.CENTER,
