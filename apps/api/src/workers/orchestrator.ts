@@ -352,9 +352,9 @@ export async function kjørOrchestrator(): Promise<void> {
     // STEG E: GRAF-FASE
     console.log(`[Orchestrator] Steg E: starter graf-fase for ${bestilling.id}`);
 
-    // Hent tenant-tema (global — én rad i OrganisasjonTema)
-    const tema = await prisma.organisasjonTema.findFirst({
-      orderBy: { opprettet: 'asc' },
+    // Hent tema for denne tenanten (per-tenant siden migrasjon 20260602)
+    const tema = await prisma.organisasjonTema.findUnique({
+      where: { tenantSlug: bestilling.tenantSlug },
     });
 
     const grafFarger: GrafFarger = {

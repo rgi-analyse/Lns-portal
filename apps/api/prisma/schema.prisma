@@ -219,7 +219,8 @@ model Tenant {
 
 model OrganisasjonTema {
   id               String   @id @default(uuid())
-  organisasjonNavn String   @unique @db.NVarChar(200)
+  tenantSlug       String   @unique @db.NVarChar(100)
+  organisasjonNavn String   @db.NVarChar(200)
   primaryColor     String   @default("#F5A623") @db.NVarChar(20)
   backgroundColor  String   @default("#0a1628") @db.NVarChar(20)
   navyColor        String   @default("#1B2A4A") @db.NVarChar(20)

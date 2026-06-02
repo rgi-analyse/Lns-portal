@@ -8,7 +8,13 @@ export type TenantRequest = FastifyRequest & {
   tenantSlug?: string;
 };
 
-function extractSlug(request: FastifyRequest): string {
+/**
+ * Kanonisk slug-utleder fra request. X-Tenant-Id-header overstyrer host;
+ * host-baserte system-hosts (Azure-domener, localhost, IP-er) faller til
+ * 'lns'. Brukes av resolveTenant og av master-DB-endepunkter som er i
+ * SKIP_TENANT_PATHS men likevel trenger tenant-binding (f.eks. /api/tema).
+ */
+export function extractSlug(request: FastifyRequest): string {
   const header = (request.headers['x-tenant-id'] as string | undefined)?.trim().toLowerCase();
   if (header) return header;
 
