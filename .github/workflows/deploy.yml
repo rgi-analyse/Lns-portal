@@ -5,8 +5,40 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
 jobs:
+  deploy-migrations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installer avhengigheter (workspaces)
+        run: npm ci
+
+      - name: Migrate deploy
+        run: npx prisma migrate deploy
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.PROD_MASTER_DATABASE_URL }}
+
+      - name: Verifiser migrasjons-status
+        run: npx prisma migrate status
+        working-directory: apps/api
+        env:
+          DATABASE_URL: ${{ secrets.PROD_MASTER_DATABASE_URL }}
+
   deploy-api:
+    needs: deploy-migrations
     runs-on: ubuntu-latest
 
     steps:
@@ -71,6 +103,7 @@ jobs:
           package: /tmp/api-deploy
 
   deploy-portal:
+    needs: deploy-migrations
     runs-on: ubuntu-latest
 
     steps:
