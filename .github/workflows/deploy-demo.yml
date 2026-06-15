@@ -1,0 +1,139 @@
+name: Deploy Demo til Azure
+
+# Manuell deploy av demo-instansen (test-dataportal-api / -portal).
+# Kun workflow_dispatch — ingen automatisk deploy på push. Roger trykker
+# "Run workflow" i Actions-fanen når demo skal oppdateres.
+#
+# INGEN migrate-jobb: demo-tenant-DB (test-dwh) er manuelt schema'et (Vei B),
+# og master-DB (lns-dwh) migreres av prod-deploy.yml. Denne workflowen
+# deployer kun kode.
+#
+# Egen concurrency-group (demo-deploy) slik at demo og prod aldri blokkerer
+# hverandre. Speiler stegene i deploy.yml; eneste forskjeller er trigger,
+# app-navn, publish-profiler og NEXT_PUBLIC_API_URL (=DEMO_API_URL).
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: demo-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installer avhengigheter (workspaces)
+        run: npm ci
+
+      - name: Generer Prisma-klient
+        run: npx prisma generate
+        working-directory: apps/api
+        env:
+          DATABASE_URL: "sqlserver://localhost:1433;database=ci;user=ci;password=ci;trustServerCertificate=true"
+
+      - name: Bygg API
+        run: npm run build
+        working-directory: apps/api
+
+      - name: Lag deploy-pakke (uten node_modules)
+        run: |
+          rm -rf /tmp/api-deploy
+          mkdir /tmp/api-deploy
+          cp -r apps/api/dist /tmp/api-deploy/
+          # Fonter må følge med — grafService leser apps/api/fonts/*.otf ved
+          # modul-load. __dirname blir <approot>/dist/services i prod, og
+          # join('..','..','fonts') => <approot>/fonts. tsc kopierer ikke assets.
+          cp -r apps/api/fonts /tmp/api-deploy/
+          # Lag forenklet package.json: kun start-script + dependencies (ingen build/dev)
+          node -e "
+            const pkg = require('./apps/api/package.json');
+            const deploy = {
+              name: pkg.name,
+              version: pkg.version,
+              main: 'dist/index.js',
+              scripts: { start: 'node dist/index.js' },
+              engines: pkg.engines,
+              dependencies: pkg.dependencies
+            };
+            require('fs').writeFileSync('/tmp/api-deploy/package.json', JSON.stringify(deploy, null, 2));
+          "
+          # Generer package-lock.json isolert (ingen workspace-kontekst i /tmp)
+          cd /tmp/api-deploy && npm install --package-lock-only
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Innhold ===" && ls /tmp/api-deploy/
+          echo "=== package.json scripts ===" && node -e "console.log(JSON.stringify(require('/tmp/api-deploy/package.json').scripts,null,2))"
+          echo "=== package-lock.json finnes ===" && test -f /tmp/api-deploy/package-lock.json && echo "JA" || echo "NEI"
+          echo "=== dist/index.js (første 3 linjer) ===" && head -3 /tmp/api-deploy/dist/index.js
+
+      - name: Deploy API til Azure
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: test-dataportal-api
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_DEMO_API }}
+          package: /tmp/api-deploy
+
+  deploy-portal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installer alle workspace dependencies (fra rot)
+        run: npm install
+
+      - name: Bygg Portal
+        run: npm run build --workspace=apps/portal
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.DEMO_API_URL }}
+          NEXT_PUBLIC_AZURE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_AZURE_CLIENT_ID }}
+          NEXT_PUBLIC_AZURE_TENANT_ID: ${{ secrets.NEXT_PUBLIC_AZURE_TENANT_ID }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NODE_OPTIONS: '--max-old-space-size=4096'
+
+      - name: Lag deploy-pakke
+        run: |
+          rm -rf /tmp/portal-deploy
+          mkdir -p /tmp/portal-deploy
+          cp -r apps/portal/.next /tmp/portal-deploy/.next
+          cp -r apps/portal/public /tmp/portal-deploy/public 2>/dev/null || mkdir /tmp/portal-deploy/public
+          cp apps/portal/package.json /tmp/portal-deploy/package.json
+          cp apps/portal/next.config.mjs /tmp/portal-deploy/next.config.mjs
+          cp apps/portal/tailwind.config.ts /tmp/portal-deploy/tailwind.config.ts 2>/dev/null || true
+          cp apps/portal/postcss.config.js /tmp/portal-deploy/postcss.config.js 2>/dev/null || true
+          # KRITISK: Kopier node_modules fra ROT (workspaces hoister hit)
+          cp -r node_modules /tmp/portal-deploy/node_modules
+          cp package-lock.json /tmp/portal-deploy/package-lock.json 2>/dev/null || true
+
+      - name: Verifiser deploy-pakke
+        run: |
+          echo "=== Rot-innhold ===" && ls /tmp/portal-deploy/
+          echo "=== .next finnes ===" && test -d /tmp/portal-deploy/.next && echo "JA" || echo "NEI"
+          echo "=== node_modules finnes ===" && test -d /tmp/portal-deploy/node_modules && echo "JA" || echo "NEI"
+          echo "=== node_modules/next finnes ===" && test -d /tmp/portal-deploy/node_modules/next && echo "JA" || echo "NEI"
+          echo "=== node_modules/jspdf finnes ===" && test -d /tmp/portal-deploy/node_modules/jspdf && echo "JA" || echo "NEI"
+          echo "=== node_modules/html2canvas finnes ===" && test -d /tmp/portal-deploy/node_modules/html2canvas && echo "JA" || echo "NEI"
+          echo "=== Total størrelse ===" && du -sh /tmp/portal-deploy/
+
+      - name: Deploy Portal til Azure
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: test-dataportal-portal
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE_DEMO_PORTAL }}
+          package: /tmp/portal-deploy
