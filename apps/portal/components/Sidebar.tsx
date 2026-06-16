@@ -8,7 +8,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useTema } from '@/components/ThemeProvider';
+import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
 
 interface Rapport {
   id: string;
@@ -36,7 +36,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { authHeaders, grupper } = usePortalAuth();
-  const { organisasjonNavn } = useTema();
+  const { organisasjonNavn, logoUrl } = useTema();
 
   const [collapsed, setCollapsed] = useState(false);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -115,7 +115,7 @@ export default function Sidebar() {
         style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
         <img
-          src="/logo/LNS-logo-hvit-gul-liten-RGB.png"
+          src={logoUrl ?? STANDARD_LOGO}
           alt={organisasjonNavn}
           className={cn('object-contain shrink-0', collapsed ? 'w-9 h-9' : 'w-14 h-14')}
         />
