@@ -7,6 +7,7 @@ import { loginRequest } from '@/lib/authConfig';
 import { getLocalSession, setLocalSession } from '@/lib/localAuth';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
+import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const { instance }    = useMsal();
   const router          = useRouter();
   const searchParams    = useSearchParams();
+  const { organisasjonNavn, logoUrl } = useTema();
 
   const sessionUtlopt = searchParams.get('expired') === 'true';
   const returnTo      = searchParams.get('returnTo') ?? '/dashboard';
@@ -207,8 +209,8 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
           <img
-            src="/logo/LNS-logo-hvit-gul-liten-RGB.png"
-            alt="LNS"
+            src={logoUrl ?? STANDARD_LOGO}
+            alt={organisasjonNavn}
             className="w-14 h-14 object-contain"
           />
           <span
