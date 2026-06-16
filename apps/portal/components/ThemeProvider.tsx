@@ -16,9 +16,13 @@ interface Tema {
 
 interface TemaContext {
   organisasjonNavn: string;
+  logoUrl: string | null;
 }
 
-const TemaCtx = createContext<TemaContext>({ organisasjonNavn: 'LNS' });
+/** Fallback-logo når tenant ikke har satt logoUrl (f.eks. LNS før Blob-URL er konfigurert). */
+export const STANDARD_LOGO = '/logo/LNS-logo-hvit-gul-liten-RGB.png';
+
+const TemaCtx = createContext<TemaContext>({ organisasjonNavn: 'LNS', logoUrl: null });
 
 export function useTema() {
   return useContext(TemaCtx);
@@ -71,6 +75,7 @@ export function applyTheme(tema: Tema) {
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [organisasjonNavn, setOrganisasjonNavn] = useState('LNS');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const hentTema = () => {
@@ -80,6 +85,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
           if (tema) {
             applyTheme(tema);
             setOrganisasjonNavn(tema.organisasjonNavn ?? 'LNS');
+            setLogoUrl(tema.logoUrl ?? null);
           }
         })
         .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });
@@ -92,7 +98,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   }, []);
 
   return (
-    <TemaCtx.Provider value={{ organisasjonNavn }}>
+    <TemaCtx.Provider value={{ organisasjonNavn, logoUrl }}>
       {children}
     </TemaCtx.Provider>
   );
