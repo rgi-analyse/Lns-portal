@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { apiFetch } from '@/lib/apiClient';
+import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
 
 const nav = [
   { href: '/admin',            label: 'Oversikt',   icon: Settings2, exact: true },
@@ -21,6 +22,7 @@ const nav = [
 export default function AdminSidebar() {
   const pathname = usePathname();
   const { accounts } = useMsal();
+  const { organisasjonNavn, logoUrl } = useTema();
   const [rolle, setRolle] = useState<string>('');
 
   useEffect(() => {
@@ -53,8 +55,8 @@ export default function AdminSidebar() {
         style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
         <img
-          src="/logo/LNS-logo-hvit-gul-liten-RGB.png"
-          alt="LNS"
+          src={logoUrl ?? STANDARD_LOGO}
+          alt={organisasjonNavn}
           className="w-14 h-14 object-contain shrink-0"
         />
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, color: 'var(--gold)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
