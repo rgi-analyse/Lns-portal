@@ -19,9 +19,6 @@ interface TemaContext {
   logoUrl: string | null;
 }
 
-/** Fallback-logo når tenant ikke har satt logoUrl (f.eks. LNS før Blob-URL er konfigurert). */
-export const STANDARD_LOGO = '/logo/LNS-logo-hvit-gul-liten-RGB.png';
-
 const TemaCtx = createContext<TemaContext>({ organisasjonNavn: 'LNS', logoUrl: null });
 
 export function useTema() {

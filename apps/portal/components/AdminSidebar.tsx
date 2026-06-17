@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
 import { useMsal } from '@azure/msal-react';
 import { apiFetch } from '@/lib/apiClient';
-import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
+import { useTema } from '@/components/ThemeProvider';
 
 const nav = [
   { href: '/admin',            label: 'Oversikt',   icon: Settings2, exact: true },
@@ -54,11 +54,13 @@ export default function AdminSidebar() {
         className="flex flex-col items-center px-4 py-4 shrink-0"
         style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
-        <img
-          src={logoUrl ?? STANDARD_LOGO}
-          alt={organisasjonNavn}
-          className="w-14 h-14 object-contain shrink-0"
-        />
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt={organisasjonNavn}
+            className="w-14 h-14 object-contain shrink-0"
+          />
+        )}
         <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, color: 'var(--gold)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
           Analyseportal
         </div>

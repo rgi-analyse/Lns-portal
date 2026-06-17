@@ -7,7 +7,7 @@ import { loginRequest } from '@/lib/authConfig';
 import { getLocalSession, setLocalSession } from '@/lib/localAuth';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
-import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
+import { useTema } from '@/components/ThemeProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -208,11 +208,13 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="flex flex-col items-center gap-2">
-          <img
-            src={logoUrl ?? STANDARD_LOGO}
-            alt={organisasjonNavn}
-            className="w-14 h-14 object-contain"
-          />
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt={organisasjonNavn}
+              className="w-14 h-14 object-contain"
+            />
+          )}
           <span
             style={{
               fontFamily:    'Barlow Condensed, sans-serif',

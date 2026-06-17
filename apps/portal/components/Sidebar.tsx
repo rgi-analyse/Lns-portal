@@ -8,7 +8,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useTema, STANDARD_LOGO } from '@/components/ThemeProvider';
+import { useTema } from '@/components/ThemeProvider';
 
 interface Rapport {
   id: string;
@@ -114,11 +114,13 @@ export default function Sidebar() {
         className={cn('flex flex-col items-center shrink-0', collapsed ? 'py-3' : 'px-4 py-4')}
         style={{ borderBottom: '1px solid var(--glass-bg)' }}
       >
-        <img
-          src={logoUrl ?? STANDARD_LOGO}
-          alt={organisasjonNavn}
-          className={cn('object-contain shrink-0', collapsed ? 'w-9 h-9' : 'w-14 h-14')}
-        />
+        {logoUrl && (
+          <img
+            src={logoUrl}
+            alt={organisasjonNavn}
+            className={cn('object-contain shrink-0', collapsed ? 'w-9 h-9' : 'w-14 h-14')}
+          />
+        )}
         {!collapsed && (
           <div style={{
             fontFamily: 'Barlow Condensed, sans-serif',
