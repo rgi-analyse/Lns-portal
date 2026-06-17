@@ -5,8 +5,8 @@ import LisensProvider from '@/components/LisensProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'LNS Dataportal',
-  description: 'LNS Power BI Portal',
+  title: 'Dataportal',          // tenant-nøytral fallback; ThemeProvider setter ekte tittel når tema er hentet
+  description: 'Power BI Portal',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

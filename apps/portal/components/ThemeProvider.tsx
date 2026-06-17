@@ -79,7 +79,13 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         .then(tema => {
           if (tema) {
             applyTheme(tema);
-            setOrganisasjonNavn(tema.organisasjonNavn ?? 'LNS');
+            const navn = tema.organisasjonNavn ?? 'LNS';
+            setOrganisasjonNavn(navn);
+            // Tenant-bevisst fane-tittel. Settes imperativt her (samme mønster som
+            // applyTheme) i stedet for via useEffect på default-staten — ellers ville
+            // mount skrevet "LNS Dataportal" og gjeninnført LNS-flash på demo. Den
+            // nøytrale metadata-fallbacken ("Dataportal") vises til ekte tema ankommer.
+            document.title = `${navn} Dataportal`;
           }
         })
         .catch(() => { /* ikke kritisk — standard LNS-tema beholdes */ });
