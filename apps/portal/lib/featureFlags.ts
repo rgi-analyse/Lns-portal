@@ -6,7 +6,7 @@
 const BETA_BRUKERE: string[] = [];
 
 // Tenants der ALLE brukere har beta-tilgang
-const BETA_TENANTS = ['lns'];
+const BETA_TENANTS = ['lns', 'demo'];
 
 /**
  * Deriv tenant-slug fra hostname (samme logikk som LisensProvider).
