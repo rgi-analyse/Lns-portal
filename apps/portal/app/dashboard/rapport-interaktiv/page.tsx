@@ -2452,16 +2452,24 @@ export default function RapportInteraktivPage() {
     if (!config) return filtrerteData;
     let data = [...filtrerteData];
     if (config.sorterPaa) {
+      // Når absoluttverdi-toggelen er på, sorter numeriske verdier på abs slik at
+      // rekkefølgen stemmer med det brukeren faktisk ser (positive tall). Tekst-
+      // /xAkse-sortering (localeCompare-grenen) er upåvirket.
+      const absSort = config.visAbsoluttverdi;
       data.sort((a, b) => {
         const av = a[config.sorterPaa!], bv = b[config.sorterPaa!];
         const mult = config.sorterRetning === 'DESC' ? -1 : 1;
-        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * mult;
+        if (typeof av === 'number' && typeof bv === 'number') {
+          const an = absSort ? Math.abs(av) : av;
+          const bn = absSort ? Math.abs(bv) : bv;
+          return (an - bn) * mult;
+        }
         return String(av ?? '').localeCompare(String(bv ?? '')) * mult;
       });
     }
     data = data.slice(0, config.maksRader);
-    // Absoluttverdi-toggle: rent presentasjonslag, påføres ETTER filter/sortering/slice
-    // slik at sortering opererer på reelle verdier. xAkse (kategori) beholder fortegn.
+    // Absoluttverdi-toggle: påføres ETTER slice (rent presentasjonslag).
+    // xAkse (kategori) beholder fortegn.
     if (config.visAbsoluttverdi) {
       const xKol = config.xAkse;
       data = data.map(rad => {
