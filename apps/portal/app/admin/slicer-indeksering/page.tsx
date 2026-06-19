@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, Database, FileBarChart2, Layers, MoreVertical,
   Pencil, Play, Plus, RefreshCw, Trash2,
@@ -86,8 +86,7 @@ interface RadMeny {
 const ETT_DØGN_MS = 24 * 60 * 60 * 1000;
 
 export default function SlicerIndekseringPage() {
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
 
   const [konfiger, setKonfiger]   = useState<SlicerKonfigKort[] | null>(null);
   const [forslag, setForslag]     = useState<ForslagRespons | null>(null);

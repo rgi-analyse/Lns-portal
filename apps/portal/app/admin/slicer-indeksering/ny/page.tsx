@@ -16,7 +16,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -206,8 +206,7 @@ function RapportVelger({
 
 export default function NyKonfigurasjonPage() {
   const router = useRouter();
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
 
   const [steg, setSteg] = useState<Steg>(1);
   const [form, setForm] = useState<Form>(TOMT_FORM);

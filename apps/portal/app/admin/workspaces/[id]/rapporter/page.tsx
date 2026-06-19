@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from 'lucide-react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,8 +43,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function WorkspaceRapporterPage() {
   const { id } = useParams<{ id: string }>();
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
   const metaHeaders: Record<string, string> = entraObjectId
     ? { 'X-Entra-Object-Id': entraObjectId }
     : {};

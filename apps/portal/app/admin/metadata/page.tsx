@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiClient';
@@ -86,8 +86,7 @@ function formatDate(iso: string | null) {
 }
 
 export default function MetadataAdminPage() {
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
   // Basisheaders uten Content-Type — legg til 'Content-Type': 'application/json' kun på kall med body
   const authHeaders: Record<string, string> = entraObjectId
     ? { 'X-Entra-Object-Id': entraObjectId }
