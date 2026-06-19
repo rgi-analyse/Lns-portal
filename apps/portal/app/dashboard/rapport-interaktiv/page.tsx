@@ -63,6 +63,7 @@ interface RedigertConfig {
   sorterRetning:    string;
   maksRader:        number;
   referanseLinje?:  { verdi: number; etikett?: string; farge?: string } | null;
+  visAbsoluttverdi?: boolean;
 }
 
 interface AktivFilter {
@@ -2130,6 +2131,7 @@ export default function RapportInteraktivPage() {
         sorterPaa:       (cfg.sorterPaa as string | null) ?? null,
         sorterRetning:  (cfg.sorterRetning as string) ?? 'DESC',
         maksRader:      (cfg.maksRader as number) ?? 50,
+        visAbsoluttverdi: (cfg.visAbsoluttverdi as boolean) ?? false,
       };
 
       // Hent ferske kolonnetyper fra API — ikke bruk lagret config (kan være utdatert/feil)
@@ -2457,7 +2459,20 @@ export default function RapportInteraktivPage() {
         return String(av ?? '').localeCompare(String(bv ?? '')) * mult;
       });
     }
-    return data.slice(0, config.maksRader);
+    data = data.slice(0, config.maksRader);
+    // Absoluttverdi-toggle: rent presentasjonslag, påføres ETTER filter/sortering/slice
+    // slik at sortering opererer på reelle verdier. xAkse (kategori) beholder fortegn.
+    if (config.visAbsoluttverdi) {
+      const xKol = config.xAkse;
+      data = data.map(rad => {
+        const ny = { ...rad };
+        for (const k of Object.keys(ny)) {
+          if (k !== xKol && typeof ny[k] === 'number') ny[k] = Math.abs(ny[k] as number);
+        }
+        return ny;
+      });
+    }
+    return data;
   }, [filtrerteData, config]);
 
   const visKolonner = useMemo(() => {
@@ -2673,6 +2688,7 @@ export default function RapportInteraktivPage() {
         ekstraKolonner: config.ekstraKolonner,
         valgteKolonner,
         aktiveFiltre,
+        visAbsoluttverdi: config.visAbsoluttverdi ?? false,
       };
       console.log('[Lagre] aktiveFiltre:', JSON.stringify(aktiveFiltre));
       console.log('[Lagre] valgteKolonner:', JSON.stringify(valgteKolonner));
@@ -3528,6 +3544,25 @@ export default function RapportInteraktivPage() {
                   <div style={{ marginTop:8, fontSize:11, color:'var(--text-muted)', fontFamily:'monospace', background:'var(--glass-bg)', borderRadius:5, padding:'4px 8px' }}>
                     {yAkseLabel}
                   </div>
+                </div>
+              )}
+
+              {/* ── Tallvisning: absoluttverdi (ikke for waterfall — fortegn er meningsbærende der) ── */}
+              {config.visualType !== 'waterfall' && (
+                <div>
+                  <label style={labelStyle}>Tallvisning</label>
+                  <button type="button"
+                    onClick={()=>setConfig(p=>p?{...p, visAbsoluttverdi: !p.visAbsoluttverdi}:p)}
+                    style={{
+                      width:'100%', padding:'8px 10px', borderRadius:7, cursor:'pointer',
+                      border: config.visAbsoluttverdi ? '1px solid var(--gold-dim)' : '1px solid var(--glass-bg-hover)',
+                      background: config.visAbsoluttverdi ? 'var(--glass-gold-bg)' : 'var(--glass-bg)',
+                      color: config.visAbsoluttverdi ? 'var(--gold)' : 'var(--text-secondary)',
+                      fontSize:12, display:'flex', alignItems:'center', gap:8, fontFamily:'Barlow, sans-serif',
+                    }}>
+                    <span style={{ fontSize:14, fontWeight:700, fontFamily:'monospace' }}>|x|</span>
+                    <span>Vis som absoluttverdi{config.visAbsoluttverdi ? ' ✓' : ''}</span>
+                  </button>
                 </div>
               )}
 
