@@ -110,6 +110,8 @@ const OPERATORER = [
   { verdi: 'NOT LIKE', label: 'inneh. ikke' },
   { verdi: 'BETWEEN',  label: 'mellom' },
   { verdi: 'IN_LIST',  label: 'i liste' },
+  { verdi: 'IS NOT NULL', label: 'ikke null' },
+  { verdi: 'IS NULL',     label: 'er null' },
 ];
 
 const selectStyle: React.CSSProperties = {
@@ -2323,7 +2325,9 @@ export default function RapportInteraktivPage() {
     });
     setAktiveFiltre(oppdaterte);
     const cfg = configRef.current;
-    if (aktiveFiltre[idx]?.verdi && cfg && operator !== 'IN_LIST') hentData(cfg, oppdaterte);
+    // IS NOT NULL / IS NULL er "komplette" uten verdi — refetch umiddelbart ved bytte.
+    const verdiløs = operator === 'IS NOT NULL' || operator === 'IS NULL';
+    if ((aktiveFiltre[idx]?.verdi || verdiløs) && cfg && operator !== 'IN_LIST') hentData(cfg, oppdaterte);
   };
 
   const oppdaterFilterVerdier = (idx: number, verdier: string[]) => {
@@ -2871,7 +2875,9 @@ export default function RapportInteraktivPage() {
                   style={{ background:'transparent', border:'none', color:'var(--text-secondary)', fontSize:11, cursor:'pointer', outline:'none' }}>
                   {OPERATORER.map(op => <option key={op.verdi} value={op.verdi}>{op.label}</option>)}
                 </select>
-                {filter.operator === 'BETWEEN' ? (
+                {(filter.operator === 'IS NOT NULL' || filter.operator === 'IS NULL') ? (
+                  <span style={{ color:'var(--text-muted)', fontSize:11, fontStyle:'italic', flexShrink:0, padding:'0 4px' }}>(uten verdi)</span>
+                ) : filter.operator === 'BETWEEN' ? (
                   <>
                     <input type="text" value={filter.verdi} onChange={e => oppdaterFilterVerdi(idx, e.target.value)}
                       placeholder="Fra..." style={{ background:'var(--glass-bg)', border:'1px solid var(--glass-border)', color:'var(--text-primary)', borderRadius:4, fontSize:11, padding:'3px 6px', outline:'none', width:72 }} />
