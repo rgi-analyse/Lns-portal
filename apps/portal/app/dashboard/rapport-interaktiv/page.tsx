@@ -2246,6 +2246,9 @@ export default function RapportInteraktivPage() {
 
   // ── Auto-oppdater sorteringsretning og sorterPaa når xAkse endres ────────────
   useEffect(() => {
+    // Ikke overskriv lagret sortering ved innlasting — kun ved interaktivt
+    // xAkse-bytte etter at initialiseringen er ferdig (samme guard som 2228/2272).
+    if (!initialiseringFerdig.current) return;
     if (!config?.xAkse) return;
     const smartRetning = defaultSorterRetning(config.xAkse);
     const xL = config.xAkse.toLowerCase();
