@@ -2536,8 +2536,14 @@ export default function RapportInteraktivPage() {
         element.style.overflow  = 'visible';
       }
 
+      // html2canvas 1.4.1 tåler ikke var() som backgroundColor-opsjon (parses rått,
+      // omgår getComputedStyle) — resolve CSS-variabelen til konkret farge. Tema-
+      // bevisst for begge tenants; fallback = LNS/standard navy hvis variabelen mangler.
+      const rotStil = getComputedStyle(document.documentElement);
+      const pdfBakgrunn = rotStil.getPropertyValue('--navy-darkest').trim() || '#0a1628';
+
       const canvas = await html2canvas(element, {
-        backgroundColor: 'var(--navy-darkest)',
+        backgroundColor: pdfBakgrunn,
         scale: 2,
         useCORS: true,
         logging: false,
