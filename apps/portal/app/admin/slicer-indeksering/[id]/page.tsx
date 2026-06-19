@@ -8,7 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, ArrowLeft, Database, Loader2, Pencil, Play, Power, RefreshCw, Trash2,
 } from 'lucide-react';
@@ -40,8 +40,7 @@ function parseFq(fq: string | null | undefined): { tabell: string; kolonne: stri
 export default function SlicerKonfigDetaljPage() {
   const router = useRouter();
   const { id }  = useParams<{ id: string }>();
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
 
   const [konfig, setKonfig] = useState<SlicerKonfigDetalj | null>(null);
   const [error, setError]   = useState<string | null>(null);

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
 
@@ -21,20 +21,19 @@ const nav = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const { accounts } = useMsal();
+  const { entraObjectId, authHeaders } = usePortalAuth();
   const { organisasjonNavn, logoUrl } = useTema();
   const [rolle, setRolle] = useState<string>('');
 
   useEffect(() => {
-    const account = accounts[0];
-    if (!account) return;
+    if (!entraObjectId) return;
     apiFetch('/api/me', {
-      headers: { 'X-Entra-Object-Id': account.localAccountId },
+      headers: authHeaders,
     })
       .then(r => r.json())
       .then((b: { rolle?: string }) => setRolle(b.rolle ?? ''))
       .catch(() => {});
-  }, [accounts]);
+  }, [entraObjectId]);
 
   const synligeNav = nav.filter(item => !item.kreverRolle || item.kreverRolle === rolle);
 

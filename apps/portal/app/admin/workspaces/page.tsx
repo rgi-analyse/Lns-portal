@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Plus, Pencil, FileBarChart2, Shield, Trash2, GripVertical } from 'lucide-react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   DndContext,
   closestCenter,
@@ -124,8 +124,7 @@ function SortableWorkspaceRow({
 }
 
 export default function WorkspacesPage() {
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);

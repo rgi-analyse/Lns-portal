@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Building2, FileBarChart2, Users, ArrowRight } from 'lucide-react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 
 interface WorkspaceCount {
@@ -13,8 +13,7 @@ interface WorkspaceCount {
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function AdminOverviewPage() {
-  const { accounts } = useMsal();
-  const entraObjectId = accounts[0]?.localAccountId ?? '';
+  const entraObjectId = usePortalAuth().entraObjectId ?? '';
 
   const [stats, setStats] = useState<{ workspaces: number; rapporter: number; tilgang: number } | null>(null);
 

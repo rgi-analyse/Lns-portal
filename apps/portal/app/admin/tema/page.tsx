@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useMsal } from '@azure/msal-react';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { applyTheme } from '@/components/ThemeProvider';
 
@@ -56,8 +56,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 }
 
 export default function TemaAdminPage() {
-  const { accounts } = useMsal();
-  const entraId = accounts[0]?.localAccountId ?? '';
+  const entraId = usePortalAuth().entraObjectId ?? '';
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? '';
 
   const [tema, setTema] = useState<Tema>(STANDARD_TEMA);
