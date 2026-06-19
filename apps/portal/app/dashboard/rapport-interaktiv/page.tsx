@@ -386,10 +386,20 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
 
   // Kolonner som må castes til INT for riktig sortering (ikke alfabetisk)
   const tallKolonner = new Set(['måned', 'år', 'årmåned', 'åruke', 'kontonr']);
-  const byggOrderBy = (kol: string, retning: string): string =>
-    tallKolonner.has(kol?.toLowerCase())
-      ? `ORDER BY CAST([${kol}] AS INT) ${retning}`
-      : `ORDER BY [${kol}] ${retning}`;
+  const byggOrderBy = (kol: string, retning: string, abs = false): string => {
+    const inner = tallKolonner.has(kol?.toLowerCase()) ? `CAST([${kol}] AS INT)` : `[${kol}]`;
+    return `ORDER BY ${abs ? `ABS(${inner})` : inner} ${retning}`;
+  };
+
+  // Absoluttverdi-sortering: kun når toggelen er på OG sorteringskolonnen er numerisk
+  // (measure/kpi/yAkse). ABS på en tekstkolonne ville gitt SQL-feil — tekst sorteres
+  // som før (samme tekst/numerisk-skille som frontend-komparatoren).
+  const absSort = !!cfg.visAbsoluttverdi && !!cfg.sorterPaa && (
+    cfg.sorterPaa === cfg.yAkse ||
+    kolonnTyper[cfg.sorterPaa]?.startsWith('measure') ||
+    kolonnTyper[cfg.sorterPaa] === 'kpi' ||
+    !!finnKpiUttrykk(cfg.sorterPaa, kpiUttrykk)
+  );
 
   if (isMed) {
     // Window function: wrap in subquery with DISTINCT to deduplicate rows
@@ -397,7 +407,7 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
       ? `SELECT DISTINCT ${x}, ${grp}, ${yUttrykk} AS ${alias} FROM ${viewNavn}${where}`
       : `SELECT DISTINCT ${x}, ${yUttrykk} AS ${alias} FROM ${viewNavn}${where}`;
     const orderPart = cfg.sorterPaa
-      ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning)
+      ? byggOrderBy(cfg.sorterPaa, cfg.sorterRetning, absSort)
       : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
     return `SELECT TOP 500 * FROM (${innerPart}) _med ${orderPart}`;
   }
@@ -408,8 +418,8 @@ function byggSQL(cfg: RedigertConfig, viewNavn: string, prosjektFilter = '', kol
   // for å unngå SQL-feil (ORDER BY [Beløp] er ugyldig — kolonnen finnes bare som SUM([Beløp])).
   const orderBy = cfg.sorterPaa
     ? (erAggregert && cfg.sorterPaa === cfg.yAkse
-        ? `ORDER BY ${yUttrykk} ${cfg.sorterRetning}`
-        : byggOrderBy(cfg.sorterPaa, cfg.sorterRetning))
+        ? `ORDER BY ${absSort ? `ABS(${yUttrykk})` : yUttrykk} ${cfg.sorterRetning}`
+        : byggOrderBy(cfg.sorterPaa, cfg.sorterRetning, absSort))
     : erMånedsnavn
       ? `ORDER BY CAST([årmåned] AS INT) ${cfg.sorterRetning}`
       : byggOrderBy(cfg.xAkse, cfg.sorterRetning);
@@ -1988,12 +1998,25 @@ export default function RapportInteraktivPage() {
           ...valgteKpiKol.map(k => `${finnKpiUttrykk(k, kpiUtrykkRef.current) ?? `SUM([${k}])`} AS [${k}]`),
         ].join(',\n  ');
         const groupBy = valgteDimensjoner.length > 0 ? `GROUP BY ${valgteDimensjoner.map(k => `[${k}]`).join(', ')}` : '';
-        const firstMeasure = valgteMeasures[0] ?? valgteKpiKol[0];
-        const orderBy = valgteMeasures.length > 0
-          ? `ORDER BY SUM([${valgteMeasures[0]}]) DESC`
-          : valgteKpiKol.length > 0
-            ? `ORDER BY ${finnKpiUttrykk(firstMeasure, kpiUtrykkRef.current) ?? `SUM([${firstMeasure}])`} DESC`
-            : valgteDimensjoner.length > 0 ? `ORDER BY [${valgteDimensjoner[0]}] ASC` : '';
+        // Sorteringskolonne: sorterPaa hvis satt og blant valgte kolonner, ellers
+        // første measure/kpi/dimensjon (uendret default). Respekter sorterRetning og ABS.
+        const sortKol = (cfg.sorterPaa && valgteKol.includes(cfg.sorterPaa))
+          ? cfg.sorterPaa
+          : (valgteMeasures[0] ?? valgteKpiKol[0] ?? valgteDimensjoner[0] ?? null);
+        const sortType = sortKol ? getType(sortKol) : null;
+        const sortErNumerisk = sortType === 'measure' || sortType === 'kpi';
+        const retning = sortType && sortType !== 'measure' && sortType !== 'kpi'
+          ? (cfg.sorterPaa ? cfg.sorterRetning : 'ASC')   // ren dimensjon: ASC default som før
+          : (cfg.sorterPaa ? cfg.sorterRetning : 'DESC'); // measure/kpi: DESC default som før
+        const sortExpr =
+          !sortKol                 ? null
+          : sortType === 'kpi'     ? (finnKpiUttrykk(sortKol, kpiUtrykkRef.current) ?? `SUM([${sortKol}])`)
+          : sortType === 'measure' ? `SUM([${sortKol}])`
+          :                          `[${sortKol}]`;
+        const absSort = !!cfg.visAbsoluttverdi && sortErNumerisk;
+        const orderBy = sortExpr
+          ? `ORDER BY ${absSort ? `ABS(${sortExpr})` : sortExpr} ${retning}`
+          : '';
 
         sql = `SELECT TOP ${cfg.maksRader} ${selectListe} FROM ${vn} ${where} ${groupBy} ${orderBy}`.replace(/\s+/g, ' ').trim();
       } else if (forslag?.sql && cfg.xAkse === (forslag.xAkse ?? cfg.xAkse) && cfg.yAkse === (forslag.yAkse ?? cfg.yAkse) && cfg.grupperPaa === (forslag.grupperPaa ?? cfg.grupperPaa)) {
@@ -2055,10 +2078,18 @@ export default function RapportInteraktivPage() {
           }
         }
 
+        // ABS kun når sorteringen er drevet av sorterPaa (ikke xAkse-fallback) og
+        // kolonnen er numerisk (measure/kpi/yAkse). Tekst → ingen ABS (ville gitt SQL-feil).
+        const absSort = !!cfg.visAbsoluttverdi && !!cfg.sorterPaa && (
+          cfg.sorterPaa === cfg.yAkse ||
+          kolonnTyperRef.current[cfg.sorterPaa]?.startsWith('measure') ||
+          kolonnTyperRef.current[cfg.sorterPaa] === 'kpi' ||
+          !!finnKpiUttrykk(cfg.sorterPaa, kpiUtrykkRef.current)
+        );
         const orderByStr = sorterKol
           ? (tallKolonner.has(sorterKol.toLowerCase())
-              ? `ORDER BY CAST([${sorterKol}] AS INT) ${cfg.sorterRetning}`
-              : `ORDER BY [${sorterKol}] ${cfg.sorterRetning}`)
+              ? `ORDER BY ${absSort ? `ABS(CAST([${sorterKol}] AS INT))` : `CAST([${sorterKol}] AS INT)`} ${cfg.sorterRetning}`
+              : `ORDER BY ${absSort ? `ABS([${sorterKol}])` : `[${sorterKol}]`} ${cfg.sorterRetning}`)
           : '';
 
         sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
@@ -2246,7 +2277,7 @@ export default function RapportInteraktivPage() {
     console.log('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, aktiveFiltre, autoRefresh]);
+  }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, config?.visAbsoluttverdi, aktiveFiltre, autoRefresh]);
 
   // ── Auto-oppdater sorteringsretning og sorterPaa når xAkse endres ────────────
   useEffect(() => {
