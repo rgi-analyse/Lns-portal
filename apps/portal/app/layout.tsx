@@ -13,6 +13,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="nb">
       <head>
+        {/*
+          Blokkerende inline-script som setter cachet tema (fra forrige besøk) før
+          first paint, slik at refresh ikke flasher fallback-temaet. Slug-utledningen
+          speiler getTenantSlug() i lib/apiClient.ts og prefikset TEMA_CACHE_PREFIX i
+          ThemeProvider.tsx. Kjører før React; ThemeProvider henter fersk data og
+          oppdaterer cachen + UI etterpå.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var h=location.hostname.toLowerCase();var sys=h.indexOf('azurewebsites.net')>-1||h.indexOf('azure.com')>-1||h.indexOf('.azure.')>-1||h==='localhost'||/^[\\d.]+$/.test(h)||h.indexOf('.')===-1;var slug='lns';if(!sys){var s=h.split('.')[0];if(s&&s!=='www')slug=s;}var raw=localStorage.getItem('tema:'+slug);if(!raw)return;var d=JSON.parse(raw);if(d&&d.vars){var r=document.documentElement;for(var k in d.vars){r.style.setProperty(k,d.vars[k]);}}}catch(e){}})();`,
+          }}
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap"
           rel="stylesheet"

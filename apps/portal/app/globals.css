@@ -16,7 +16,7 @@
     --card-foreground: 0 0% 90%;
     --popover: 222 47% 14%;
     --popover-foreground: 0 0% 90%;
-    --primary: 38 91% 55%;
+    --primary: 218 9% 65%;
     --primary-foreground: 222 47% 11%;
     --secondary: 222 47% 18%;
     --secondary-foreground: 0 0% 90%;
@@ -28,33 +28,35 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 100% / 0.08;
     --input: 0 0% 100% / 0.06;
-    --ring: 38 91% 55%;
+    --ring: 218 9% 65%;
     --radius: 0.5rem;
 
-    /* LNS design tokens */
-    --navy-darkest: #0a1628;
-    --navy-dark:    #111D33;
-    --navy:         #1B2A4A;
-    --navy-mid:     #243556;
-    --gold:         #F5A623;
-    --gold-light:   #F7BC55;
-    --gold-dim:     rgba(245,166,35,0.15);
+    /* Design tokens — tenant-NØYTRAL fallback. Settes til faktisk tenant-tema
+       av inline-scriptet (cache) og ThemeProvider.applyTheme. Holdt nøytralt
+       mørkt slik at førstegangsbesøk (ingen cache) ikke flasher LNS-merkevaren. */
+    --navy-darkest: #0f1218;
+    --navy-dark:    #161b22;
+    --navy:         #1e242d;
+    --navy-mid:     #28303b;
+    --gold:         #9ca3af;
+    --gold-light:   #b8bdc6;
+    --gold-dim:     rgba(156,163,175,0.15);
 
     --glass-bg:           rgba(255,255,255,0.04);
     --glass-bg-hover:     rgba(255,255,255,0.07);
     --glass-border:       rgba(255,255,255,0.12);
     --glass-border-hover: rgba(255,255,255,0.14);
-    --glass-gold-bg:      rgba(245,166,35,0.10);
-    --glass-gold-border:  rgba(245,166,35,0.22);
+    --glass-gold-bg:      rgba(156,163,175,0.10);
+    --glass-gold-border:  rgba(156,163,175,0.22);
 
     --text-primary:   rgba(255,255,255,0.95);
     --text-secondary: rgba(255,255,255,0.70);
     --text-muted:     rgba(255,255,255,0.45);
-    --text-gold:      #F5A623;
+    --text-gold:      #9ca3af;
   }
 
   body {
-    background: #0a1628;
+    background: var(--navy-darkest);
     color: rgba(255,255,255,0.90);
     font-family: 'Barlow', system-ui, sans-serif;
   }
@@ -69,10 +71,12 @@ body::before {
   content: '';
   position: fixed;
   inset: 0;
+  /* Variabel-drevet slik at orbene følger tenant-temaet (og nøytral fallback) i
+     stedet for å være permanent LNS-fargede. color-mix gir alpha på hex-variabler. */
   background:
-    radial-gradient(ellipse at 15% 15%, rgba(245,166,35,0.10) 0%, transparent 45%),
-    radial-gradient(ellipse at 85% 85%, rgba(27,42,74,0.7) 0%, transparent 50%),
-    linear-gradient(135deg, #0a1628 0%, #1B2A4A 50%, #0d1f3c 100%);
+    radial-gradient(ellipse at 15% 15%, var(--glass-gold-bg) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 85%, color-mix(in srgb, var(--navy) 70%, transparent) 0%, transparent 50%),
+    linear-gradient(135deg, var(--navy-darkest) 0%, var(--navy) 50%, var(--navy-dark) 100%);
   z-index: -1;
   pointer-events: none;
 }

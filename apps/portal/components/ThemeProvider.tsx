@@ -1,7 +1,11 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/apiClient';
+import { apiFetch, getTenantSlug } from '@/lib/apiClient';
+
+// localStorage-nøkkel for cachet tema per tenant. Inline-scriptet i layout.tsx
+// må bruke nøyaktig samme prefiks.
+export const TEMA_CACHE_PREFIX = 'tema:';
 
 interface Tema {
   primaryColor: string;
@@ -44,30 +48,45 @@ function hexToHSL(hex: string): { h: number; s: number; l: number } {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-export function applyTheme(tema: Tema) {
-  const root = document.documentElement;
+// Bygger CSS-variabel-mappen fra et tema. Holdt ren (ingen DOM-tilgang) slik at
+// samme mapping kan caches i localStorage og gjenbrukes av inline-scriptet i
+// <head> (se applyCachedTheme / layout.tsx) for å unngå tema-flash før paint.
+export function computeThemeVars(tema: Tema): Record<string, string> {
   const { h, s, l } = hexToHSL(tema.primaryColor);
-
-  root.style.setProperty('--gold', tema.primaryColor);
-  root.style.setProperty('--gold-light', `hsl(${h}, ${s}%, ${Math.min(l + 10, 90)}%)`);
-  root.style.setProperty('--gold-dim', `${tema.primaryColor}26`);
-  root.style.setProperty('--glass-gold-bg', `${tema.primaryColor}1A`);
-  root.style.setProperty('--glass-gold-border', `${tema.primaryColor}38`);
-  root.style.setProperty('--text-gold', tema.primaryColor);
-  root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
-  root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
-  root.style.setProperty('--navy-darkest', tema.backgroundColor);
-  root.style.setProperty('--navy-dark', tema.navyColor);
-  root.style.setProperty('--navy', tema.accentColor);
-  root.style.setProperty('--navy-mid', tema.accentColor);
-  document.body.style.setProperty('background', tema.backgroundColor);
+  const vars: Record<string, string> = {
+    '--gold':              tema.primaryColor,
+    '--gold-light':        `hsl(${h}, ${s}%, ${Math.min(l + 10, 90)}%)`,
+    '--gold-dim':          `${tema.primaryColor}26`,
+    '--glass-gold-bg':     `${tema.primaryColor}1A`,
+    '--glass-gold-border': `${tema.primaryColor}38`,
+    '--text-gold':         tema.primaryColor,
+    '--ring':              `${h} ${s}% ${l}%`,
+    '--primary':           `${h} ${s}% ${l}%`,
+    '--navy-darkest':      tema.backgroundColor,
+    '--navy-dark':         tema.navyColor,
+    '--navy':              tema.accentColor,
+    '--navy-mid':          tema.accentColor,
+  };
   if (tema.textColor) {
-    root.style.setProperty('--text-primary', tema.textColor);
+    vars['--text-primary'] = tema.textColor;
   }
   if (tema.textMutedColor) {
-    root.style.setProperty('--text-secondary', tema.textMutedColor);
-    root.style.setProperty('--text-muted', tema.textMutedColor);
+    vars['--text-secondary'] = tema.textMutedColor;
+    vars['--text-muted']     = tema.textMutedColor;
   }
+  return vars;
+}
+
+export function applyTheme(tema: Tema): Record<string, string> {
+  const root = document.documentElement;
+  const vars = computeThemeVars(tema);
+  for (const [navn, verdi] of Object.entries(vars)) {
+    root.style.setProperty(navn, verdi);
+  }
+  // body-bakgrunn drives nå av var(--navy-darkest) (globals.css), så --navy-darkest
+  // over dekker den. Setter også eksplisitt for å overstyre evt. tidligere inline-verdi.
+  document.body.style.setProperty('background', tema.backgroundColor);
+  return vars;
 }
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -80,8 +99,16 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
         .then(res => res.ok ? res.json() as Promise<Tema> : null)
         .then(tema => {
           if (tema) {
-            applyTheme(tema);
-const navn = tema.organisasjonNavn ?? 'LNS';
+            const vars = applyTheme(tema);
+            // Cache mappen for denne tenanten slik at neste refresh kan settes
+            // synkront før paint av inline-scriptet (eliminerer tema-flash).
+            try {
+              localStorage.setItem(
+                TEMA_CACHE_PREFIX + getTenantSlug(),
+                JSON.stringify({ vars, bodyBg: tema.backgroundColor }),
+              );
+            } catch { /* localStorage utilgjengelig (privat modus o.l.) — ikke kritisk */ }
+            const navn = tema.organisasjonNavn ?? 'LNS';
             setOrganisasjonNavn(navn);
             setLogoUrl(tema.logoUrl ?? null);
             // Tenant-bevisst fane-tittel. Settes imperativt her (samme mønster som
