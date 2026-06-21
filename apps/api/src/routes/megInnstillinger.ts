@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
-import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { queryAzureSQL, executeAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 
 interface TtsInnstillinger {
   stemmNavn?: string;
@@ -50,30 +51,41 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // GET /api/meg/favoritter — returnerer workspace-IDer brukeren har pinnet
-  fastify.get('/api/meg/favoritter', { preHandler: [requireBruker] }, async (request, reply) => {
-    const { id } = (request as AuthRequest).bruker;
-    try {
-      const rows = await queryAzureSQL(
-        `SELECT workspaceId FROM brukerFavoritter WHERE brukerId = '${safeId(id)}'`,
-      );
-      const ids = rows.map((r) => (r as { workspaceId: string }).workspaceId);
-      return reply.send(ids);
-    } catch {
-      // Tabell finnes ikke ennå
-      return reply.send([]);
-    }
-  });
-
-  // POST /api/meg/favoritter/:workspaceId — legg til favoritt
-  fastify.post<{ Params: { workspaceId: string } }>(
-    '/api/meg/favoritter/:workspaceId',
-    { preHandler: [requireBruker] },
+  // GET /api/meg/favoritter — returnerer workspace-IDer brukeren har pinnet.
+  // Favoritter ligger i tenant-DB (per-tenant isolasjon) — workspaceId-FK peker
+  // på Workspace i samme tenant-DB. resolveTenant gir tenantDatabaseUrl.
+  fastify.get(
+    '/api/meg/favoritter',
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const { id } = (request as AuthRequest).bruker;
+      const dbUrl  = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(400).send({ error: 'Mangler tenant-kontekst.' });
+      try {
+        const rows = await queryAzureSQLForTenant(
+          dbUrl,
+          `SELECT workspaceId FROM brukerFavoritter WHERE brukerId = '${safeId(id)}'`,
+        );
+        const ids = rows.map((r) => (r as { workspaceId: string }).workspaceId);
+        return reply.send(ids);
+      } catch {
+        // Tabell ikke migrert i denne tenant-DB ennå — tom liste (graceful)
+        return reply.send([]);
+      }
+    },
+  );
+
+  // POST /api/meg/favoritter/:workspaceId — legg til favoritt (tenant-DB)
+  fastify.post<{ Params: { workspaceId: string } }>(
+    '/api/meg/favoritter/:workspaceId',
+    { preHandler: [resolveTenant, requireBruker] },
+    async (request, reply) => {
+      const { id } = (request as AuthRequest).bruker;
+      const dbUrl  = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(400).send({ error: 'Mangler tenant-kontekst.' });
       const wsId = safeId(request.params.workspaceId);
       try {
-        await executeAzureSQL(`
+        await queryAzureSQLForTenant(dbUrl, `
           IF NOT EXISTS (
             SELECT 1 FROM brukerFavoritter
             WHERE brukerId = '${safeId(id)}' AND workspaceId = '${wsId}'
@@ -89,15 +101,18 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
     },
   );
 
-  // DELETE /api/meg/favoritter/:workspaceId — fjern favoritt
+  // DELETE /api/meg/favoritter/:workspaceId — fjern favoritt (tenant-DB)
   fastify.delete<{ Params: { workspaceId: string } }>(
     '/api/meg/favoritter/:workspaceId',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const { id } = (request as AuthRequest).bruker;
+      const dbUrl  = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(400).send({ error: 'Mangler tenant-kontekst.' });
       const wsId = safeId(request.params.workspaceId);
       try {
-        await executeAzureSQL(
+        await queryAzureSQLForTenant(
+          dbUrl,
           `DELETE FROM brukerFavoritter WHERE brukerId = '${safeId(id)}' AND workspaceId = '${wsId}'`,
         );
         return reply.status(204).send();

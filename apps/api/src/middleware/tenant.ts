@@ -6,6 +6,9 @@ import type { PrismaClient } from '../generated/prisma/client';
 export type TenantRequest = FastifyRequest & {
   tenantPrisma: PrismaClient;
   tenantSlug?: string;
+  // Rå databaseUrl for tenant-DB — brukes av ruter som kjører rå SQL via
+  // queryAzureSQLForTenant (f.eks. /api/meg/favoritter) i stedet for Prisma.
+  tenantDatabaseUrl?: string;
 };
 
 /**
@@ -59,8 +62,9 @@ export async function resolveTenant(
   if (!tenant) {
     return reply.status(404).send({ error: `Tenant '${slug}' ikke funnet.` });
   }
-  (request as TenantRequest).tenantPrisma = getPrismaForTenant(tenant.databaseUrl);
-  (request as TenantRequest).tenantSlug   = slug;
+  (request as TenantRequest).tenantPrisma      = getPrismaForTenant(tenant.databaseUrl);
+  (request as TenantRequest).tenantSlug        = slug;
+  (request as TenantRequest).tenantDatabaseUrl = tenant.databaseUrl;
 }
 
 /**
@@ -76,6 +80,7 @@ export async function resolveTenantAdmin(
   if (!tenant) {
     return reply.status(404).send({ error: `Tenant '${slug}' ikke funnet.` });
   }
-  (request as TenantRequest).tenantPrisma = getPrismaForTenant(tenant.databaseUrl);
-  (request as TenantRequest).tenantSlug   = slug;
+  (request as TenantRequest).tenantPrisma      = getPrismaForTenant(tenant.databaseUrl);
+  (request as TenantRequest).tenantSlug        = slug;
+  (request as TenantRequest).tenantDatabaseUrl = tenant.databaseUrl;
 }
