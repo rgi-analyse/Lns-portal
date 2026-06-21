@@ -49,7 +49,7 @@ function projectCode(navn: string): string {
 export default function WorkspacePage() {
   const { id }                             = useParams<{ id: string }>();
   const router                             = useRouter();
-  const { isAuthenticated, entraObjectId, authHeaders, grupper } = usePortalAuth();
+  const { isAuthenticated, authAvklart, entraObjectId, authHeaders, grupper } = usePortalAuth();
   const lisens = useLisens();
 
   const [workspace,        setWorkspace]        = useState<WorkspaceDetail | null>(null);
@@ -64,6 +64,7 @@ export default function WorkspacePage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!authAvklart) return;                          // vent på MSAL-init — unngå feilredirect til login
     if (!isAuthenticated) { router.replace('/'); return; }
     if (!id) return;
 
@@ -102,7 +103,7 @@ export default function WorkspacePage() {
     }
 
     load().catch(() => setError('Workspace ikke funnet eller du har ikke tilgang.'));
-  }, [id, isAuthenticated, authHeaders, grupper, router]);
+  }, [id, authAvklart, isAuthenticated, authHeaders, grupper, router]);
 
   // ── Inline redigering ────────────────────────────────────────────────────────
 
