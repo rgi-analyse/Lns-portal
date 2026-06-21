@@ -42,7 +42,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function RapportPage() {
   const { id }                                       = useParams<{ id: string }>();
   const router                                       = useRouter();
-  const { isAuthenticated, authHeaders, grupper,
+  const { isAuthenticated, authAvklart, authHeaders, grupper,
           entraObjectId }                            = usePortalAuth();
   const [brukerRolleState, setBrukerRolleState]      = useState<string>('');
   const [brukerDisplayName, setBrukerDisplayName]    = useState<string | null>(null);
@@ -72,6 +72,7 @@ export default function RapportPage() {
   const getVisualsDataRef = useRef<(() => Promise<Record<string, string>>) | null>(null);
 
   useEffect(() => {
+    if (!authAvklart) return;                          // vent på MSAL-init — unngå feilredirect til login
     if (!isAuthenticated) { router.replace('/'); return; }
     if (!id) return;
 
@@ -135,7 +136,7 @@ export default function RapportPage() {
     }
 
     load().catch(() => setError('Rapporten ble ikke funnet eller du har ikke tilgang.'));
-  }, [id, isAuthenticated, router, entraObjectId, authHeaders, grupper]);
+  }, [id, authAvklart, isAuthenticated, router, entraObjectId, authHeaders, grupper]);
 
   if (error) {
     return (

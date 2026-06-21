@@ -2,10 +2,19 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { InteractionStatus } from '@azure/msal-browser';
 import { getLocalSession, clearLocalSession, type LocalSession } from '@/lib/localAuth';
 
 export interface PortalAuth {
   isAuthenticated: boolean;
+  /**
+   * True når auth-statusen faktisk er avgjort: enten har MSAL fullført
+   * initialisering (inProgress === None), eller vi har en synkron lokal sesjon.
+   * Konsumenter må vente på denne før de redirigerer/maler login-UI — ellers
+   * behandles den forbigående "ikke avklart"-tilstanden feilaktig som
+   * "ikke innlogget" og gir login-flash ved refresh.
+   */
+  authAvklart:     boolean;
   entraObjectId:  string | undefined;
   displayName:    string;
   email:          string | undefined;
@@ -20,14 +29,19 @@ export interface PortalAuth {
 }
 
 export function usePortalAuth(): PortalAuth {
-  const msalAuthenticated      = useIsAuthenticated();
-  const { instance, accounts } = useMsal();
-  const msalAccount            = accounts[0];
+  const msalAuthenticated                  = useIsAuthenticated();
+  const { instance, accounts, inProgress } = useMsal();
+  const msalAccount                        = accounts[0];
 
   // Les session synkront på klient (unngår ett-render-delay som kan føre til feil omdirigering)
   const [localSession] = useState<LocalSession | null>(
     () => (typeof window !== 'undefined' ? getLocalSession() : null),
   );
+
+  // Auth er avgjort når MSAL er ferdig initialisert, eller når vi har en lokal
+  // sesjon (lest synkront over). MSAL starter på InteractionStatus.Startup og
+  // går til None når cachen er gjenopprettet.
+  const authAvklart = inProgress === InteractionStatus.None || localSession !== null;
 
   // ── Stabile primitive verdier ────────────────────────────────────────────
   const msalEntraObjectId = msalAccount?.localAccountId;
@@ -67,6 +81,7 @@ export function usePortalAuth(): PortalAuth {
   if (msalAuthenticated && msalAccount) {
     return {
       isAuthenticated: true,
+      authAvklart,
       entraObjectId:   msalEntraObjectId,
       displayName:     msalAccount.name ?? msalAccount.username ?? 'Bruker',
       email:           msalAccount.username,
@@ -82,6 +97,7 @@ export function usePortalAuth(): PortalAuth {
   if (localSession) {
     return {
       isAuthenticated: true,
+      authAvklart,
       entraObjectId:   localEntraObjectId,
       displayName:     localSession.displayName ?? 'Bruker',
       email:           localSession.email ?? undefined,
@@ -96,6 +112,7 @@ export function usePortalAuth(): PortalAuth {
   // ── Ikke innlogget ────────────────────────────────────────────────────────
   return {
     isAuthenticated: false,
+    authAvklart,
     entraObjectId:   undefined,
     displayName:     'Bruker',
     email:           undefined,

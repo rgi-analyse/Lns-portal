@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
-import { getLocalSession, setLocalSession } from '@/lib/localAuth';
+import { setLocalSession } from '@/lib/localAuth';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
@@ -14,7 +15,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 type Step = 'email' | 'microsoft' | 'passord' | 'bytt-passord';
 
 export default function LoginPage() {
-  const isAuthenticated = useIsAuthenticated();
+  const { isAuthenticated, authAvklart } = usePortalAuth();
   const { instance }    = useMsal();
   const router          = useRouter();
   const searchParams    = useSearchParams();
@@ -33,12 +34,14 @@ export default function LoginPage() {
   const [laster,        setLaster]        = useState(false);
   const [pendingEntraOid, setPendingEntraOid] = useState<string | null>(null);
 
-  // Allerede innlogget via MSAL eller lokal sesjon
+  // Allerede innlogget via MSAL eller lokal sesjon. Vent til auth er avgjort —
+  // ellers ser MSAL-brukere isAuthenticated=false under init og redirect uteblir
+  // til MSAL er klar (login-flash).
   useEffect(() => {
-    if (isAuthenticated || getLocalSession()) {
+    if (authAvklart && isAuthenticated) {
       router.replace(returnTo);
     }
-  }, [isAuthenticated, router, returnTo]);
+  }, [authAvklart, isAuthenticated, router, returnTo]);
 
   // ── Steg 1: sjekk e-post ──────────────────────────────────────────────────
   const sjekkEpost = async (e: React.FormEvent) => {
@@ -168,6 +171,23 @@ export default function LoginPage() {
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  // Vent til auth er avgjort før login-UI males. Er brukeren allerede innlogget,
+  // viser vi loading mens redirect til dashboard skjer — slik unngås at
+  // login-skjemaet blinker ved refresh (login-flash).
+  if (!authAvklart || isAuthenticated) {
+    return (
+      <main
+        className="min-h-screen flex items-center justify-center p-6"
+        style={{
+          background: 'linear-gradient(135deg, var(--navy-darkest) 0%, var(--navy) 50%, #0d1f3c 100%)',
+        }}
+      >
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--gold)' }} />
+      </main>
+    );
+  }
+
   return (
     <main
       className="min-h-screen flex items-center justify-center p-6"
