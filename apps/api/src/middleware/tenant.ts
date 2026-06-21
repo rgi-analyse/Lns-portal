@@ -51,11 +51,24 @@ const SKIP_TENANT_PATHS = [
   '/health',
 ];
 
+/**
+ * Grense-bevisst matching av skip-path mot request-URL. Oppføringer som slutter
+ * på '/' er bevisste prefikser (f.eks. /api/admin/). Øvrige matches kun som
+ * eksakt endepunkt eller med ekte understi ('/') — slik at /api/me IKKE svelger
+ * /api/meg/favoritter (en ren startsWith ville matchet siden /api/me er en
+ * bokstavelig prefiks av /api/meg). Query-string strippes før sammenligning.
+ */
+function erSkipPath(url: string, skip: string): boolean {
+  const path = url.split('?')[0];
+  if (skip.endsWith('/')) return path.startsWith(skip);
+  return path === skip || path.startsWith(skip + '/');
+}
+
 export async function resolveTenant(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  if (SKIP_TENANT_PATHS.some(p => request.url.startsWith(p))) return;
+  if (SKIP_TENANT_PATHS.some(p => erSkipPath(request.url, p))) return;
 
   const slug = extractSlug(request);
   const tenant = await prisma.tenant.findFirst({ where: { slug, erAktiv: true } });
