@@ -61,10 +61,13 @@ async function slåSammenErPersonlig<T extends { id: string }>(
   const ids = workspaces.map((w) => `'${w.id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
   try {
     const rows = await queryAzureSQL(`SELECT id, erPersonlig FROM Workspace WHERE id IN (${ids})`);
+    // NB: SQL Server returnerer uniqueidentifier i UPPERCASE via rå mssql, mens
+    // Prisma gir lowercase. Normaliser begge sider (samme som hentDesignerFlagg)
+    // — ellers bommer oppslaget og alt blir null -> admin ser tom liste.
     const flagMap = new Map(
-      rows.map((r) => [(r as { id: string }).id, Boolean((r as { erPersonlig: unknown }).erPersonlig)]),
+      rows.map((r) => [(r as { id: string }).id.toLowerCase(), Boolean((r as { erPersonlig: unknown }).erPersonlig)]),
     );
-    return workspaces.map((w) => ({ ...w, erPersonlig: flagMap.get(w.id) ?? null }));
+    return workspaces.map((w) => ({ ...w, erPersonlig: flagMap.get(w.id.toLowerCase()) ?? null }));
   } catch {
     return workspaces.map((w) => ({ ...w, erPersonlig: null }));
   }
