@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import TilgangStyring from '@/components/TilgangStyring';
 import { apiFetch } from '@/lib/apiClient';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 interface Workspace {
   id: string;
@@ -15,15 +16,20 @@ interface Workspace {
 
 export default function SikkerhetPage() {
   const { id } = useParams<{ id: string }>();
+  const { authHeaders, isAuthenticated, authAvklart } = usePortalAuth();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
+    // Vent til auth er avgjort — ellers fyres fetch før MSAL er initialisert og
+    // authHeaders er tom -> 401. (Samme mønster som øvrige admin-sider.)
+    if (!authAvklart) return;
+    if (!isAuthenticated) { setLoading(false); return; }
     const load = async () => {
       try {
-        const r = await apiFetch(`/api/workspaces/${id}`);
+        const r = await apiFetch(`/api/workspaces/${id}`, { headers: authHeaders });
         console.log('[SikkerhetPage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
@@ -41,7 +47,7 @@ export default function SikkerhetPage() {
       }
     };
     load();
-  }, [id]);
+  }, [id, authAvklart, isAuthenticated, authHeaders]);
 
   return (
     <div className="p-8 max-w-3xl">
