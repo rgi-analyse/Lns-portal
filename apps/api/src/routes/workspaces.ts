@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, erAdmin } from '../middleware/auth';
-import { queryAzureSQL } from '../services/azureSqlService';
+import { queryAzureSQLForTenant } from '../services/azureSqlService';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -38,11 +38,13 @@ function sammeId(a: string | null | undefined, b: string | null | undefined): bo
 }
 
 // Slår opp erDesignerRapport for en liste av rapport-IDer.
-async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
+// databaseUrl: tenant-DB (Rapport-data ligger i tenant-DB, ikke master).
+async function hentDesignerFlagg(databaseUrl: string, ids: string[]): Promise<Map<string, boolean>> {
   if (ids.length === 0) return new Map();
   const safeIds = ids.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
   try {
-    const rows = await queryAzureSQL(
+    const rows = await queryAzureSQLForTenant(
+      databaseUrl,
       `SELECT id, erDesignerRapport FROM Rapport WHERE id IN (${safeIds})`,
     );
     return new Map(
@@ -62,12 +64,13 @@ async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
 // konservativt (som personlig/privat), så et transient SQL-feil ikke lekker
 // andres personlige workspaces til admin.
 async function slåSammenErPersonlig<T extends { id: string }>(
+  databaseUrl: string,
   workspaces: T[],
 ): Promise<(T & { erPersonlig: boolean | null })[]> {
   if (workspaces.length === 0) return [];
   const ids = workspaces.map((w) => `'${w.id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
   try {
-    const rows = await queryAzureSQL(`SELECT id, erPersonlig FROM Workspace WHERE id IN (${ids})`);
+    const rows = await queryAzureSQLForTenant(databaseUrl, `SELECT id, erPersonlig FROM Workspace WHERE id IN (${ids})`);
     // NB: SQL Server returnerer uniqueidentifier i UPPERCASE via rå mssql, mens
     // Prisma gir lowercase. Normaliser begge sider (samme som hentDesignerFlagg)
     // — ellers bommer oppslaget og alt blir null -> admin ser tom liste.
@@ -87,7 +90,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
   fastify.get<{ Querystring: { grupper?: string } }>(
     '/api/workspaces',
     async (request, reply) => {
-      const db = (request as TenantRequest).tenantPrisma;
+      const db    = (request as TenantRequest).tenantPrisma;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       try {
         const grupper      = request.query.grupper;
         const grupperArray = grupper ? grupper.split(',').filter(Boolean) : [];
@@ -122,7 +127,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             },
             orderBy: [{ sortOrder: 'asc' }, { navn: 'asc' }],
           });
-          const merged = await slåSammenErPersonlig(workspaces);
+          const merged = await slåSammenErPersonlig(dbUrl, workspaces);
           // Personlige (og ukjente, konservativt) mapper er private — admin ser kun sine egne.
           // Kun bekreftet ikke-personlig (=== false) vises til andre enn eier.
           const filtered = merged.filter(w => w.erPersonlig === false || w.opprettetAv === (bruker?.id ?? ''));
@@ -217,7 +222,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         }));
 
         const allWorkspaces = [...direkteWorkspaces, ...rapportWorkspaces];
-        const merged = await slåSammenErPersonlig(allWorkspaces);
+        const merged = await slåSammenErPersonlig(dbUrl, allWorkspaces);
         merged.sort((a, b) => {
           const personligDiff = (b.erPersonlig ? 1 : 0) - (a.erPersonlig ? 1 : 0);
           if (personligDiff !== 0) return personligDiff;
@@ -332,7 +337,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
   fastify.get<{ Params: { id: string }; Querystring: { grupper?: string } }>(
     '/api/workspaces/:id',
     async (request, reply) => {
-      const db = (request as TenantRequest).tenantPrisma;
+      const db    = (request as TenantRequest).tenantPrisma;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       try {
         const bruker = await resolveBruker(request);
         const isAdmin = erAdmin(bruker?.rolle);
@@ -364,7 +371,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           // Personlige mapper er alltid private — sjekk via raw SQL
           const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
           try {
-            const rows = await queryAzureSQL(
+            const rows = await queryAzureSQLForTenant(
+              dbUrl,
               `SELECT erPersonlig, opprettetAv FROM Workspace WHERE id = '${safeWsId}'`,
             );
             const erPersonlig = Boolean((rows[0] as { erPersonlig?: unknown })?.erPersonlig);
@@ -380,7 +388,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           }
 
           const ids = workspace.rapporter.map((wr) => wr.rapport.id);
-          const designerMap = await hentDesignerFlagg(ids);
+          const designerMap = await hentDesignerFlagg(dbUrl, ids);
           return reply.send({
             ...workspace,
             rapporter: workspace.rapporter.map((wr) => ({
@@ -394,7 +402,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const inClause  = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
         let harTilgang  = false;
         try {
-          const tilgangRows = await queryAzureSQL(`
+          const tilgangRows = await queryAzureSQLForTenant(dbUrl, `
             SELECT 1 AS har_tilgang FROM Tilgang
             WHERE workspaceId = '${safeWsId}' AND entraId IN (${inClause})
             UNION
@@ -428,7 +436,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         });
 
         const ids = filtrerteRapporter.map((wr) => wr.rapport.id);
-        const designerMap = await hentDesignerFlagg(ids);
+        const designerMap = await hentDesignerFlagg(dbUrl, ids);
         console.log(`[workspaces/:id] filtrerteRapporter=${filtrerteRapporter.length} | designerFlagg=${[...designerMap.entries()].map(([k,v]) => `${k}=${v}`).join(',')}`);
 
         return reply.send({
@@ -514,6 +522,8 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
     '/api/workspaces/:id/views',
     async (request, reply) => {
       const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+      const dbUrl    = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
 
       // H5: tilgangssjekk — kun admin eller bruker med tilgang til workspacet.
       const bruker       = await resolveBruker(request);
@@ -529,7 +539,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const inClause = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
         let harTilgang = false;
         try {
-          const tilgangRows = await queryAzureSQL(`
+          const tilgangRows = await queryAzureSQLForTenant(dbUrl, `
             SELECT 1 FROM Tilgang
             WHERE workspaceId = '${safeWsId}' AND entraId IN (${inClause})
             UNION
@@ -550,7 +560,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        const rows = await queryAzureSQL(`
+        const rows = await queryAzureSQLForTenant(dbUrl, `
           -- Views fra PBI-rapporter via metadata-kobling
           SELECT DISTINCT
             v.schema_name + '.' + v.view_name AS viewNavn,
