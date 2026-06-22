@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
-import { queryAzureSQL } from '../services/azureSqlService';
+import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -62,7 +62,9 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     '/api/rapporter/:id',
     { preHandler: [resolveTenant] },
     async (request, reply) => {
-      const db = (request as TenantRequest).tenantPrisma;
+      const db    = (request as TenantRequest).tenantPrisma;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       try {
         const id = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
         const rapport = await db.rapport.findUnique({
@@ -75,7 +77,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
 
         let erDesignerRapport = false;
         try {
-          const rows = await queryAzureSQL(`SELECT erDesignerRapport FROM Rapport WHERE id = '${id}'`);
+          const rows = await queryAzureSQLForTenant(dbUrl, `SELECT erDesignerRapport FROM Rapport WHERE id = '${id}'`);
           erDesignerRapport = Boolean((rows[0] as { erDesignerRapport?: unknown } | undefined)?.erDesignerRapport);
         } catch { /* kolonnen finnes ikke ennå */ }
 
@@ -83,7 +85,8 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         // Brukes av rapport-siden til å vise "Utvidet AI-analyse"-badge.
         let harKobledeViews = false;
         try {
-          const rows = await queryAzureSQL(
+          const rows = await queryAzureSQLForTenant(
+            dbUrl,
             `SELECT COUNT(*) AS antall FROM ai_rapport_view_kobling WHERE rapport_id = '${id}'`,
           );
           const antall = Number((rows[0] as { antall?: number } | undefined)?.antall ?? 0);
@@ -275,7 +278,9 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     '/api/workspaces/:id/rapporter',
     { preHandler: [resolveTenant] },
     async (request, reply) => {
-      const db = (request as TenantRequest).tenantPrisma;
+      const db    = (request as TenantRequest).tenantPrisma;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       try {
         const bruker = await resolveBruker(request);
         const isAdmin = erAdmin(bruker?.rolle);
@@ -300,7 +305,9 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           const ids = rapporter.map((r) => `'${r.id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
           let flagMap = new Map<string, boolean>();
           try {
-            const rows = await queryAzureSQL(`SELECT id, erDesignerRapport FROM Rapport WHERE id IN (${ids})`);
+            // dbUrl er guardet (truthy) i handleren; non-null her siden TS ikke
+            // narrower closure-fanget variabel.
+            const rows = await queryAzureSQLForTenant(dbUrl!, `SELECT id, erDesignerRapport FROM Rapport WHERE id IN (${ids})`);
             flagMap = new Map(rows.map((row) => [(row as { id: string }).id.toLowerCase(), Boolean((row as { erDesignerRapport: unknown }).erDesignerRapport)]));
           } catch { /* kolonnen finnes ikke ennå */ }
           return rapporter.map((r) => ({ ...r, erDesignerRapport: flagMap.get(r.id.toLowerCase()) ?? false }));
@@ -319,7 +326,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         const inClause    = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
         let harTilgang    = false;
         try {
-          const tilgangRows = await queryAzureSQL(`
+          const tilgangRows = await queryAzureSQLForTenant(dbUrl, `
             SELECT 1 AS har_tilgang FROM Tilgang
             WHERE workspaceId = '${safeWsId}' AND entraId IN (${inClause})
             UNION
