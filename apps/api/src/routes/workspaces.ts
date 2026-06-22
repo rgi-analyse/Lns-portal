@@ -30,6 +30,13 @@ interface UpdateWorkspaceBody {
   kontekstLabel?:   string | null;
 }
 
+// Case-insensitiv id-sammenligning. SQL Server kan returnere uniqueidentifier
+// i UPPERCASE via rå mssql mens Prisma gir lowercase — direkte === bommer da.
+// Tom/undefined på en av sidene gir alltid false.
+function sammeId(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
+}
+
 // Slår opp erDesignerRapport for en liste av rapport-IDer.
 async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
   if (ids.length === 0) return new Map();
@@ -362,12 +369,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             );
             const erPersonlig = Boolean((rows[0] as { erPersonlig?: unknown })?.erPersonlig);
             const opprettetAv = (rows[0] as { opprettetAv?: string })?.opprettetAv;
-            if (erPersonlig && opprettetAv !== bruker?.id) {
+            if (erPersonlig && !sammeId(opprettetAv, bruker?.id)) {
               return reply.status(404).send({ error: 'Workspace ikke funnet.' });
             }
           } catch {
             // Konservativt: kan ikke bekrefte at workspacet ikke er personlig -> nekt med mindre eier
-            if (workspace.opprettetAv !== bruker?.id) {
+            if (!sammeId(workspace.opprettetAv, bruker?.id)) {
               return reply.status(404).send({ error: 'Workspace ikke funnet.' });
             }
           }
