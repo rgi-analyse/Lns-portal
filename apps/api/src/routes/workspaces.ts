@@ -330,6 +330,13 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];
 
+        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
+        // Sjekkes FØR eksistens-oppslaget — gir deterministisk 401 og unngår
+        // eksistens-oracle (404 vs 401) samt unødvendig DB-spørring.
+        if (!isAdmin && identities.length === 0) {
+          return reply.status(401).send({ error: 'Ikke innlogget.' });
+        }
+
         const workspace = await db.workspace.findUnique({
           where: { id: request.params.id },
           include: {
@@ -342,11 +349,6 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           },
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
-
-        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
-        if (!isAdmin && identities.length === 0) {
-          return reply.status(401).send({ error: 'Ikke innlogget.' });
-        }
 
         if (isAdmin) {
           // Personlige mapper er alltid private — sjekk via raw SQL

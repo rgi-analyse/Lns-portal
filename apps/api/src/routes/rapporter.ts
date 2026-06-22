@@ -277,17 +277,23 @@ export async function rapportRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const db = (request as TenantRequest).tenantPrisma;
       try {
-        const workspace = await db.workspace.findUnique({
-          where: { id: request.params.id },
-          select: { id: true, opprettetAv: true },
-        });
-        if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
-
         const bruker = await resolveBruker(request);
         const isAdmin = erAdmin(bruker?.rolle);
         const entraId = bruker?.entraObjectId;
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
         const identities = [...(entraId ? [entraId] : []), ...grupperArray];
+
+        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
+        // Sjekkes FØR eksistens-oppslaget — deterministisk 401, ingen eksistens-oracle.
+        if (!isAdmin && identities.length === 0) {
+          return reply.status(401).send({ error: 'Ikke innlogget.' });
+        }
+
+        const workspace = await db.workspace.findUnique({
+          where: { id: request.params.id },
+          select: { id: true, opprettetAv: true },
+        });
+        if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
         async function medDesignerFlagg(rapporter: { id: string }[]): Promise<object[]> {
           if (rapporter.length === 0) return rapporter;
@@ -298,11 +304,6 @@ export async function rapportRoutes(fastify: FastifyInstance) {
             flagMap = new Map(rows.map((row) => [(row as { id: string }).id.toLowerCase(), Boolean((row as { erDesignerRapport: unknown }).erDesignerRapport)]));
           } catch { /* kolonnen finnes ikke ennå */ }
           return rapporter.map((r) => ({ ...r, erDesignerRapport: flagMap.get(r.id.toLowerCase()) ?? false }));
-        }
-
-        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
-        if (!isAdmin && identities.length === 0) {
-          return reply.status(401).send({ error: 'Ikke innlogget.' });
         }
 
         if (isAdmin) {
