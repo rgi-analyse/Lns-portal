@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 interface Workspace {
   id:              string;
@@ -31,6 +32,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function RedigerWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { authHeaders } = usePortalAuth();
 
   const [loading,          setLoading]          = useState(true);
   const [navn,             setNavn]             = useState('');
@@ -87,7 +89,7 @@ export default function RedigerWorkspacePage() {
     try {
       const r = await apiFetch(`/api/workspaces/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           navn:            navn.trim(),
           beskrivelse:     beskrivelse.trim() || null,

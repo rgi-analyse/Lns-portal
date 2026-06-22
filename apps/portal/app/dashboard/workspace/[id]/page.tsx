@@ -465,6 +465,7 @@ export default function WorkspacePage() {
         <NyRapportModal
           workspace={workspace}
           authHeaders={authHeaders}
+          grupper={grupper}
           onLukk={() => setVisNyRapportModal(false)}
         />
       )}

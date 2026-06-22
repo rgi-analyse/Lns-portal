@@ -300,7 +300,12 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           return rapporter.map((r) => ({ ...r, erDesignerRapport: flagMap.get(r.id.toLowerCase()) ?? false }));
         }
 
-        if (isAdmin || identities.length === 0) {
+        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
+        if (!isAdmin && identities.length === 0) {
+          return reply.status(401).send({ error: 'Ikke innlogget.' });
+        }
+
+        if (isAdmin) {
           const links = await db.workspaceRapport.findMany({
             where: { workspaceId: request.params.id, rapport: { erAktiv: true } },
             include: { rapport: true },
