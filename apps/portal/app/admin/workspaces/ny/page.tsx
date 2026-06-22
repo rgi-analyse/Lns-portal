@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 interface FormState {
   navn: string;
@@ -24,6 +25,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function NyttWorkspacePage() {
   const router = useRouter();
+  const { authHeaders } = usePortalAuth();
   const [form, setForm] = useState<FormState>({ navn: '', beskrivelse: '' });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +44,7 @@ export default function NyttWorkspacePage() {
     try {
       const r = await apiFetch('/api/workspaces', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           navn: form.navn.trim(),
           beskrivelse: form.beskrivelse.trim() || undefined,

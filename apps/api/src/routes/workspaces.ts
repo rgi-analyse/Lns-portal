@@ -50,19 +50,23 @@ async function hentDesignerFlagg(ids: string[]): Promise<Map<string, boolean>> {
 }
 
 // Slår opp erPersonlig via raw SQL og fletter inn i workspace-listen.
+// erPersonlig: false = bekreftet ikke-personlig, true = personlig,
+// null = UKJENT (oppslag feilet / id ikke funnet). Kallere må behandle null
+// konservativt (som personlig/privat), så et transient SQL-feil ikke lekker
+// andres personlige workspaces til admin.
 async function slåSammenErPersonlig<T extends { id: string }>(
   workspaces: T[],
-): Promise<(T & { erPersonlig: boolean })[]> {
-  if (workspaces.length === 0) return workspaces.map((w) => ({ ...w, erPersonlig: false }));
+): Promise<(T & { erPersonlig: boolean | null })[]> {
+  if (workspaces.length === 0) return [];
   const ids = workspaces.map((w) => `'${w.id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
   try {
     const rows = await queryAzureSQL(`SELECT id, erPersonlig FROM Workspace WHERE id IN (${ids})`);
     const flagMap = new Map(
       rows.map((r) => [(r as { id: string }).id, Boolean((r as { erPersonlig: unknown }).erPersonlig)]),
     );
-    return workspaces.map((w) => ({ ...w, erPersonlig: flagMap.get(w.id) ?? false }));
+    return workspaces.map((w) => ({ ...w, erPersonlig: flagMap.get(w.id) ?? null }));
   } catch {
-    return workspaces.map((w) => ({ ...w, erPersonlig: false }));
+    return workspaces.map((w) => ({ ...w, erPersonlig: null }));
   }
 }
 
@@ -109,8 +113,9 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             orderBy: [{ sortOrder: 'asc' }, { navn: 'asc' }],
           });
           const merged = await slåSammenErPersonlig(workspaces);
-          // Personlige mapper er alltid private — admin ser kun sitt eget
-          const filtered = merged.filter(w => !w.erPersonlig || w.opprettetAv === (bruker?.id ?? ''));
+          // Personlige (og ukjente, konservativt) mapper er private — admin ser kun sine egne.
+          // Kun bekreftet ikke-personlig (=== false) vises til andre enn eier.
+          const filtered = merged.filter(w => w.erPersonlig === false || w.opprettetAv === (bruker?.id ?? ''));
           return reply.send(filtered);
         }
 
@@ -178,7 +183,14 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           orderBy: ordreByAdmin,
         });
 
-        const direkteWorkspaces = direkteWorkspacesRaw.map((ws) => ({
+        // Strip rapport.tilgang fra responsen (eksponerte hvem som har tilgang).
+        // Filtreres fortsatt på tilgang før feltet fjernes.
+        const stripTilgang = <W extends { rapporter: Array<{ rapport: { tilgang?: unknown } }> }>(ws: W) => ({
+          ...ws,
+          rapporter: ws.rapporter.map(({ rapport: { tilgang: _t, ...rapport }, ...wr }) => ({ ...wr, rapport })),
+        });
+
+        const direkteWorkspaces = direkteWorkspacesRaw.map((ws) => stripTilgang({
           ...ws,
           rapporter: ws.rapporter.filter((wr) => {
             const t = wr.rapport.tilgang ?? [];
@@ -187,7 +199,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           }),
         }));
 
-        const rapportWorkspaces = rapportWorkspacesRaw.map((ws) => ({
+        const rapportWorkspaces = rapportWorkspacesRaw.map((ws) => stripTilgang({
           ...ws,
           rapporter: ws.rapporter.filter((wr) =>
             (wr.rapport.tilgang ?? []).some((r) => identities.includes(r.entraId)),
@@ -289,6 +301,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const bruker = await resolveBruker(request);
+      if (!bruker) return reply.status(401).send({ error: 'Ikke innlogget.' });
+      if (!erAdmin(bruker.rolle)) return reply.status(403).send({ error: 'Krever admin-tilgang.' });
+
       const db = (request as TenantRequest).tenantPrisma;
       try {
         const workspace = await db.workspace.create({
@@ -327,7 +343,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         });
         if (!workspace) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
 
-        if (isAdmin || identities.length === 0) {
+        // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
+        if (!isAdmin && identities.length === 0) {
+          return reply.status(401).send({ error: 'Ikke innlogget.' });
+        }
+
+        if (isAdmin) {
           // Personlige mapper er alltid private — sjekk via raw SQL
           const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
           try {
@@ -339,7 +360,12 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             if (erPersonlig && opprettetAv !== bruker?.id) {
               return reply.status(404).send({ error: 'Workspace ikke funnet.' });
             }
-          } catch { /* ikke kritisk — fortsett */ }
+          } catch {
+            // Konservativt: kan ikke bekrefte at workspacet ikke er personlig -> nekt med mindre eier
+            if (workspace.opprettetAv !== bruker?.id) {
+              return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+            }
+          }
 
           const ids = workspace.rapporter.map((wr) => wr.rapport.id);
           const designerMap = await hentDesignerFlagg(ids);
@@ -431,6 +457,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const bruker = await resolveBruker(request);
+      if (!bruker) return reply.status(401).send({ error: 'Ikke innlogget.' });
+      if (!erAdmin(bruker.rolle)) return reply.status(403).send({ error: 'Krever admin-tilgang.' });
+
       const db = (request as TenantRequest).tenantPrisma;
       try {
         const workspace = await db.workspace.update({
@@ -450,6 +480,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
   fastify.delete<{ Params: { id: string } }>(
     '/api/workspaces/:id',
     async (request, reply) => {
+      const bruker = await resolveBruker(request);
+      if (!bruker) return reply.status(401).send({ error: 'Ikke innlogget.' });
+      if (!erAdmin(bruker.rolle)) return reply.status(403).send({ error: 'Krever admin-tilgang.' });
+
       const db = (request as TenantRequest).tenantPrisma;
       try {
         await db.workspace.delete({ where: { id: request.params.id } });
@@ -464,10 +498,45 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
 
   // GET /api/workspaces/:id/views
   // Returnerer unike views fra alle rapporter i workspacet (PBI + designer)
-  fastify.get<{ Params: { id: string } }>(
+  fastify.get<{ Params: { id: string }; Querystring: { grupper?: string } }>(
     '/api/workspaces/:id/views',
     async (request, reply) => {
       const safeWsId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+
+      // H5: tilgangssjekk — kun admin eller bruker med tilgang til workspacet.
+      const bruker       = await resolveBruker(request);
+      const isAdmin      = erAdmin(bruker?.rolle);
+      const entraId      = bruker?.entraObjectId;
+      const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
+      const identities   = [...(entraId ? [entraId] : []), ...grupperArray];
+
+      if (!isAdmin) {
+        if (identities.length === 0) {
+          return reply.status(401).send({ error: 'Ikke innlogget.' });
+        }
+        const inClause = identities.map((i) => `'${i.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+        let harTilgang = false;
+        try {
+          const tilgangRows = await queryAzureSQL(`
+            SELECT 1 FROM Tilgang
+            WHERE workspaceId = '${safeWsId}' AND entraId IN (${inClause})
+            UNION
+            SELECT 1 FROM Workspace w
+            JOIN bruker b ON b.id = w.opprettetAv
+            WHERE w.id = '${safeWsId}' AND b.entraObjectId IN (${inClause})
+            UNION
+            SELECT 1 FROM bruker
+            WHERE entraObjectId IN (${inClause}) AND mittWorkspaceId = '${safeWsId}'
+          `);
+          harTilgang = tilgangRows.length > 0;
+        } catch {
+          harTilgang = false;
+        }
+        if (!harTilgang) {
+          return reply.status(403).send({ error: 'Ingen tilgang til workspace.' });
+        }
+      }
+
       try {
         const rows = await queryAzureSQL(`
           -- Views fra PBI-rapporter via metadata-kobling

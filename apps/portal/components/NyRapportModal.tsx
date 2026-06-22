@@ -21,6 +21,7 @@ interface Workspace {
 interface Props {
   workspace:   Workspace;
   authHeaders: Record<string, string>;
+  grupper?:    string[];
   onLukk:      () => void;
 }
 
@@ -31,7 +32,7 @@ const KONTEKST_LABEL: Record<string, string> = {
   leverandor:  'Leverandør',
 };
 
-export default function NyRapportModal({ workspace, authHeaders, onLukk }: Props) {
+export default function NyRapportModal({ workspace, authHeaders, grupper, onLukk }: Props) {
   const router = useRouter();
   const [views,       setViews]       = useState<View[]>([]);
   const [laster,      setLaster]      = useState(true);
@@ -40,8 +41,12 @@ export default function NyRapportModal({ workspace, authHeaders, onLukk }: Props
   const [manueltView, setManueltView] = useState('');
   const [visManuelt,  setVisManuelt]  = useState(false);
 
+  const grupperParam = (grupper ?? []).join(',');
+
   useEffect(() => {
-    apiFetch(`/api/workspaces/${workspace.id}/views`, { headers: authHeaders })
+    // Send grupper slik at gruppe-baserte brukere består tilgangssjekken på /:id/views
+    const qs  = grupperParam ? `?grupper=${encodeURIComponent(grupperParam)}` : '';
+    apiFetch(`/api/workspaces/${workspace.id}/views${qs}`, { headers: authHeaders })
       .then(r => r.ok ? r.json() : [])
       .then((data: View[]) => {
         setViews(data);
@@ -49,7 +54,7 @@ export default function NyRapportModal({ workspace, authHeaders, onLukk }: Props
         setLaster(false);
       })
       .catch(() => { setVisManuelt(true); setLaster(false); });
-  }, [workspace.id, authHeaders]);
+  }, [workspace.id, authHeaders, grupperParam]);
 
   function startDesigner() {
     const view = visManuelt ? manueltView.trim() : valgtView;
