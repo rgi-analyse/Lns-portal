@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';
+import { usePortalAuth } from '@/hooks/usePortalAuth';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function PBIRapportBrowser({ open, onClose, workspaceId, onSuccess }: Props) {
+  const { authHeaders } = usePortalAuth();
   const [alleRapporter, setAlleRapporter] = useState<PbiRapport[]>([]);
   const [loading, setLoading]             = useState(false);
   const [søk, setSøk]                     = useState('');
@@ -113,7 +115,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
         try {
           const createRes = await apiFetch('/api/rapporter', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body:    JSON.stringify({
               navn:           rapport.name,
               pbiReportId:    rapport.id,
@@ -129,7 +131,7 @@ export default function PBIRapportBrowser({ open, onClose, workspaceId, onSucces
 
           const linkRes = await apiFetch(`/api/workspaces/${workspaceId}/rapporter`, {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body:    JSON.stringify({ rapportId: ny.id }),
           });
           if (!linkRes.ok) throw new Error(`Kobling feilet: HTTP ${linkRes.status}`);
