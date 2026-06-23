@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQLForTenant } from '../services/azureSqlService';
+import { verifiserGrupper } from '../services/graphService';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -134,9 +135,13 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           return reply.send(filtered);
         }
 
+        // Verifiser klient-styrte grupper mot faktisk Entra-medlemskap.
+        const verifiserteGrupper = entraId
+          ? await verifiserGrupper(entraId, grupperArray, !!bruker?.erEntraBruker)
+          : [];
         const identities = [
           ...(entraId ? [entraId] : []),
-          ...grupperArray,
+          ...verifiserteGrupper,
         ];
 
         if (identities.length === 0) {
@@ -345,7 +350,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         const isAdmin = erAdmin(bruker?.rolle);
         const entraId = bruker?.entraObjectId;
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
-        const identities = [...(entraId ? [entraId] : []), ...grupperArray];
+        const verifiserteGrupper = entraId
+          ? await verifiserGrupper(entraId, grupperArray, !!bruker?.erEntraBruker)
+          : [];
+        const identities = [...(entraId ? [entraId] : []), ...verifiserteGrupper];
 
         // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
         // Sjekkes FØR eksistens-oppslaget — gir deterministisk 401 og unngår
@@ -530,7 +538,10 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       const isAdmin      = erAdmin(bruker?.rolle);
       const entraId      = bruker?.entraObjectId;
       const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
-      const identities   = [...(entraId ? [entraId] : []), ...grupperArray];
+      const verifiserteGrupper = entraId
+        ? await verifiserGrupper(entraId, grupperArray, !!bruker?.erEntraBruker)
+        : [];
+      const identities   = [...(entraId ? [entraId] : []), ...verifiserteGrupper];
 
       if (!isAdmin) {
         if (identities.length === 0) {
