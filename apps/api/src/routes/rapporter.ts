@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
+import { verifiserGrupper } from '../services/graphService';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -286,7 +287,11 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         const isAdmin = erAdmin(bruker?.rolle);
         const entraId = bruker?.entraObjectId;
         const grupperArray = request.query.grupper ? request.query.grupper.split(',').filter(Boolean) : [];
-        const identities = [...(entraId ? [entraId] : []), ...grupperArray];
+        // Verifiser klient-styrte grupper mot faktisk Entra-medlemskap.
+        const verifiserteGrupper = entraId
+          ? await verifiserGrupper(entraId, grupperArray, !!bruker?.erEntraBruker)
+          : [];
+        const identities = [...(entraId ? [entraId] : []), ...verifiserteGrupper];
 
         // H7: ingen identitet (anonym/manglende header) skal aldri gi full tilgang.
         // Sjekkes FØR eksistens-oppslaget — deterministisk 401, ingen eksistens-oracle.
