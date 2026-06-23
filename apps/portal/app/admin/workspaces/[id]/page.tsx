@@ -32,7 +32,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function RedigerWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { authHeaders } = usePortalAuth();
+  const { authHeaders, isAuthenticated, authAvklart } = usePortalAuth();
 
   const [loading,          setLoading]          = useState(true);
   const [navn,             setNavn]             = useState('');
@@ -46,11 +46,14 @@ export default function RedigerWorkspacePage() {
 
   useEffect(() => {
     if (!id) return;
+    // Vent til auth er avgjort før fetch — ellers er authHeaders tom før MSAL-init -> 401.
+    if (!authAvklart) return;
+    if (!isAuthenticated) { setLoading(false); return; }
     const load = async () => {
       console.log('[RedigerWorkspacePage] API URL:', process.env.NEXT_PUBLIC_API_URL);
       console.log('[RedigerWorkspacePage] Henter workspace:', `/api/workspaces/${id}`);
       try {
-        const r = await apiFetch(`/api/workspaces/${id}`);
+        const r = await apiFetch(`/api/workspaces/${id}`, { headers: authHeaders });
         console.log('[RedigerWorkspacePage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
@@ -73,7 +76,7 @@ export default function RedigerWorkspacePage() {
       }
     };
     load();
-  }, [id]);
+  }, [id, authAvklart, isAuthenticated, authHeaders]);
 
   const validate = (): boolean => {
     const e: FormErrors = {};

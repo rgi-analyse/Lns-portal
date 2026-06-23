@@ -43,11 +43,9 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export default function WorkspaceRapporterPage() {
   const { id } = useParams<{ id: string }>();
-  const entraObjectId = usePortalAuth().entraObjectId ?? '';
-  const metaHeaders: Record<string, string> = entraObjectId
-    ? { 'X-Entra-Object-Id': entraObjectId }
-    : {};
-  const metaJsonHeaders = { ...metaHeaders, 'Content-Type': 'application/json' };
+  const { authHeaders, isAuthenticated, authAvklart } = usePortalAuth();
+  const metaHeaders = authHeaders;
+  const metaJsonHeaders = { ...authHeaders, 'Content-Type': 'application/json' };
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [rapporter, setRapporter] = useState<Rapport[]>([]);
@@ -83,12 +81,15 @@ export default function WorkspaceRapporterPage() {
 
   const fetchData = useCallback(async () => {
     if (!id) return;
+    // Vent til auth er avgjort før fetch — ellers er authHeaders tom før MSAL-init -> 401.
+    if (!authAvklart) return;
+    if (!isAuthenticated) { setLoading(false); return; }
     console.log('[RapporterPage] API URL:', process.env.NEXT_PUBLIC_API_URL);
     setLoading(true);
     try {
       const wsUrl = `/api/workspaces/${id}`;
       console.log('[RapporterPage] Henter workspace:', wsUrl);
-      const wsRes = await apiFetch(wsUrl);
+      const wsRes = await apiFetch(wsUrl, { headers: metaHeaders });
       console.log('[RapporterPage] Workspace response status:', wsRes.status);
       if (!wsRes.ok) {
         const body = await wsRes.text();
@@ -99,7 +100,7 @@ export default function WorkspaceRapporterPage() {
 
       const rapUrl = `/api/workspaces/${id}/rapporter`;
       console.log('[RapporterPage] Henter rapporter:', rapUrl);
-      const rapRes = await apiFetch(rapUrl);
+      const rapRes = await apiFetch(rapUrl, { headers: metaHeaders });
       console.log('[RapporterPage] Rapporter response status:', rapRes.status);
       if (!rapRes.ok) {
         const body = await rapRes.text();
@@ -120,7 +121,7 @@ export default function WorkspaceRapporterPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, authAvklart, isAuthenticated, authHeaders]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -130,7 +131,7 @@ export default function WorkspaceRapporterPage() {
     if (!unlinkId) return;
     setUnlinking(true);
     try {
-      const r = await apiFetch(`/api/workspaces/${id}/rapporter/${unlinkId}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/workspaces/${id}/rapporter/${unlinkId}`, { method: 'DELETE', headers: metaHeaders });
       if (!r.ok && r.status !== 204) throw new Error();
       toast({ title: 'Rapport fjernet fra workspace', variant: 'success' });
       setUnlinkId(null);
@@ -150,7 +151,7 @@ export default function WorkspaceRapporterPage() {
     if (!deaktiverId) return;
     setDeaktiverer(true);
     try {
-      const r = await apiFetch(`/api/admin/rapporter/${deaktiverId}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/admin/rapporter/${deaktiverId}`, { method: 'DELETE', headers: metaHeaders });
       if (!r.ok && r.status !== 204) throw new Error();
       toast({ title: 'Rapport fjernet fra portalen', variant: 'success' });
       setDeaktiverLId(null);
@@ -180,7 +181,7 @@ export default function WorkspaceRapporterPage() {
     try {
       const res = await apiFetch(`/api/rapporter/${editRapport.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: metaJsonHeaders,
         body: JSON.stringify({
           navn:        editForm.navn.trim(),
           område:      editForm.område.trim() || null,
@@ -266,7 +267,7 @@ export default function WorkspaceRapporterPage() {
     setPickerOpen(true);
     setPickerSøk('');
     setAlleLoading(true);
-    apiFetch('/api/rapporter')
+    apiFetch('/api/rapporter', { headers: metaHeaders })
       .then((r) => r.json() as Promise<AlleRapporter[]>)
       .then((data) => setAlleRapporter(Array.isArray(data) ? data : []))
       .catch(() => toast({ title: 'Kunne ikke hente rapporter', variant: 'destructive' }))
@@ -278,7 +279,7 @@ export default function WorkspaceRapporterPage() {
     try {
       const r = await apiFetch(`/api/workspaces/${id}/rapporter`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: metaJsonHeaders,
         body: JSON.stringify({ rapportId }),
       });
       if (!r.ok) {
