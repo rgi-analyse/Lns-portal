@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { queryAzureSQL, executeAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { syncViewColumns, syncAllViews, discoverNewViews } from '../services/metadataSync';
 import { requireBruker, requireAdmin } from '../middleware/auth';
-import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { validerKpiUttrykk } from '../services/kpiValidator';
 
 const esc = (val: string): string => val.replace(/'/g, "''").replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -356,7 +356,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // ai_rapport_view_kobling er per-tenant (rapport_id er tenant-lokal).
   fastify.get<{ Params: { id: string } }>(
     '/api/admin/metadata/views/:id/rapporter',
-    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
+    { preHandler: [resolveTenantAdmin, requireBruker, requireAdmin] },
     async (request, reply) => {
       const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
       if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
@@ -373,7 +373,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // GET /api/admin/metadata/rapport/:rapportId/views — hent views koblet til rapport
   fastify.get<{ Params: { rapportId: string } }>(
     '/api/admin/metadata/rapport/:rapportId/views',
-    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
+    { preHandler: [resolveTenantAdmin, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId } = request.params;
       const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
@@ -424,7 +424,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // POST /api/admin/metadata/rapport/:rapportId/views — koble view til rapport
   fastify.post<{ Params: { rapportId: string }; Body: { viewId: string; prioritet?: number } }>(
     '/api/admin/metadata/rapport/:rapportId/views',
-    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
+    { preHandler: [resolveTenantAdmin, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId } = request.params;
       const { viewId, prioritet = 0 } = request.body;
@@ -452,7 +452,7 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // DELETE /api/admin/metadata/rapport/:rapportId/views/:viewId — fjern kobling
   fastify.delete<{ Params: { rapportId: string; viewId: string } }>(
     '/api/admin/metadata/rapport/:rapportId/views/:viewId',
-    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
+    { preHandler: [resolveTenantAdmin, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId, viewId } = request.params;
       const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
