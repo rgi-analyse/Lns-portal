@@ -595,21 +595,32 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
           }
         }
 
-        // Steg 2 (master): PBI-view-defs for workspacets rapporter via metadata-kobling.
+        // Steg 2a (tenant): koblede view_id-er for workspacets rapporter
+        // (ai_rapport_view_kobling er per-tenant).
         const rapportIds = Array.from(new Set(
           (tenantRows as { rapportId?: string }[])
             .map((r) => r.rapportId)
             .filter((id): id is string => !!id),
         ));
+        let viewIds: string[] = [];
         if (rapportIds.length > 0) {
-          const inClause = rapportIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+          const rapportInClause = rapportIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+          const koblinger = await queryAzureSQLForTenant(
+            dbUrl,
+            `SELECT DISTINCT view_id FROM ai_rapport_view_kobling WHERE rapport_id IN (${rapportInClause})`,
+          );
+          viewIds = koblinger.map((r) => String((r as { view_id: string }).view_id));
+        }
+
+        // Steg 2b (master): PBI-view-defs by view_id (ai_metadata_views er master-global).
+        if (viewIds.length > 0) {
+          const viewInClause = viewIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
           const pbiRows = await queryAzureSQL(`
             SELECT DISTINCT
               v.schema_name + '.' + v.view_name AS viewNavn,
               v.visningsnavn                    AS visningsnavn
             FROM ai_metadata_views v
-            JOIN ai_rapport_view_kobling k ON k.view_id = v.id
-            WHERE k.rapport_id IN (${inClause}) AND v.er_aktiv = 1
+            WHERE v.id IN (${viewInClause}) AND v.er_aktiv = 1
           `);
           for (const row of pbiRows) {
             const r = row as { viewNavn?: string; visningsnavn?: string };

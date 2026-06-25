@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
+import { queryAzureSQL, executeAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { syncViewColumns, syncAllViews, discoverNewViews } from '../services/metadataSync';
 import { requireBruker, requireAdmin } from '../middleware/auth';
+import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { validerKpiUttrykk } from '../services/kpiValidator';
 
 const esc = (val: string): string => val.replace(/'/g, "''").replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -352,11 +353,14 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   );
 
   // GET /api/admin/metadata/views/:id/rapporter — hent rapporter koblet til view
+  // ai_rapport_view_kobling er per-tenant (rapport_id er tenant-lokal).
   fastify.get<{ Params: { id: string } }>(
     '/api/admin/metadata/views/:id/rapporter',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
     async (request, reply) => {
-      const rows = await queryAzureSQL(`
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
+      const rows = await queryAzureSQLForTenant(dbUrl, `
         SELECT rapport_id, prioritet
         FROM ai_rapport_view_kobling
         WHERE view_id = '${esc(request.params.id)}'
@@ -369,19 +373,45 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // GET /api/admin/metadata/rapport/:rapportId/views — hent views koblet til rapport
   fastify.get<{ Params: { rapportId: string } }>(
     '/api/admin/metadata/rapport/:rapportId/views',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId } = request.params;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       fastify.log.info(`[metadata] GET rapport/${rapportId}/views`);
       try {
-        const rows = await queryAzureSQL(`
-          SELECT k.view_id, k.prioritet,
-                 v.schema_name, v.view_name, v.visningsnavn, v.beskrivelse, v.område
-          FROM ai_rapport_view_kobling k
-          JOIN ai_metadata_views v ON k.view_id = v.id
-          WHERE k.rapport_id = '${esc(rapportId)}'
-          ORDER BY k.prioritet
+        // Steg 1 (tenant): koblinger (view_id + prioritet)
+        const koblinger = await queryAzureSQLForTenant(dbUrl, `
+          SELECT view_id, prioritet FROM ai_rapport_view_kobling
+          WHERE rapport_id = '${esc(rapportId)}'
         `);
+        if (koblinger.length === 0) return reply.send([]);
+        const prioMap = new Map<string, number>();
+        for (const row of koblinger) {
+          const r = row as { view_id: string; prioritet?: number };
+          prioMap.set(String(r.view_id).toLowerCase(), Number(r.prioritet ?? 0));
+        }
+        // Steg 2 (master): view-defs
+        const inClause = [...prioMap.keys()].map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+        const defs = await queryAzureSQL(`
+          SELECT id, schema_name, view_name, visningsnavn, beskrivelse, område
+          FROM ai_metadata_views WHERE id IN (${inClause})
+        `);
+        // Flett: behold prioritet-rekkefølge og samme respons-form som før
+        const rows = defs
+          .map((row) => {
+            const r = row as { id: string; schema_name?: string; view_name?: string; visningsnavn?: string; beskrivelse?: string | null; område?: string | null };
+            return {
+              view_id:      r.id,
+              prioritet:    prioMap.get(String(r.id).toLowerCase()) ?? 0,
+              schema_name:  r.schema_name,
+              view_name:    r.view_name,
+              visningsnavn: r.visningsnavn,
+              beskrivelse:  r.beskrivelse ?? null,
+              område:       r.område ?? null,
+            };
+          })
+          .sort((a, b) => a.prioritet - b.prioritet);
         fastify.log.info(`[metadata] GET rapport/${rapportId}/views → ${rows.length} rader`);
         return reply.send(rows);
       } catch (err) {
@@ -394,13 +424,15 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // POST /api/admin/metadata/rapport/:rapportId/views — koble view til rapport
   fastify.post<{ Params: { rapportId: string }; Body: { viewId: string; prioritet?: number } }>(
     '/api/admin/metadata/rapport/:rapportId/views',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId } = request.params;
       const { viewId, prioritet = 0 } = request.body;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       fastify.log.info(`[metadata] POST rapport/${rapportId}/views viewId=${viewId} prioritet=${prioritet}`);
       try {
-        await executeAzureSQL(`
+        await queryAzureSQLForTenant(dbUrl, `
           IF NOT EXISTS (
             SELECT 1 FROM ai_rapport_view_kobling
             WHERE rapport_id = '${esc(rapportId)}' AND view_id = '${esc(viewId)}'
@@ -420,12 +452,14 @@ export async function metadataRoutes(fastify: FastifyInstance) {
   // DELETE /api/admin/metadata/rapport/:rapportId/views/:viewId — fjern kobling
   fastify.delete<{ Params: { rapportId: string; viewId: string } }>(
     '/api/admin/metadata/rapport/:rapportId/views/:viewId',
-    { preHandler: [requireBruker, requireAdmin] },
+    { preHandler: [resolveTenant, requireBruker, requireAdmin] },
     async (request, reply) => {
       const { rapportId, viewId } = request.params;
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ error: 'Mangler tenant-kontekst.' });
       fastify.log.info(`[metadata] DELETE rapport/${rapportId}/views/${viewId}`);
       try {
-        await executeAzureSQL(`
+        await queryAzureSQLForTenant(dbUrl, `
           DELETE FROM ai_rapport_view_kobling
           WHERE rapport_id = '${esc(rapportId)}' AND view_id = '${esc(viewId)}'
         `);

@@ -196,26 +196,36 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   );
 
   // GET /api/rapporter/:id/views
-  // ai_metadata_views/ai_rapport_view_kobling er MASTER-globale (sql/001 "kjøres
-  // mot lns-dwh"), ikke per-tenant — derfor master-queryAzureSQL, ikke tenant.
+  // ai_rapport_view_kobling er PER-TENANT (rapport_id er tenant-lokal); ai_metadata_views
+  // er master-global. Cross-DB: hent view_id-er fra tenant, view-defs fra master.
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id/views',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const rapportId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+      const dbUrl     = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ views: [], feil: 'Mangler tenant-kontekst.' });
       console.log(`[Views API] henter views for rapport: ${rapportId}`);
       try {
+        // Steg 1 (tenant): koblede view_id-er
+        const koblinger = await queryAzureSQLForTenant(
+          dbUrl,
+          `SELECT view_id FROM ai_rapport_view_kobling WHERE rapport_id = '${rapportId}'`,
+        );
+        if (koblinger.length === 0) return reply.send({ views: [] });
+        const viewIds = koblinger.map((r) => String((r as { view_id: string }).view_id));
+        const inClause = viewIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+
+        // Steg 2 (master): view-defs
         const rows = await queryAzureSQL(`
           SELECT v.id, v.schema_name, v.view_name, v.visningsnavn,
                  v.prosjekt_kolonne,
                  COALESCE(v.prosjekt_kolonne_type, 'number') AS prosjekt_kolonne_type
           FROM ai_metadata_views v
-          JOIN ai_rapport_view_kobling k ON k.view_id = v.id
-          WHERE k.rapport_id = '${rapportId}' AND v.er_aktiv = 1
+          WHERE v.id IN (${inClause}) AND v.er_aktiv = 1
           ORDER BY v.visningsnavn
         `);
         console.log(`[Views API] rapport: ${rapportId} → ${rows.length} views funnet`);
-        if (rows.length > 0) console.log(`[Views API] første view:`, JSON.stringify(rows[0]));
         return reply.send({ views: rows });
       } catch (err) {
         console.error('[Views API] SQL-feil:', err);
