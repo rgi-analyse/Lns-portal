@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, erAdmin } from '../middleware/auth';
-import { queryAzureSQLForTenant } from '../services/azureSqlService';
+import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { verifiserGrupper } from '../services/graphService';
 
 function isNotFound(error: unknown): boolean {
@@ -571,37 +571,62 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
       }
 
       try {
-        const rows = await queryAzureSQLForTenant(dbUrl, `
-          -- Views fra PBI-rapporter via metadata-kobling
-          SELECT DISTINCT
-            v.schema_name + '.' + v.view_name AS viewNavn,
-            v.visningsnavn                    AS visningsnavn
-          FROM ai_metadata_views v
-          JOIN ai_rapport_view_kobling k ON k.view_id = v.id
-          JOIN WorkspaceRapport wr ON wr.rapportId = k.rapport_id
-          WHERE wr.workspaceId = '${safeWsId}' AND v.er_aktiv = 1
+        // ai_metadata_* er master-globale (sql/001 "kjøres mot lns-dwh"), mens
+        // WorkspaceRapport/Rapport er per-tenant. Spørringen er derfor cross-DB og
+        // kjøres i to steg: 1) rapport-IDer + designer-views fra tenant-DB,
+        // 2) PBI-view-defs fra master, 3) flett i kode.
+        const viewMap = new Map<string, string>();
 
-          UNION
-
-          -- Views fra designer-rapporter via designerConfig JSON
-          SELECT DISTINCT
-            JSON_VALUE(r.designerConfig, '$.viewNavn')                                          AS viewNavn,
-            COALESCE(JSON_VALUE(r.designerConfig, '$.visningsnavn'),
-                     JSON_VALUE(r.designerConfig, '$.viewNavn'))                                AS visningsnavn
-          FROM Rapport r
-          JOIN WorkspaceRapport wr ON wr.rapportId = r.id
-          WHERE wr.workspaceId = '${safeWsId}'
-            AND r.erAktiv = 1
-            AND r.erDesignerRapport = 1
-            AND JSON_VALUE(r.designerConfig, '$.viewNavn') IS NOT NULL
+        // Steg 1 (tenant-DB): rapport-IDer i workspacet + designer-rapport-views.
+        const tenantRows = await queryAzureSQLForTenant(dbUrl, `
+          SELECT wr.rapportId AS rapportId,
+                 JSON_VALUE(r.designerConfig, '$.viewNavn')                      AS designerViewNavn,
+                 COALESCE(JSON_VALUE(r.designerConfig, '$.visningsnavn'),
+                          JSON_VALUE(r.designerConfig, '$.viewNavn'))            AS designerVisningsnavn
+          FROM WorkspaceRapport wr
+          JOIN Rapport r ON r.id = wr.rapportId
+          WHERE wr.workspaceId = '${safeWsId}' AND r.erAktiv = 1
         `);
 
-        // Dedup og bygg svarliste
-        const viewMap = new Map<string, string>();
-        for (const row of rows) {
-          const r = row as { viewNavn?: string; visningsnavn?: string };
-          if (r.viewNavn && !viewMap.has(r.viewNavn)) {
-            viewMap.set(r.viewNavn, r.visningsnavn ?? r.viewNavn);
+        for (const row of tenantRows) {
+          const r = row as { designerViewNavn?: string | null; designerVisningsnavn?: string | null };
+          if (r.designerViewNavn && !viewMap.has(r.designerViewNavn)) {
+            viewMap.set(r.designerViewNavn, r.designerVisningsnavn ?? r.designerViewNavn);
+          }
+        }
+
+        // Steg 2a (tenant): koblede view_id-er for workspacets rapporter
+        // (ai_rapport_view_kobling er per-tenant).
+        const rapportIds = Array.from(new Set(
+          (tenantRows as { rapportId?: string }[])
+            .map((r) => r.rapportId)
+            .filter((id): id is string => !!id),
+        ));
+        let viewIds: string[] = [];
+        if (rapportIds.length > 0) {
+          const rapportInClause = rapportIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+          const koblinger = await queryAzureSQLForTenant(
+            dbUrl,
+            `SELECT DISTINCT view_id FROM ai_rapport_view_kobling WHERE rapport_id IN (${rapportInClause})`,
+          );
+          viewIds = koblinger.map((r) => String((r as { view_id: string }).view_id));
+        }
+
+        // Steg 2b (master): PBI-view-defs by view_id (ai_metadata_views er master-global).
+        if (viewIds.length > 0) {
+          const viewInClause = viewIds.map((id) => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+          const pbiRows = await queryAzureSQL(`
+            SELECT DISTINCT
+              v.schema_name + '.' + v.view_name AS viewNavn,
+              v.visningsnavn                    AS visningsnavn
+            FROM ai_metadata_views v
+            WHERE v.id IN (${viewInClause}) AND v.er_aktiv = 1
+          `);
+          for (const row of pbiRows) {
+            const r = row as { viewNavn?: string; visningsnavn?: string };
+            if (r.viewNavn && !viewMap.has(r.viewNavn)) {
+              viewMap.set(r.viewNavn, r.visningsnavn ?? r.viewNavn);
+            }
           }
         }
 
