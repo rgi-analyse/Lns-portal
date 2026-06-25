@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
-import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
+import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { verifiserGrupper } from '../services/graphService';
 
 function isNotFound(error: unknown): boolean {
@@ -198,12 +198,14 @@ export async function rapportRoutes(fastify: FastifyInstance) {
   // GET /api/rapporter/:id/views
   fastify.get<{ Params: { id: string } }>(
     '/api/rapporter/:id/views',
-    { preHandler: [requireBruker] },
+    { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const rapportId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
+      const dbUrl     = (request as TenantRequest).tenantDatabaseUrl;
+      if (!dbUrl) return reply.status(500).send({ views: [], feil: 'Mangler tenant-kontekst.' });
       console.log(`[Views API] henter views for rapport: ${rapportId}`);
       try {
-        const rows = await queryAzureSQL(`
+        const rows = await queryAzureSQLForTenant(dbUrl, `
           SELECT v.id, v.schema_name, v.view_name, v.visningsnavn,
                  v.prosjekt_kolonne,
                  COALESCE(v.prosjekt_kolonne_type, 'number') AS prosjekt_kolonne_type
