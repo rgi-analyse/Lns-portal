@@ -280,7 +280,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 9998,
-          color: 'var(--navy-dark, #0a1628)',
+          color: 'var(--primary-text)',
         }}
       >
         <MessageCircle size={24} />

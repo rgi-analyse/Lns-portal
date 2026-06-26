@@ -121,7 +121,7 @@ export default function ChatWidget() {
           justifyContent: 'center',
           zIndex: 9998,
           transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-          color: 'var(--navy-dark, #0a1628)',
+          color: 'var(--primary-text)',
         }}
         onMouseEnter={e => {
           (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)';
