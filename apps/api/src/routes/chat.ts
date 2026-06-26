@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { chat, type ChatMessage, type ChatContext, type SlicerInfo, type SlicerState } from '../services/openaiService';
-import { queryAzureSQL } from '../services/azureSqlService';
+import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import {
   erIndeksert as slicerErIndeksert,
   hentKompleteSlicerVerdier,
@@ -486,15 +486,17 @@ async function buildSystemPrompt(
   brukerSpørsmål?: string,
   tillatteViewIds?: string[] | null,
   profilViews?: string[],
+  dbUrl?: string | null,
 ): Promise<string> {
   console.log('[buildSystemPrompt] rapportId:', rapportId);
   console.log('[buildSystemPrompt] tillatteViewIds:', tillatteViewIds);
 
-  // Prøv rapport-spesifikk kobling først
+  // Prøv rapport-spesifikk kobling først. ai_rapport_view_kobling er per-tenant
+  // (rapport_id er tenant-lokal) — spørres mot tenant-DB via dbUrl.
   let kobletViewIds: string[] | null = null;
-  if (rapportId) {
+  if (rapportId && dbUrl) {
     try {
-      const kobling = await queryAzureSQL(`
+      const kobling = await queryAzureSQLForTenant(dbUrl, `
         SELECT view_id FROM ai_rapport_view_kobling
         WHERE rapport_id = '${escStr(rapportId)}'
         ORDER BY prioritet
@@ -504,7 +506,7 @@ async function buildSystemPrompt(
         console.log(`[Chat] bruker ${kobletViewIds.length} koblede views for rapport ${rapportId}`);
       }
     } catch {
-      // Tabell finnes ikke ennå — fallback til område-filter
+      // Tom kobling-tabell / feil — fallback til område-filter
     }
   }
 
@@ -827,6 +829,9 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }
       }
 
+      // ai_rapport_view_kobling er per-tenant — hentes via tenant-DB (dbUrl).
+      const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
+
       // Hent views brukeren har tilgang til via workspace-kjede:
       // Bruker → Workspace-tilgang → Rapport → ai_rapport_view_kobling → View
       // Admin-shortcut: tillatteViewIds = null = ingen restriksjon (konsistent med UI-tilgang)
@@ -847,7 +852,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           });
           const rapportIds = wsRapporter.flatMap(w => w.rapporter.map(r => r.rapportId));
           if (rapportIds.length > 0) {
-            const koblinger = await queryAzureSQL(`
+            const koblinger = await queryAzureSQLForTenant(dbUrl ?? '', `
               SELECT DISTINCT view_id FROM ai_rapport_view_kobling
               WHERE rapport_id IN (${rapportIds.map(id => `'${escStr(id)}'`).join(',')})
             `);
@@ -908,14 +913,20 @@ export async function chatRoutes(fastify: FastifyInstance) {
                 profilTopRapporter = k.topRapporter ?? [];
                 if (profilTopRapporter.length > 0) {
                   const navnListe = profilTopRapporter.slice(0, 3).map(r => `'${escStr(r.navn)}'`).join(', ');
-                  const koblingRows = await queryAzureSQL(`
-                    SELECT DISTINCT v.view_name
+                  // Steg 1 (tenant): view_id-er for topp-rapportene (kobling ⋈ Rapport, begge tenant)
+                  const koblingRows = await queryAzureSQLForTenant(dbUrl ?? '', `
+                    SELECT DISTINCT k.view_id
                     FROM ai_rapport_view_kobling k
-                    JOIN ai_metadata_views v ON k.view_id = v.id
                     JOIN Rapport r ON k.rapport_id = r.id
                     WHERE r.navn IN (${navnListe})
                   `);
-                  profilViews = koblingRows.map(r => String(r['view_name'] ?? '')).filter(Boolean);
+                  const profilViewIds = koblingRows.map(r => String(r['view_id'] ?? '')).filter(Boolean);
+                  // Steg 2 (master): view-navn fra katalogen (ai_metadata_views er master-global)
+                  if (profilViewIds.length > 0) {
+                    const inClause = profilViewIds.map(id => `'${id.replace(/[^a-zA-Z0-9\-]/g, '')}'`).join(',');
+                    const navnRows = await queryAzureSQL(`SELECT view_name FROM ai_metadata_views WHERE id IN (${inClause})`);
+                    profilViews = navnRows.map(r => String(r['view_name'] ?? '')).filter(Boolean);
+                  }
                   console.log('[Chat] profilViews fra topRapporter:', profilViews);
                 }
               } catch { /* ignorerer ugyldig JSON */ }
@@ -975,7 +986,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         console.log('[Chat] prosjektNr:', 'ingen (forside)');
         console.log('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews);
+        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
         console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
         console.log('[systemPrompt] lengde:', basisPrompt.length);
         // FIX 4: token-estimat (ingen-rapport branch)
@@ -1271,7 +1282,7 @@ Tilgjengelige visualiseringstyper:
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews);
+      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
       console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
       console.log('[systemPrompt] lengde:', basisPrompt.length);
 
