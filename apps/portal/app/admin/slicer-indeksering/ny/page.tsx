@@ -67,7 +67,7 @@ function StegIndikator({ aktiv }: { aktiv: Steg }) {
               className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
               style={
                 denne ? {
-                  background: 'var(--gold)', color: 'var(--navy-darkest)', boxShadow: '0 0 0 4px var(--glass-gold-bg)',
+                  background: 'var(--gold)', color: 'var(--primary-text)', boxShadow: '0 0 0 4px var(--glass-gold-bg)',
                 } : ferdig ? {
                   background: 'var(--glass-gold-bg)', color: 'var(--gold)', border: '1px solid var(--glass-gold-border)',
                 } : {

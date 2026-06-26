@@ -1691,7 +1691,7 @@ export default function AIChat({
           style={{
             background: 'var(--gold)',
             border: 'none',
-            color: 'var(--navy-dark)',
+            color: 'var(--primary-text)',
             boxShadow: '0 4px 20px var(--gold-dim)',
           }}
           onMouseEnter={(e) => {

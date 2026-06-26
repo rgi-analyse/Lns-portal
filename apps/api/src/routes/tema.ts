@@ -9,6 +9,7 @@ interface TemaBody {
   backgroundColor?: string;
   navyColor?: string;
   accentColor?: string;
+  primaryTextColor?: string;
   textColor?: string;
   textMutedColor?: string;
   logoUrl?: string | null;
@@ -23,6 +24,7 @@ const ÅPEN_TEMA_SELECT = {
   backgroundColor:  true,
   navyColor:        true,
   accentColor:      true,
+  primaryTextColor: true,
   textColor:        true,
   textMutedColor:   true,
   logoUrl:          true,
@@ -47,6 +49,7 @@ export async function temaRoutes(fastify: FastifyInstance) {
           backgroundColor: '#0a1628',
           navyColor: '#1B2A4A',
           accentColor: '#243556',
+          primaryTextColor: '#ffffff',
           textColor: '#FFFFFF',
           textMutedColor: 'rgba(255,255,255,0.65)',
           logoUrl: null,

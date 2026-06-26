@@ -53,6 +53,8 @@
     --text-secondary: rgba(255,255,255,0.70);
     --text-muted:     rgba(255,255,255,0.45);
     --text-gold:      #9ca3af;
+    /* Tekstfarge på primaryColor-bakgrunn (knapper o.l.); settes per tenant av tema. */
+    --primary-text:   #ffffff;
   }
 
   body {
