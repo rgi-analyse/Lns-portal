@@ -203,7 +203,7 @@ export default function TemaAdminPage() {
         onClick={lagreTema}
         disabled={lagrer}
         className="rounded-lg px-6 py-2.5 text-sm font-medium transition-opacity disabled:opacity-50"
-        style={{ background: `${tema.primaryColor}1A`, border: `1px solid ${tema.primaryColor}38`, color: tema.primaryColor }}
+        style={{ background: tema.primaryColor, color: 'var(--primary-text)' }}
       >
         {lagrer ? 'Lagrer...' : 'Lagre tema'}
       </button>
