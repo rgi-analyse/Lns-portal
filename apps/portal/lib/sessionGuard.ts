@@ -4,6 +4,7 @@ import {
   type PublicClientApplication,
   InteractionRequiredAuthError,
 } from '@azure/msal-browser';
+import { getLocalSession } from './localAuth';
 
 const INAKTIVITETS_MS = 8 * 60 * 60 * 1000; // 8 timer
 const STORAGE_KEY = 'lns-siste-aktivitet';
@@ -80,12 +81,21 @@ export class SessionGuard {
       }
     }
 
+    // MSAL v3 krever initialize() før noen MSAL API-kall. MsalProvider gjør dette
+    // asynkront ved mount, så sjekkVedOppstart() kan race det (uninitialized-feil
+    // i konsollen). initialize() er idempotent — trygt å awaite her for å lukke racen.
+    await this.msalInstance.initialize();
+
     // Verifiser at MSAL-token fortsatt er gyldig
     const account =
       this.msalInstance.getActiveAccount() ??
       this.msalInstance.getAllAccounts()[0];
 
     if (!account) {
+      // Lokal bruker (sessionStorage) har ingen MSAL-account — SessionGuards
+      // MSAL-token-sjekk gjelder ikke dem. Ikke trigger re-login (ellers logges
+      // alle lokale brukere ut ved hver sidelast etter init-race-fiksen).
+      if (getLocalSession()) return;
       console.log('[SessionGuard] Ingen MSAL-account funnet');
       this.triggerReLogin();
       return;
