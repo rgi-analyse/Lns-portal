@@ -12,6 +12,7 @@ interface Tema {
   backgroundColor: string;
   navyColor: string;
   accentColor: string;
+  primaryTextColor: string;
   textColor: string;
   textMutedColor: string;
   logoUrl?: string | null;
@@ -23,6 +24,7 @@ const STANDARD_TEMA: Tema = {
   backgroundColor: 'var(--navy-darkest)',
   navyColor: 'var(--navy)',
   accentColor: 'var(--navy-mid)',
+  primaryTextColor: '#ffffff',
   textColor: '#FFFFFF',
   textMutedColor: 'var(--text-secondary)',
   logoUrl: null,
@@ -83,6 +85,7 @@ export default function TemaAdminPage() {
     root.style.setProperty('--navy-darkest', tema.backgroundColor);
     root.style.setProperty('--navy-dark', tema.navyColor);
     root.style.setProperty('--navy', tema.accentColor);
+    root.style.setProperty('--primary-text', tema.primaryTextColor);
     document.body.style.setProperty('background', tema.backgroundColor);
     root.style.setProperty('--text-primary', tema.textColor);
     root.style.setProperty('--text-secondary', tema.textMutedColor);
@@ -142,6 +145,7 @@ export default function TemaAdminPage() {
           <ColorField label="Bakgrunnsfarge" value={tema.backgroundColor} onChange={v => setTema(t => ({ ...t, backgroundColor: v }))} />
           <ColorField label="Navigasjonsfarge" value={tema.navyColor} onChange={v => setTema(t => ({ ...t, navyColor: v }))} />
           <ColorField label="Aksentfarge" value={tema.accentColor} onChange={v => setTema(t => ({ ...t, accentColor: v }))} />
+          <ColorField label="Tekstfarge på primærfarget bakgrunn (knapper, avatarer)" value={tema.primaryTextColor} onChange={v => setTema(t => ({ ...t, primaryTextColor: v }))} />
           <ColorField label="Tekstfarge (overskrifter, innhold)" value={tema.textColor} onChange={v => setTema(t => ({ ...t, textColor: v }))} />
           <div className="flex flex-col gap-1">
             <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Dempet tekstfarge (beskrivelser, labels)</label>

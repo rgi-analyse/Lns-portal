@@ -287,7 +287,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !email.trim()}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
+              style={{ background: 'var(--gold)', color: 'var(--primary-text)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fortsett'}
             </button>
@@ -385,7 +385,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !passord}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
+              style={{ background: 'var(--gold)', color: 'var(--primary-text)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Logg inn'}
             </button>
@@ -449,7 +449,7 @@ export default function LoginPage() {
               type="submit"
               disabled={laster || !nyttPassord || !bekreft}
               className="w-full py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-              style={{ background: 'var(--gold)', color: 'var(--navy-dark)' }}
+              style={{ background: 'var(--gold)', color: 'var(--primary-text)' }}
             >
               {laster ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lagre og logg inn'}
             </button>

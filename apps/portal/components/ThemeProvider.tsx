@@ -12,6 +12,7 @@ interface Tema {
   backgroundColor: string;
   navyColor: string;
   accentColor: string;
+  primaryTextColor?: string;
   textColor?: string;
   textMutedColor?: string;
   logoUrl?: string | null;
@@ -66,6 +67,8 @@ export function computeThemeVars(tema: Tema): Record<string, string> {
     '--navy-dark':         tema.navyColor,
     '--navy':              tema.accentColor,
     '--navy-mid':          tema.accentColor,
+    // Tekstfarge på primaryColor-bakgrunn (knapper o.l.). Fallback hvit.
+    '--primary-text':      tema.primaryTextColor ?? '#ffffff',
   };
   if (tema.textColor) {
     vars['--text-primary'] = tema.textColor;
