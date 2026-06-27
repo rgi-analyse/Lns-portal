@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { queryAzureSQLForTenant } from '../services/azureSqlService';
 import { kjørBlokkerende } from '../services/openaiService';
 import { lagGrafPng, type GrafSpec, type GrafFarger } from '../services/grafService';
@@ -162,11 +163,11 @@ export async function kjørOrchestrator(): Promise<void> {
   });
 
   if (!bestilling) {
-    console.log('[Orchestrator] Ingen ventende bestillinger');
+    logger.debug('[Orchestrator] Ingen ventende bestillinger');
     return;
   }
 
-  console.log(
+  logger.warn(
     `[Orchestrator] Plukket opp bestilling ${bestilling.id} ` +
     `(type: ${bestilling.analyseTypeId}, tenant: ${bestilling.tenantSlug})`,
   );
@@ -183,16 +184,16 @@ export async function kjørOrchestrator(): Promise<void> {
   });
 
   if (oppdatert.count === 0) {
-    console.log(`[Orchestrator] ${bestilling.id} ble plukket av annen instans, hopper over`);
+    logger.warn(`[Orchestrator] ${bestilling.id} ble plukket av annen instans, hopper over`);
     return;
   }
 
   const nyttForsøk = bestilling.forsokAntall + 1;
-  console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.KJORER} (forsøk ${nyttForsøk})`);
+  logger.warn(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.KJORER} (forsøk ${nyttForsøk})`);
 
   // STEG C: DATAFASE
   try {
-    console.log(`[Orchestrator] Steg C: starter datafase for ${bestilling.id}`);
+    logger.warn(`[Orchestrator] Steg C: starter datafase for ${bestilling.id}`);
 
     // 1. Hent analyse-type fra master-prisma
     const analyseType = await prisma.analyseType.findUnique({
@@ -220,13 +221,13 @@ export async function kjørOrchestrator(): Promise<void> {
     }
 
     const parametre = JSON.parse(bestilling.parametre || '{}');
-    console.log(`[Orchestrator] Parametre:`, Object.keys(parametre).join(', '));
-    console.log(`[Orchestrator] Kjører ${datakilder.queries.length} queries`);
+    logger.debug(`[Orchestrator] Parametre:`, Object.keys(parametre).join(', '));
+    logger.debug(`[Orchestrator] Kjører ${datakilder.queries.length} queries`);
 
     // 4. Kjør alle queries (strict — feil i én avbryter alt)
     const dataResultater: Record<string, any[]> = {};
     for (const kilde of datakilder.queries) {
-      console.log(`[Orchestrator] Query: ${kilde.id} — ${kilde.beskrivelse || ''}`);
+      logger.debug(`[Orchestrator] Query: ${kilde.id} — ${kilde.beskrivelse || ''}`);
 
       // Bygg parametre for denne query-en
       const queryParams: Record<string, any> = {};
@@ -240,7 +241,7 @@ export async function kjørOrchestrator(): Promise<void> {
         queryParams,
       );
       dataResultater[kilde.id] = rader;
-      console.log(`[Orchestrator]   → ${rader.length} rader`);
+      logger.debug(`[Orchestrator]   → ${rader.length} rader`);
     }
 
     // 5. Bygg sammendrag-tekst
@@ -249,10 +250,10 @@ export async function kjørOrchestrator(): Promise<void> {
       .join(', ');
     const totalRader = Object.values(dataResultater).reduce((sum, r) => sum + r.length, 0);
 
-    console.log(`[Orchestrator] Datafase ferdig: ${detaljer} (totalt ${totalRader} rader)`);
+    logger.debug(`[Orchestrator] Datafase ferdig: ${detaljer} (totalt ${totalRader} rader)`);
 
     // STEG D: AI-FASE
-    console.log(`[Orchestrator] Steg D: starter AI-fase for ${bestilling.id}`);
+    logger.warn(`[Orchestrator] Steg D: starter AI-fase for ${bestilling.id}`);
 
     // 6a. Parse rapportStruktur og modellPreferanse
     if (!analyseType.rapportStruktur) {
@@ -277,7 +278,7 @@ export async function kjørOrchestrator(): Promise<void> {
       maksTokens: modellPref.maks_tokens ?? 2000,
     };
 
-    console.log(`[Orchestrator] AI-konfig: modell=${aiOpts.modell ?? 'env-default'}, temp=${aiOpts.temperatur}, maksTokens=${aiOpts.maksTokens}`);
+    logger.debug(`[Orchestrator] AI-konfig: modell=${aiOpts.modell ?? 'env-default'}, temp=${aiOpts.temperatur}, maksTokens=${aiOpts.maksTokens}`);
 
     // 6b. Sorter seksjoner på rekkefolge
     const sorterteSeksjoner = [...rapportStruktur.seksjoner].sort(
@@ -293,12 +294,12 @@ export async function kjørOrchestrator(): Promise<void> {
     for (const seksjon of sorterteSeksjoner) {
       // Skipp seksjoner som kun viser grafer (ingen tekst)
       if (seksjon.type === 'graf') {
-        console.log(`[Orchestrator] Seksjon ${seksjon.id}: skipper (kun graf, ingen tekst)`);
+        logger.debug(`[Orchestrator] Seksjon ${seksjon.id}: skipper (kun graf, ingen tekst)`);
         hoppetOver.push(seksjon.id);
         continue;
       }
 
-      console.log(`[Orchestrator] Seksjon ${seksjon.id}: bygger prompt`);
+      logger.debug(`[Orchestrator] Seksjon ${seksjon.id}: bygger prompt`);
 
       // Bygg brukerPrompt
       let brukerPrompt: string;
@@ -340,17 +341,17 @@ export async function kjørOrchestrator(): Promise<void> {
       const resultat = await kjørBlokkerende(systemPrompt, brukerPrompt, aiOpts);
       const latens = Date.now() - start;
 
-      console.log(`[Orchestrator] Seksjon ${seksjon.id}: ferdig (${resultat.totaltTokens} tokens, ${latens}ms)`);
+      logger.debug(`[Orchestrator] Seksjon ${seksjon.id}: ferdig (${resultat.totaltTokens} tokens, ${latens}ms)`);
 
       aiSeksjoner[seksjon.id] = resultat.tekst;
       tokenForbrukTotal += resultat.totaltTokens;
       modellSomBleBrukt = resultat.modell;
     }
 
-    console.log(`[Orchestrator] AI-fase ferdig: ${Object.keys(aiSeksjoner).length} seksjoner generert (${hoppetOver.length} hoppet over), totalt ${tokenForbrukTotal} tokens`);
+    logger.debug(`[Orchestrator] AI-fase ferdig: ${Object.keys(aiSeksjoner).length} seksjoner generert (${hoppetOver.length} hoppet over), totalt ${tokenForbrukTotal} tokens`);
 
     // STEG E: GRAF-FASE
-    console.log(`[Orchestrator] Steg E: starter graf-fase for ${bestilling.id}`);
+    logger.warn(`[Orchestrator] Steg E: starter graf-fase for ${bestilling.id}`);
 
     // Hent tema for denne tenanten (per-tenant siden migrasjon 20260602)
     const tema = await prisma.organisasjonTema.findUnique({
@@ -366,7 +367,7 @@ export async function kjørOrchestrator(): Promise<void> {
       tekstMuted: tema?.textMutedColor  ?? 'rgba(255,255,255,0.55)',
     };
 
-    console.log(`[Orchestrator] Tema lastet: primær=${grafFarger.primær}, bakgrunn=${grafFarger.bakgrunn}`);
+    logger.debug(`[Orchestrator] Tema lastet: primær=${grafFarger.primær}, bakgrunn=${grafFarger.bakgrunn}`);
 
     const aiGrafer: Record<string, string> = {};
 
@@ -379,7 +380,7 @@ export async function kjørOrchestrator(): Promise<void> {
 
       // Hent data fra første query i seksjonens queries-liste
       if (!seksjon.queries || seksjon.queries.length === 0) {
-        console.log(`[Orchestrator] Seksjon ${seksjon.id}: graf-spec finnes men ingen queries, skipper graf`);
+        logger.debug(`[Orchestrator] Seksjon ${seksjon.id}: graf-spec finnes men ingen queries, skipper graf`);
         continue;
       }
 
@@ -387,25 +388,25 @@ export async function kjørOrchestrator(): Promise<void> {
       const data = dataResultater[queryId];
 
       if (!data || data.length === 0) {
-        console.log(`[Orchestrator] Seksjon ${seksjon.id}: graf-data tom (query ${queryId}), skipper graf`);
+        logger.debug(`[Orchestrator] Seksjon ${seksjon.id}: graf-data tom (query ${queryId}), skipper graf`);
         continue;
       }
 
-      console.log(`[Orchestrator] Genererer graf for seksjon ${seksjon.id} (type: ${grafSpec.type}, ${data.length} rader)`);
+      logger.debug(`[Orchestrator] Genererer graf for seksjon ${seksjon.id} (type: ${grafSpec.type}, ${data.length} rader)`);
 
       // Generer PNG
       const pngBuffer = await lagGrafPng(grafSpec, data, grafFarger);
-      console.log(`[Orchestrator] Graf ${seksjon.id}: ${pngBuffer.length} bytes`);
+      logger.debug(`[Orchestrator] Graf ${seksjon.id}: ${pngBuffer.length} bytes`);
 
       // Last opp til blob
       const blobSti = `${bestilling.id}/grafer/${seksjon.id}.png`;
       const uploadResultat = await lastOppBlob(pngBuffer, blobSti, 'image/png');
 
       aiGrafer[seksjon.id] = uploadResultat.blobSti;
-      console.log(`[Orchestrator] Graf ${seksjon.id}: opplastet til ${uploadResultat.blobSti}`);
+      logger.debug(`[Orchestrator] Graf ${seksjon.id}: opplastet til ${uploadResultat.blobSti}`);
     }
 
-    console.log(`[Orchestrator] Graf-fase ferdig: ${Object.keys(aiGrafer).length} grafer generert og opplastet`);
+    logger.debug(`[Orchestrator] Graf-fase ferdig: ${Object.keys(aiGrafer).length} grafer generert og opplastet`);
 
     // TABELL-FASE: bygg deterministiske tabeller fra queries (rapportStruktur.seksjoner[].tabell)
     // Tabellene er fasit (ikke fra AI-tekst) — orchestrator eier summene.
@@ -417,13 +418,13 @@ export async function kjørOrchestrator(): Promise<void> {
       const kilde = tabellConfig.kilde as string | undefined;
       const tabellType = tabellConfig.type as string | undefined;
       if (!kilde || !tabellType) {
-        console.log(`[Orchestrator] Tabell ${seksjon.id}: mangler kilde eller type, skipper`);
+        logger.debug(`[Orchestrator] Tabell ${seksjon.id}: mangler kilde eller type, skipper`);
         continue;
       }
 
       const rader = dataResultater[kilde];
       if (!rader || rader.length === 0) {
-        console.log(`[Orchestrator] Tabell ${seksjon.id}: ingen data i kilde "${kilde}", skipper`);
+        logger.debug(`[Orchestrator] Tabell ${seksjon.id}: ingen data i kilde "${kilde}", skipper`);
         continue;
       }
 
@@ -431,18 +432,18 @@ export async function kjørOrchestrator(): Promise<void> {
       if (tabellType === 'resultatoppstilling') {
         tabellData = byggResultatoppstilling(rader);
       } else {
-        console.log(`[Orchestrator] Tabell ${seksjon.id}: ukjent type "${tabellType}", skipper`);
+        logger.debug(`[Orchestrator] Tabell ${seksjon.id}: ukjent type "${tabellType}", skipper`);
         continue;
       }
 
       aiTabeller[seksjon.id] = tabellData;
-      console.log(`[Orchestrator] Tabell ${seksjon.id}: ${tabellData.rader.length} rader bygget fra "${kilde}"`);
+      logger.debug(`[Orchestrator] Tabell ${seksjon.id}: ${tabellData.rader.length} rader bygget fra "${kilde}"`);
     }
 
-    console.log(`[Orchestrator] Tabell-fase ferdig: ${Object.keys(aiTabeller).length} tabeller bygget`);
+    logger.debug(`[Orchestrator] Tabell-fase ferdig: ${Object.keys(aiTabeller).length} tabeller bygget`);
 
     // STEG F: WORD-RAPPORT
-    console.log(`[Orchestrator] Steg F: starter Word-generering for ${bestilling.id}`);
+    logger.warn(`[Orchestrator] Steg F: starter Word-generering for ${bestilling.id}`);
 
     const tenantNavn = tema?.organisasjonNavn ?? 'LNS';
 
@@ -499,7 +500,7 @@ export async function kjørOrchestrator(): Promise<void> {
       parametre,
       new Date(),
     );
-    console.log(`[Orchestrator] Steg F ferdig: ${docxBuffer.length} bytes → ${docxSti} (${dokumentNavn})`);
+    logger.debug(`[Orchestrator] Steg F ferdig: ${docxBuffer.length} bytes → ${docxSti} (${dokumentNavn})`);
 
     // 6d. Bygg JSON for sammendrag-kolonnen
     const sammendragsObjekt = {
@@ -536,10 +537,10 @@ export async function kjørOrchestrator(): Promise<void> {
       },
     });
 
-    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg F — Word-rapport generert)`);
+    logger.warn(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FERDIG} (Steg F — Word-rapport generert)`);
 
   } catch (error) {
-    console.error(`[Orchestrator] Feil i datafase for ${bestilling.id}:`, error);
+    logger.error(`[Orchestrator] Feil i datafase for ${bestilling.id}:`, error);
 
     await prisma.analyseBestilling.update({
       where: { id: bestilling.id },
@@ -552,6 +553,6 @@ export async function kjørOrchestrator(): Promise<void> {
       },
     });
 
-    console.log(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FEILET}`);
+    logger.warn(`[Orchestrator] Markerte ${bestilling.id} som ${STATUS.FEILET}`);
   }
 }
