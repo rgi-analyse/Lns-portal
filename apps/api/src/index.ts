@@ -1,4 +1,5 @@
 import 'dotenv/config';
+// Logger må importeres etter dotenv så NODE_ENV er populert før logger leser den.
 import { logger } from './lib/logger';
 
 // Startup-logging FØR noe annet lastes
