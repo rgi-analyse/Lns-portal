@@ -6,6 +6,7 @@ import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settin
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
 import { apiFetch, apiHeaders } from '@/lib/apiClient';
+import { logger } from '@/lib/logger';
 import { useTema } from '@/components/ThemeProvider';
 import * as XLSX from 'xlsx';
 import SamtaleHistorikkSidebar from '@/components/chat/SamtaleHistorikkSidebar';
@@ -482,10 +483,10 @@ export default function AIChat({
         if (data?.tts) {
           setTtsInstillinger(p => ({ ...p, ...data.tts }));
           if (data.tts.autoOpplesing !== undefined) setAutoOpplesing(data.tts.autoOpplesing);
-          console.log('[TTS] innstillinger lastet:', data.tts);
+          logger.debug('[TTS] innstillinger lastet:', data.tts);
         }
       })
-      .catch(err => console.error('[TTS] kunne ikke laste innstillinger:', err));
+      .catch(err => logger.error('[TTS] kunne ikke laste innstillinger:', err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entraObjectId]);
 
@@ -503,7 +504,7 @@ export default function AIChat({
         credentials: 'include',
         headers,
         body: JSON.stringify({ tts: nyeTts }),
-      }).catch(err => console.error('[TTS] lagring feilet:', err));
+      }).catch(err => logger.error('[TTS] lagring feilet:', err));
     }, 1000);
   };
 
@@ -534,8 +535,6 @@ export default function AIChat({
     });
   };
 
-  console.log('[AIChat] props:', { rapportId, pbiReportId, rapportNavn });
-
   // ── Azure STT ─────────────────────────────────────────────────────────────
   const startLytting = async () => {
     setSttFeil(null);
@@ -550,7 +549,7 @@ export default function AIChat({
             // Bekreftet ytring — legg til i akkumulatoren
             sttBekreftedRef.current = (sttBekreftedRef.current + tekst + ' ').trimStart();
             setInput(sttBekreftedRef.current);
-            console.log('[Azure STT] bekreftet:', tekst);
+            logger.debug('[Azure STT] bekreftet:', tekst);
           } else {
             // Interim — vis akkumulert + pågående frase uten å endre akkumulatoren
             setInput((sttBekreftedRef.current + tekst).trimStart());
@@ -562,7 +561,7 @@ export default function AIChat({
           setTimeout(() => inputRef.current?.focus(), 50);
         },
         (feil) => {
-          console.error('[Azure STT] feil:', feil);
+          logger.error('[Azure STT] feil:', feil);
           setSttFeil(feil);
           setLytter(false);
         },
@@ -570,7 +569,7 @@ export default function AIChat({
       azureSTTRef.current = recognizer;
       setLytter(true);
     } catch (err) {
-      console.error('[Azure STT] oppstart feil:', err);
+      logger.error('[Azure STT] oppstart feil:', err);
       setSttFeil((err as Error).message);
       setLytter(false);
     }
@@ -599,7 +598,7 @@ export default function AIChat({
     // Ikke les opp korte statustekster
     const lower = tekst.toLowerCase().trim();
     if (tekst.length < 50 && STATUSTEKSTER.some(s => lower.includes(s))) {
-      console.log('[TTS] skipper statustekst:', tekst);
+      logger.debug('[TTS] skipper statustekst:', tekst);
       return;
     }
     stoppOpplesing();
@@ -614,11 +613,11 @@ export default function AIChat({
       ttsInstillinger.hastighet,
       () => {
         // onFerdig kalles fra onAudioEnd — lyd er faktisk ferdig
-        console.log('[AIChat] TTS ferdig (onAudioEnd)');
+        logger.debug('[AIChat] TTS ferdig (onAudioEnd)');
         if (ttsTimerRef.current) { clearTimeout(ttsTimerRef.current); ttsTimerRef.current = null; }
         setTtsAktivIdx(null);
       },
-    ).catch(err => console.error('[Azure TTS] feil:', err));
+    ).catch(err => logger.error('[Azure TTS] feil:', err));
   };
 
   // Brukes av auto-opplesing (ingen meldings-index)
@@ -628,15 +627,15 @@ export default function AIChat({
     stoppAzureTTS();
     if (ttsTimerRef.current) { clearTimeout(ttsTimerRef.current); ttsTimerRef.current = null; }
     setTtsAktivIdx(null);
-    console.log('[TTS] stoppet manuelt');
+    logger.debug('[TTS] stoppet manuelt');
   }
 
   function visRapportFullskjerm(forslag: RapportForslag) {
-    console.log('[CreateReport] åpner fullskjerm, rader:', forslag.data?.length);
+    logger.debug('[CreateReport] åpner fullskjerm, rader:', forslag.data?.length);
     try {
       sessionStorage.setItem('rapport_forslag', JSON.stringify(forslag));
     } catch (e) {
-      console.warn('[CreateReport] sessionStorage feil:', e);
+      logger.warn('[CreateReport] sessionStorage feil:', e);
     }
     router.push('/dashboard/rapport-interaktiv');
   }
@@ -648,7 +647,7 @@ export default function AIChat({
 
   async function lagreKpi(forslag: KpiForslag, viewNavn: string | null) {
     if (!viewNavn) {
-      console.warn('[KPI] mangler viewNavn — kan ikke lagre');
+      logger.warn('[KPI] mangler viewNavn — kan ikke lagre');
       return;
     }
     const key = `${viewNavn}::${forslag.teknisk_navn}`;
@@ -691,7 +690,7 @@ export default function AIChat({
     try {
       sessionStorage.setItem('rapport_forslag', JSON.stringify(forslagMedTomData));
     } catch (e) {
-      console.warn('[Historikk] sessionStorage feil:', e);
+      logger.warn('[Historikk] sessionStorage feil:', e);
     }
     router.push('/dashboard/rapport-interaktiv');
   }
@@ -738,14 +737,13 @@ export default function AIChat({
     if (getVisualsData) {
       try {
         visualData = await getVisualsData();
-        console.log('[AIChat] visual data hentet:', Object.keys(visualData));
+        logger.debug('[AIChat] visual data hentet:', Object.keys(visualData));
       } catch (e) {
-        console.warn('[AIChat] Kunne ikke hente visual data:', e);
+        logger.warn('[AIChat] Kunne ikke hente visual data:', e);
       }
     }
 
-    console.log('[AIChat] activeSlicerState:', JSON.stringify(activeSlicerState));
-    console.log('[AIChat] activeSlicerState sendes:', Object.keys(activeSlicerState ?? {}).length, 'slicere');
+    logger.debug('[AIChat] activeSlicerState sendes:', Object.keys(activeSlicerState ?? {}).length, 'slicere');
 
     const requestBody = {
       messages: nextMessages, rapportId, pbiReportId, rapportNavn,
@@ -761,15 +759,10 @@ export default function AIChat({
         chatRapportId: rapportId ?? null,
       } : {}),
     };
-    console.log('[AIChat] sender melding med øktId:', øktIdRef.current, '| rapportId (chatRapportId):', rapportId ?? null);
-    console.log('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
-    console.log('[AIChat] slicere som sendes:', slicere?.length ?? 0,
+    logger.debug('[AIChat] sender melding med øktId:', øktIdRef.current, '| rapportId (chatRapportId):', rapportId ?? null);
+    logger.debug('[AIChat] grupper som sendes:', grupper?.length ?? 0, grupper);
+    logger.debug('[AIChat] slicere som sendes:', slicere?.length ?? 0,
       slicere?.map((s) => `${s.tittel}(${s.type}, ${s.type === 'basic' ? s.verdier.length : Object.keys(s.barnPerForelder ?? {}).length} verdier)`));
-    if (slicere && slicere.length > 0) {
-      const første = slicere[0];
-      console.log('[AIChat] første slicer detaljert:', JSON.stringify(første).slice(0, 500));
-    }
-    console.log('[AIChat] sender body activeSlicerState:', JSON.stringify(requestBody.activeSlicerState));
 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -781,7 +774,7 @@ export default function AIChat({
         signal: abortRef.current.signal,
       });
 
-      console.log('[AIChat] fetch status:', res.status);
+      logger.debug('[AIChat] fetch status:', res.status);
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(errText || `HTTP ${res.status}`);
@@ -841,13 +834,13 @@ export default function AIChat({
           } else if (chunk.type === 'filter' && chunk.filterConfig) {
             onSetFilter?.(chunk.filterConfig);
           } else if (chunk.type === 'slicer' && chunk.config) {
-            console.log('[AIChat] kaller onSetSlicer:', chunk.config);
+            logger.debug('[AIChat] kaller onSetSlicer:', chunk.config);
             onSetSlicer?.(chunk.config as SlicerConfig);
           } else if (chunk.type === 'date_filter' && chunk.config) {
-            console.log('[AIChat] kaller onSetDateFilter:', chunk.config);
+            logger.debug('[AIChat] kaller onSetDateFilter:', chunk.config);
             onSetDateFilter?.(chunk.config as DateFilterConfig);
           } else if (chunk.type === 'slicer_clear' && chunk.tittel) {
-            console.log('[AIChat] kaller onClearSlicer:', chunk.tittel);
+            logger.debug('[AIChat] kaller onClearSlicer:', chunk.tittel);
             onClearSlicer?.(chunk.tittel);
           } else if (chunk.type === 'open_report' && chunk.rapportId) {
             router.push(`/dashboard/rapport/${chunk.rapportId}`);
@@ -896,7 +889,7 @@ export default function AIChat({
         setMessages(updated);
       }
     } catch (err) {
-      console.error('[AIChat] fetch feil:', err);
+      logger.error('[AIChat] fetch feil:', err);
       if ((err as Error).name !== 'AbortError') {
         addDisplay({ role: 'status', content: '❌ Kunne ikke koble til AI-assistenten.' });
       }
