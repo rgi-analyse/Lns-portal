@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import * as mssql from 'mssql';
 import { getAzureToken } from '../lib/azureToken';
+import { logger } from '../lib/logger';
 
 const server   = process.env.FABRIC_SQL_SERVER   ?? '';
 const database = process.env.FABRIC_SQL_DATABASE ?? '';
@@ -66,17 +67,17 @@ export async function reportContextRoutes(fastify: FastifyInstance) {
     '/api/report-context/:rapportId',
     async (request, reply) => {
       const { rapportId } = request.params;
-      console.log('[ReportContext] Henter kontekst for:', rapportId);
+      logger.debug('[ReportContext] Henter kontekst for:', rapportId);
 
       try {
         const context = await getReportContext(rapportId);
         if (!context) {
           return reply.status(404).send({ error: 'Rapport ikke funnet i katalog' });
         }
-        console.log('[ReportContext] Hentet:', context.ReportName);
+        logger.debug('[ReportContext] Hentet:', context.ReportName);
         return reply.send(context);
       } catch (err) {
-        console.error('[ReportContext] Feil:', err instanceof Error ? err.message : err);
+        logger.error('[ReportContext] Feil:', err instanceof Error ? err.message : err);
         return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil' });
       }
     },

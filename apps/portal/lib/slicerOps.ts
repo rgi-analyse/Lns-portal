@@ -1,4 +1,5 @@
 import { models, type Report } from 'powerbi-client';
+import { logger } from './logger';
 
 // ─────────────────────────────────────────────
 // Domene-typer (delt mellom UI, AI og PBI-laget)
@@ -254,7 +255,7 @@ export async function loadAll(report: Report): Promise<{
     let slicerState: { filters?: unknown[]; targets?: HierarchyTarget[] } | null = null;
     try {
       const state = await visual.getSlicerState();
-      console.log(`[slicerOps] state for "${visual.title ?? visual.name}":`, JSON.stringify(state));
+      logger.debug(`[slicerOps] state for "${visual.title ?? visual.name}":`, JSON.stringify(state));
       slicerState = state as unknown as { filters?: unknown[]; targets?: HierarchyTarget[] };
       targets = slicerState.targets ?? [];
     } catch { /* slicer kan være tom — fortsett */ }
@@ -272,7 +273,7 @@ export async function loadAll(report: Report): Promise<{
       headers     = linjer.length > 0 ? parseCSVRad(linjer[0]) : [];
       dataLinjer  = linjer.slice(1);
     } catch (err) {
-      console.warn(`[slicerOps] exportData feilet for "${tittelRaw || visual.name}":`, err);
+      logger.warn(`[slicerOps] exportData feilet for "${tittelRaw || visual.name}":`, err);
     }
 
     // Tittel: bruk visual.title om satt og ikke generisk; ellers første kolonnenavn fra CSV.
@@ -292,7 +293,7 @@ export async function loadAll(report: Report): Promise<{
       verdier: verdierForDeteksjon,
     });
     if (datoDeteksjon.regel) {
-      console.log(
+      logger.debug(
         `[slicerOps] erDato-deteksjon "${tittel}": match via regel="${datoDeteksjon.regel}" ` +
         `(dateTarget=${datoDeteksjon.dateTarget ? `${datoDeteksjon.dateTarget.table}.${datoDeteksjon.dateTarget.column}` : '(mangler)'})`,
       );
@@ -325,7 +326,7 @@ export async function loadAll(report: Report): Promise<{
         );
       }
 
-      console.log(
+      logger.debug(
         `[slicerOps] hierarchy "${tittel}": ${toppSet.size} forelder-noder, ` +
         `${Object.values(barnPerForelder).reduce((s, b) => s + b.length, 0)} barn totalt ` +
         `(${dataLinjer.length} CSV-rader, nivåTyper=[${nivåTyper.join(',')}])`,
@@ -344,7 +345,7 @@ export async function loadAll(report: Report): Promise<{
       });
     } else {
       const verdier = verdierForDeteksjon;
-      console.log(
+      logger.debug(
         `[slicerOps] basic "${tittel}": ${verdier.length} verdier ` +
         `(første 3: ${verdier.slice(0, 3).join(' | ')}${verdier.length > 3 ? ', …' : ''})`,
       );
@@ -529,7 +530,7 @@ async function applyHierarchy(
     filterType:    HIERARCHY_FILTER_TYPE,
     hierarchyData,
   };
-  console.log(
+  logger.debug(
     `[applyHierarchy] "${info.tittel}" nivåTyper=[${info.nivåTyper.join(',')}], ` +
     `payload:`, JSON.stringify({ filters: [filter] }, null, 2),
   );

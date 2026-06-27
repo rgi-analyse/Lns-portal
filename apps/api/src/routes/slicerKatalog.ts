@@ -11,6 +11,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveBruker, requireBruker } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
+import { logger } from '../lib/logger';
 import {
   søk as søkKatalog,
   erIndeksert,
@@ -63,7 +64,7 @@ export async function slicerKatalogRoutes(fastify: FastifyInstance) {
       // klienten/validator-laget kan falle tilbake til lokal matching.
       const status = await erIndeksert(tenant, rapport_id, slicer_tittel);
       if (!status.indeksert) {
-        console.log(`[search-katalog] ikke indeksert: tenant=${tenant} rapport=${rapport_id} slicer=${slicer_tittel}`);
+        logger.debug(`[search-katalog] ikke indeksert: tenant=${tenant} rapport=${rapport_id} slicer=${slicer_tittel}`);
         return reply.send({
           treff:             [],
           tvetydig:          false,
@@ -72,7 +73,7 @@ export async function slicerKatalogRoutes(fastify: FastifyInstance) {
         });
       }
 
-      console.log(`[search-katalog] søker: tenant=${tenant} rapport=${rapport_id} slicer=${slicer_tittel} term=${søketerm}${forelder_verdi ? ` forelder=${forelder_verdi}` : ''}`);
+      logger.debug(`[search-katalog] søker: tenant=${tenant} rapport=${rapport_id} slicer=${slicer_tittel} term=${søketerm}${forelder_verdi ? ` forelder=${forelder_verdi}` : ''}`);
 
       const respons = await søkKatalog({
         tenant,
@@ -92,7 +93,7 @@ export async function slicerKatalogRoutes(fastify: FastifyInstance) {
         : vurdering.type === 'unique'
           ? respons.treff.filter((t) => t.verdi === vurdering.treff)
           : [];
-      console.log(`[search-katalog] ${respons.treff.length} råtreff → ${treffTilUt.length} relevante (vurdering=${vurdering.type})`);
+      logger.debug(`[search-katalog] ${respons.treff.length} råtreff → ${treffTilUt.length} relevante (vurdering=${vurdering.type})`);
 
       return reply.send({
         treff:             treffTilUt,
