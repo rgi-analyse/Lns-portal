@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 import { queryAzureSQL } from '../services/azureSqlService';
@@ -48,12 +49,12 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
 
         if (!tokenRes.ok) {
           const errBody = await tokenRes.text();
-          console.error('[pbiCreateToken] GenerateToken feil:', tokenRes.status, errBody);
+          logger.error('[pbiCreateToken] GenerateToken feil:', tokenRes.status, errBody);
           return reply.status(502).send({ error: `Power BI token-feil (HTTP ${tokenRes.status})`, detail: errBody });
         }
 
         const tokenData = await tokenRes.json() as { token: string; expiration: string };
-        console.log('[pbiCreateToken] token hentet, utløper:', tokenData.expiration);
+        logger.debug('[pbiCreateToken] token hentet, utløper:', tokenData.expiration);
         return reply.send({ token: tokenData.token, expiration: tokenData.expiration });
       } catch (error) {
         fastify.log.error(error);
@@ -93,7 +94,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         const rapport = await db.rapport.create({
           data: { pbiReportId, pbiDatasetId, pbiWorkspaceId, navn, beskrivelse: beskrivelse ?? null },
         });
-        console.log('[pbiRegister] Ny rapport registrert i DB:', rapport.id, rapport.navn);
+        logger.debug('[pbiRegister] Ny rapport registrert i DB:', rapport.id, rapport.navn);
         return reply.status(201).send({ id: rapport.id, navn: rapport.navn });
       } catch (error) {
         fastify.log.error(error);
@@ -144,19 +145,19 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
 
         if (!deleteRes.ok && deleteRes.status !== 404) {
           const errBody = await deleteRes.text();
-          console.error('[pbiSlett] PBI DELETE feil:', deleteRes.status, errBody);
+          logger.error('[pbiSlett] PBI DELETE feil:', deleteRes.status, errBody);
           // Ikke avbryt — slett uansett fra DB
         } else {
-          console.log('[pbiSlett] Slettet fra PBI:', pbiReportId);
+          logger.debug('[pbiSlett] Slettet fra PBI:', pbiReportId);
         }
 
         // Slett fra portal DB
         await db.rapport.delete({ where: { id: rapportId } });
-        console.log('[pbiSlett] Slettet fra DB:', rapportId);
+        logger.debug('[pbiSlett] Slettet fra DB:', rapportId);
 
         return reply.status(204).send();
       } catch (error) {
-        console.error('[pbiSlett] Feil:', error);
+        logger.error('[pbiSlett] Feil:', error);
         fastify.log.error(error);
         return reply.status(500).send({
           error: 'Kunne ikke slette rapport.',

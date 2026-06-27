@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { queryAzureSQL } from '../services/azureSqlService';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { validerKpiUttrykk } from '../services/kpiValidator';
@@ -99,11 +100,11 @@ export async function kpiRoutes(fastify: FastifyInstance) {
             ${beskrivelse ? `'${esc(beskrivelse)}'` : 'NULL'}
           )
         `, 1);
-        console.log('[kpi.lagre] opprettet KPI:', navn, 'for', schema + '.' + view, 'av', bruker.email);
+        logger.debug('[kpi.lagre] opprettet KPI:', navn, 'for', schema + '.' + view, 'av', bruker.email);
         return reply.status(201).send({ success: true, kpi: rader[0] });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error('[kpi.lagre] INSERT feilet:', msg);
+        logger.error('[kpi.lagre] INSERT feilet:', msg);
         return reply.status(500).send({ error: `KPI-insert feilet: ${msg}` });
       }
     },

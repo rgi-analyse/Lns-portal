@@ -1,20 +1,21 @@
 import 'dotenv/config';
+import { logger } from './lib/logger';
 
 // Startup-logging FØR noe annet lastes
-console.log('[Startup] Node.js prosess startet');
-console.log('[Startup] NODE_ENV:', process.env.NODE_ENV);
-console.log('[Startup] PORT:', process.env.PORT);
-console.log('[Startup] DATABASE_URL satt:', !!process.env.DATABASE_URL);
-console.log('[Startup] PBI_TENANT_ID satt:', !!process.env.PBI_TENANT_ID);
-console.log('[Startup] PBI_CLIENT_ID satt:', !!process.env.PBI_CLIENT_ID);
-console.log('[Startup] PBI_CLIENT_SECRET satt:', !!process.env.PBI_CLIENT_SECRET);
-console.log('[Startup] AZURE_OPENAI_KEY satt:', !!process.env.AZURE_OPENAI_KEY);
+logger.warn('[Startup] Node.js prosess startet');
+logger.warn('[Startup] NODE_ENV:', process.env.NODE_ENV);
+logger.warn('[Startup] PORT:', process.env.PORT);
+logger.warn('[Startup] DATABASE_URL satt:', !!process.env.DATABASE_URL);
+logger.warn('[Startup] PBI_TENANT_ID satt:', !!process.env.PBI_TENANT_ID);
+logger.warn('[Startup] PBI_CLIENT_ID satt:', !!process.env.PBI_CLIENT_ID);
+logger.warn('[Startup] PBI_CLIENT_SECRET satt:', !!process.env.PBI_CLIENT_SECRET);
+logger.warn('[Startup] AZURE_OPENAI_KEY satt:', !!process.env.AZURE_OPENAI_KEY);
 
 const påkrevde = ['DATABASE_URL', 'PBI_TENANT_ID', 'PBI_CLIENT_ID', 'PBI_CLIENT_SECRET'];
 const mangler = påkrevde.filter(v => !process.env[v]);
 if (mangler.length > 0) {
-  console.warn('[Startup] ⚠️  MANGLENDE MILJØVARIABLER:', mangler.join(', '));
-  console.warn('[Startup]    Legg til i Azure → App Service → Configuration → Application Settings');
+  logger.warn('[Startup] ⚠️  MANGLENDE MILJØVARIABLER:', mangler.join(', '));
+  logger.warn('[Startup]    Legg til i Azure → App Service → Configuration → Application Settings');
 }
 
 import Fastify from 'fastify';
@@ -80,7 +81,7 @@ async function start() {
       if (!origin || tillatte.includes(origin)) {
         cb(null, true);
       } else {
-        console.warn('[CORS] blokkert origin:', origin);
+        logger.warn('[CORS] blokkert origin:', origin);
         cb(new Error('Ikke tillatt av CORS'), false);
       }
     },
@@ -148,14 +149,14 @@ async function start() {
 
   try {
     await server.listen({ port: PORT, host: HOST });
-    console.log(`API kjører på https://localhost:${PORT}`);
+    logger.warn(`API kjører på https://localhost:${PORT}`);
     if (process.env.NODE_ENV !== 'production') {
       // Logg admin-rutene ved oppstart for diagnostikk
       const linjer = server.printRoutes({ commonPrefix: false }).split('\n')
         .filter((l) => l.includes('/api/admin/'));
       if (linjer.length > 0) {
-        console.log('\n[routes] /api/admin/*:');
-        linjer.forEach((l) => console.log(`  ${l.trim()}`));
+        logger.debug('\n[routes] /api/admin/*:');
+        linjer.forEach((l) => logger.debug(`  ${l.trim()}`));
       }
     }
   } catch (err) {
