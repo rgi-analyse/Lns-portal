@@ -1,3 +1,5 @@
+import { logger } from '../lib/logger';
+
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
 interface GraphTokenResponse {
@@ -176,10 +178,10 @@ export async function hentBrukerGrupper(oid: string): Promise<Set<string>> {
     return set;
   } catch (err) {
     if (cached && Date.now() - cached.hentet < STALE_MS) {
-      console.warn(`[graph] stale gruppe-cache for oid=${oid} (Graph-feil, bruker forrige verdi)`);
+      logger.warn(`[graph] stale gruppe-cache for oid=${oid} (Graph-feil, bruker forrige verdi)`);
       return cached.grupper;
     }
-    console.error(`[graph] fail-closed gruppe-oppslag for oid=${oid}:`, err instanceof Error ? err.message : err);
+    logger.error(`[graph] fail-closed gruppe-oppslag for oid=${oid}:`, err instanceof Error ? err.message : err);
     return new Set();
   }
 }
@@ -199,7 +201,7 @@ export async function verifiserGrupper(
   const ok     = forespurt.filter((g) => faktiske.has(g.toLowerCase()));
   const avvist = forespurt.filter((g) => !faktiske.has(g.toLowerCase()));
   if (avvist.length > 0) {
-    console.warn(`[graph] avviste gruppe-forsøk oid=${oid} grupper=[${avvist.join(',')}]`);
+    logger.warn(`[graph] avviste gruppe-forsøk oid=${oid} grupper=[${avvist.join(',')}]`);
   }
   return ok;   // original casing — matcher Tilgang.entraId (CI-collation)
 }

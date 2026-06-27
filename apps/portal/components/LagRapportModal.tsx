@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/apiClient';
+import { logger } from '@/lib/logger';
 import { X } from 'lucide-react';
 
 interface ViewInfo {
@@ -53,20 +54,20 @@ export default function LagRapportModal({
       headers: authHeaders,
     })
       .then((r) => {
-        console.log('[Modal] views API status:', r.status);
+        logger.debug('[Modal] views API status:', r.status);
         return r.json() as Promise<unknown>;
       })
       .then((data) => {
-        console.log('[Modal] views API respons (rå):', JSON.stringify(data));
+        logger.debug('[Modal] views API respons (rå):', JSON.stringify(data));
         const liste: ViewInfo[] = (data as { views?: ViewInfo[] })?.views ?? [];
-        console.log('[Modal] views array lengde:', liste.length);
-        if (liste.length > 0) console.log('[Modal] første view:', JSON.stringify(liste[0]));
+        logger.debug('[Modal] views array lengde:', liste.length);
+        if (liste.length > 0) logger.debug('[Modal] første view:', JSON.stringify(liste[0]));
         setViews(liste);
         setIngenViews(liste.length === 0);
         if (liste.length >= 1) setValgtViewId(liste[0].id);
       })
       .catch((err) => {
-        console.error('[Modal] fetch-feil:', err);
+        logger.error('[Modal] fetch-feil:', err);
         setFetchFeil(true);
       })
       .finally(() => setLaster(false));
@@ -100,7 +101,7 @@ export default function LagRapportModal({
       params.set('laast',           'true');
     }
 
-    console.log('[Modal] sender params til rapport-designer/ny:', Object.fromEntries(params));
+    logger.debug('[Modal] sender params til rapport-designer/ny:', Object.fromEntries(params));
     router.push(`/dashboard/rapport-designer/ny?${params.toString()}`);
   };
 

@@ -1,5 +1,6 @@
 import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 import { DefaultAzureCredential } from '@azure/identity';
+import { logger } from '../lib/logger';
 
 const ACCOUNT_URL = process.env.BLOB_ACCOUNT_URL ?? '';
 const CONTAINER_NAME = process.env.BLOB_CONTAINER_NAME ?? '';
@@ -18,7 +19,7 @@ function getContainerClient(): ContainerClient {
     const credential = new DefaultAzureCredential();
     const serviceClient = new BlobServiceClient(ACCOUNT_URL, credential);
     containerClient = serviceClient.getContainerClient(CONTAINER_NAME);
-    console.log(`[Blob] Container client initialisert: ${CONTAINER_NAME} på ${ACCOUNT_URL}`);
+    logger.debug(`[Blob] Container client initialisert: ${CONTAINER_NAME} på ${ACCOUNT_URL}`);
   }
 
   return containerClient;
@@ -38,7 +39,7 @@ export async function lastOppBlob(
   const container = getContainerClient();
   const blockBlob = container.getBlockBlobClient(blobSti);
 
-  console.log(`[Blob] Laster opp: ${blobSti} (${buffer.length} bytes, type: ${contentType})`);
+  logger.debug(`[Blob] Laster opp: ${blobSti} (${buffer.length} bytes, type: ${contentType})`);
   const start = Date.now();
 
   await blockBlob.uploadData(buffer, {
@@ -46,7 +47,7 @@ export async function lastOppBlob(
   });
 
   const latens = Date.now() - start;
-  console.log(`[Blob] Opplastet OK: ${blobSti} (${latens}ms)`);
+  logger.debug(`[Blob] Opplastet OK: ${blobSti} (${latens}ms)`);
 
   return {
     blobSti,
@@ -63,13 +64,13 @@ export async function lastNedBlob(blobSti: string): Promise<Buffer> {
   const container = getContainerClient();
   const blockBlob = container.getBlockBlobClient(blobSti);
 
-  console.log(`[Blob] Laster ned: ${blobSti}`);
+  logger.debug(`[Blob] Laster ned: ${blobSti}`);
   const start = Date.now();
 
   const buffer = await blockBlob.downloadToBuffer();
 
   const latens = Date.now() - start;
-  console.log(`[Blob] Nedlastet OK: ${blobSti} (${buffer.length} bytes, ${latens}ms)`);
+  logger.debug(`[Blob] Nedlastet OK: ${blobSti} (${buffer.length} bytes, ${latens}ms)`);
 
   return buffer;
 }
@@ -84,7 +85,7 @@ export async function slettBlob(blobSti: string): Promise<boolean> {
 
   const respons = await blockBlob.deleteIfExists();
   if (respons.succeeded) {
-    console.log(`[Blob] Slettet: ${blobSti}`);
+    logger.debug(`[Blob] Slettet: ${blobSti}`);
   }
   return respons.succeeded;
 }

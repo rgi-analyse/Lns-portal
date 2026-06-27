@@ -13,6 +13,7 @@ import {
   AzureKeyCredential,
   type SearchIndex,
 } from '@azure/search-documents';
+import { logger } from '../lib/logger';
 
 export interface SearchQuery {
   searchText:    string;
@@ -49,14 +50,14 @@ export class SearchService {
   // ── Indeks-administrasjon ────────────────────────────────────────────
 
   async opprettIndeks(definition: SearchIndex): Promise<void> {
-    console.log(`[search] oppretter indeks "${definition.name}"`);
+    logger.debug(`[search] oppretter indeks "${definition.name}"`);
     try {
       await this.indexClient.createIndex(definition);
-      console.log(`[search] indeks "${definition.name}" opprettet`);
+      logger.debug(`[search] indeks "${definition.name}" opprettet`);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
       if (status === 409) {
-        console.log(`[search] indeks "${definition.name}" eksisterer allerede`);
+        logger.debug(`[search] indeks "${definition.name}" eksisterer allerede`);
         return;
       }
       throw err;
@@ -64,13 +65,13 @@ export class SearchService {
   }
 
   async slettIndeks(name: string): Promise<void> {
-    console.log(`[search] sletter indeks "${name}"`);
+    logger.debug(`[search] sletter indeks "${name}"`);
     try {
       await this.indexClient.deleteIndex(name);
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
       if (status === 404) {
-        console.log(`[search] indeks "${name}" finnes ikke (idempotent slett)`);
+        logger.debug(`[search] indeks "${name}" finnes ikke (idempotent slett)`);
         return;
       }
       throw err;
@@ -96,7 +97,7 @@ export class SearchService {
   ): Promise<void> {
     if (docs.length === 0) return;
     const klient = this.getSearchClient(indexName);
-    console.log(`[search] indekserer ${docs.length} dokument(er) i "${indexName}"`);
+    logger.debug(`[search] indekserer ${docs.length} dokument(er) i "${indexName}"`);
     const resultat = await klient.uploadDocuments(docs);
     const feilet = resultat.results.filter((r) => !r.succeeded);
     if (feilet.length > 0) {
@@ -113,7 +114,7 @@ export class SearchService {
   ): Promise<void> {
     if (keyValues.length === 0) return;
     const klient = this.getSearchClient(indexName);
-    console.log(`[search] sletter ${keyValues.length} dokument(er) fra "${indexName}"`);
+    logger.debug(`[search] sletter ${keyValues.length} dokument(er) fra "${indexName}"`);
     await klient.deleteDocuments(keyName, keyValues);
   }
 

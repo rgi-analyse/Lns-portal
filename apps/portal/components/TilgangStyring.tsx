@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -51,7 +52,7 @@ const ROLLER = [
 ];
 
 export default function TilgangStyring({ entityType, entityId }: TilgangStyringProps) {
-  console.log('[TilgangStyring] entityType:', entityType, '| entityId:', entityId);
+  logger.debug('[TilgangStyring] entityType:', entityType, '| entityId:', entityId);
   const { authHeaders } = usePortalAuth();
 
   const tilgangBaseUrl = `${API}/api/${

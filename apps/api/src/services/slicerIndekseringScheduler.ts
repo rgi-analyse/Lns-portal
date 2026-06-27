@@ -17,6 +17,7 @@
 import { Cron } from 'croner';
 import { prisma } from '../lib/prisma';
 import { indekserSlicer, type IndekseringResultat } from './slicerIndekseringService';
+import { logger } from '../lib/logger';
 
 const TIDSSONE        = 'Europe/Oslo';
 const DEFAULT_TID     = '06:00';
@@ -60,19 +61,19 @@ export async function kjorAlleAktive(): Promise<{
     orderBy: { slicer_tittel: 'asc' },
   });
 
-  console.log(`[scheduler] starter daglig indeksering — ${konfiger.length} aktive konfig(er)`);
+  logger.warn(`[scheduler] starter daglig indeksering — ${konfiger.length} aktive konfig(er)`);
 
   const resultater: IndekseringResultat[] = [];
   let suksess = 0;
   let feilet  = 0;
 
   for (const k of konfiger) {
-    console.log(`[scheduler] indekserer ${k.tenant}/${k.rapport_id}/${k.slicer_tittel} (${k.slicer_type})`);
+    logger.debug(`[scheduler] indekserer ${k.tenant}/${k.rapport_id}/${k.slicer_tittel} (${k.slicer_type})`);
     try {
       const r = await indekserSlicer(k.id);
       resultater.push(r);
       suksess++;
-      console.log(`[scheduler] ✓ "${k.slicer_tittel}": ${r.antall_rader} rader (DAX ${r.spørrings_ms}ms + indeks ${r.indekserings_ms}ms)`);
+      logger.debug(`[scheduler] ✓ "${k.slicer_tittel}": ${r.antall_rader} rader (DAX ${r.spørrings_ms}ms + indeks ${r.indekserings_ms}ms)`);
     } catch (err) {
       const melding = err instanceof Error ? err.message : String(err);
       feilet++;
@@ -84,12 +85,12 @@ export async function kjorAlleAktive(): Promise<{
         indekserings_ms: 0,
         feil:            melding,
       });
-      console.error(`[scheduler] ✗ "${k.slicer_tittel}": ${melding}`);
+      logger.error(`[scheduler] ✗ "${k.slicer_tittel}": ${melding}`);
     }
   }
 
   const total_ms = Date.now() - t0;
-  console.log(
+  logger.warn(
     `[scheduler] ferdig — ${suksess}/${konfiger.length} OK, ${feilet} feilet, ` +
     `total ${total_ms}ms (${(total_ms / 1000).toFixed(1)}s)`,
   );
@@ -103,13 +104,13 @@ export async function kjorAlleAktive(): Promise<{
  */
 export function startScheduler(): boolean {
   if (aktivJob) {
-    console.log('[scheduler] allerede startet — hopper over');
+    logger.debug('[scheduler] allerede startet — hopper over');
     return true;
   }
 
   const aktivert = process.env.SCHEDULER_ENABLED !== 'false';
   if (!aktivert) {
-    console.log('[scheduler] SCHEDULER_ENABLED=false — scheduler ikke startet');
+    logger.warn('[scheduler] SCHEDULER_ENABLED=false — scheduler ikke startet');
     return false;
   }
 
@@ -118,7 +119,7 @@ export function startScheduler(): boolean {
   try {
     cronUttrykk = tidTilCronUttrykk(tid);
   } catch (err) {
-    console.warn(`[scheduler] kunne ikke parse SCHEDULER_TIME — scheduler ikke startet:`, err instanceof Error ? err.message : err);
+    logger.warn(`[scheduler] kunne ikke parse SCHEDULER_TIME — scheduler ikke startet:`, err instanceof Error ? err.message : err);
     return false;
   }
 
@@ -127,13 +128,13 @@ export function startScheduler(): boolean {
       try {
         await kjorAlleAktive();
       } catch (err) {
-        console.error('[scheduler] uventet feil i kjorAlleAktive — scheduler fortsetter:', err);
+        logger.error('[scheduler] uventet feil i kjorAlleAktive — scheduler fortsetter:', err);
       }
     });
-    console.log(`[scheduler] Slicer-indeksering aktivert: kjører kl ${tid} ${TIDSSONE} (cron="${cronUttrykk}")`);
+    logger.warn(`[scheduler] Slicer-indeksering aktivert: kjører kl ${tid} ${TIDSSONE} (cron="${cronUttrykk}")`);
     return true;
   } catch (err) {
-    console.warn('[scheduler] kunne ikke starte cron — kjører videre uten:', err instanceof Error ? err.message : err);
+    logger.warn('[scheduler] kunne ikke starte cron — kjører videre uten:', err instanceof Error ? err.message : err);
     aktivJob = null;
     return false;
   }
@@ -144,7 +145,7 @@ export function stoppScheduler(): void {
   if (aktivJob) {
     aktivJob.stop();
     aktivJob = null;
-    console.log('[scheduler] stoppet');
+    logger.warn('[scheduler] stoppet');
   }
 }
 

@@ -1,5 +1,6 @@
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { apiFetch } from '@/lib/apiClient';
+import { logger } from '@/lib/logger';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -91,7 +92,7 @@ export async function startAzureSTT(
 
   await new Promise<void>((resolve, reject) => {
     recognizer.startContinuousRecognitionAsync(
-      () => { console.log('[Azure STT] startet'); resolve(); },
+      () => { logger.debug('[Azure STT] startet'); resolve(); },
       (err) => { reject(new Error(err)); },
     );
   });
@@ -101,8 +102,8 @@ export async function startAzureSTT(
 
 export function stoppAzureSTT(recognizer: SpeechSDK.SpeechRecognizer): void {
   recognizer.stopContinuousRecognitionAsync(
-    () => { console.log('[Azure STT] stoppet'); recognizer.close(); },
-    (err) => { console.error('[Azure STT] stopp feil:', err); recognizer.close(); },
+    () => { logger.debug('[Azure STT] stoppet'); recognizer.close(); },
+    (err) => { logger.error('[Azure STT] stopp feil:', err); recognizer.close(); },
   );
 }
 
@@ -167,7 +168,7 @@ export async function azureTTS(
   speechConfig.speechSynthesisVoiceName = stemme;
 
   const renTekst = rensTekstForTTS(tekst);
-  console.log('[TTS] original lengde:', tekst.length, '→ renset:', renTekst.length);
+  logger.debug('[TTS] original lengde:', tekst.length, '→ renset:', renTekst.length);
 
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="nb-NO">
   <voice name="${stemme}">
@@ -186,7 +187,7 @@ export async function azureTTS(
   return new Promise<void>((resolve) => {
     // onAudioEnd fyrer etter at lyden faktisk er ferdig avspilt lokalt
     player.onAudioEnd = () => {
-      console.log('[TTS] onAudioEnd — lyd ferdig avspilt');
+      logger.debug('[TTS] onAudioEnd — lyd ferdig avspilt');
       if (aktivSynthesizer === synthesizer) aktivSynthesizer = null;
       if (aktivPlayer === player) aktivPlayer = null;
       try { synthesizer.close(); } catch { /* ignore */ }
@@ -197,10 +198,10 @@ export async function azureTTS(
     synthesizer.speakSsmlAsync(
       ssml,
       (result) => {
-        console.log('[TTS] speakSsmlAsync reason:', result.reason);
+        logger.debug('[TTS] speakSsmlAsync reason:', result.reason);
         // Kun håndter feil — normal avslutning håndteres av onAudioEnd
         if (result.reason === SpeechSDK.ResultReason.Canceled) {
-          console.error('[TTS] Canceled:', result.errorDetails);
+          logger.error('[TTS] Canceled:', result.errorDetails);
           if (aktivSynthesizer === synthesizer) aktivSynthesizer = null;
           if (aktivPlayer === player) aktivPlayer = null;
           try { synthesizer.close(); } catch { /* ignore */ }
@@ -209,7 +210,7 @@ export async function azureTTS(
         }
       },
       (err) => {
-        console.error('[TTS] speakSsmlAsync feil:', err);
+        logger.error('[TTS] speakSsmlAsync feil:', err);
         if (aktivSynthesizer === synthesizer) aktivSynthesizer = null;
         if (aktivPlayer === player) aktivPlayer = null;
         try { synthesizer.close(); } catch { /* ignore */ }
@@ -221,16 +222,16 @@ export async function azureTTS(
 }
 
 export function stoppAzureTTS(): void {
-  console.log('[TTS] stoppAzureTTS kalt');
+  logger.debug('[TTS] stoppAzureTTS kalt');
 
   // pause() + close() stopper bufferet lyd umiddelbart
   if (aktivPlayer) {
     try {
       aktivPlayer.pause();
       aktivPlayer.close();
-      console.log('[TTS] player pauset og lukket');
+      logger.debug('[TTS] player pauset og lukket');
     } catch (err) {
-      console.error('[TTS] player stopp feil:', err);
+      logger.error('[TTS] player stopp feil:', err);
     }
     aktivPlayer = null;
   }
@@ -238,9 +239,9 @@ export function stoppAzureTTS(): void {
   if (aktivSynthesizer) {
     try {
       aktivSynthesizer.close();
-      console.log('[TTS] synthesizer lukket');
+      logger.debug('[TTS] synthesizer lukket');
     } catch (err) {
-      console.error('[TTS] synthesizer lukk feil:', err);
+      logger.error('[TTS] synthesizer lukk feil:', err);
     }
     aktivSynthesizer = null;
   }

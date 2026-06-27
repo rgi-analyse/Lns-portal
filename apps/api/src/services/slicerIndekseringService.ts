@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { utførDax } from './pbiQueryService';
 import {
   sikreIndeksFinnes,
@@ -58,7 +59,7 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
     throw new Error(`Konfig ${konfigId}: hierarchy-slicer mangler forelder_kolonne`);
   }
 
-  console.log(`[indeksering] start "${konfig.slicer_tittel}" (${konfig.slicer_type}) for rapport ${konfig.rapport_id}`);
+  logger.debug(`[indeksering] start "${konfig.slicer_tittel}" (${konfig.slicer_type}) for rapport ${konfig.rapport_id}`);
 
   try {
     // 1. DAX
@@ -118,7 +119,7 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
       }
     }
 
-    console.log(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} rader klare for indeksering` +
+    logger.debug(`[indeksering] "${konfig.slicer_tittel}": ${verdier.length} rader klare for indeksering` +
       (konfig.slicer_type === 'hierarchy' ? ` (inkl. ${toppNivaVerdier.size} topp-nivå-rader)` : ''));
 
     // 3. Sikre indeks finnes
@@ -130,7 +131,7 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
       const batch = verdier.slice(i, i + BATCH_STØRRELSE);
       await indekserVerdier(batch);
       const lastet = Math.min(i + BATCH_STØRRELSE, verdier.length);
-      console.log(`[indeksering] "${konfig.slicer_tittel}": ${lastet}/${verdier.length}`);
+      logger.debug(`[indeksering] "${konfig.slicer_tittel}": ${lastet}/${verdier.length}`);
     }
     const indekseringsMs = Date.now() - tIndeksStart;
 
@@ -145,7 +146,7 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
       },
     });
 
-    console.log(`[indeksering] ferdig "${konfig.slicer_tittel}": DAX ${daxResultat.spørringMs}ms + indeks ${indekseringsMs}ms`);
+    logger.debug(`[indeksering] ferdig "${konfig.slicer_tittel}": DAX ${daxResultat.spørringMs}ms + indeks ${indekseringsMs}ms`);
 
     return {
       konfig_id:       konfigId,
@@ -167,7 +168,7 @@ export async function indekserSlicer(konfigId: string): Promise<IndekseringResul
         },
       });
     } catch (lagreFeil) {
-      console.error(`[indeksering] kunne ikke lagre feilstatus for ${konfigId}:`, lagreFeil);
+      logger.error(`[indeksering] kunne ikke lagre feilstatus for ${konfigId}:`, lagreFeil);
     }
     throw err;
   }
@@ -178,7 +179,7 @@ export async function indekserRapport(rapportId: string): Promise<IndekseringRes
   const konfiger = await prisma.slicerIndeksering.findMany({
     where: { rapport_id: rapportId, er_aktiv: true },
   });
-  console.log(`[indeksering] rapport ${rapportId}: ${konfiger.length} aktive konfig(er)`);
+  logger.debug(`[indeksering] rapport ${rapportId}: ${konfiger.length} aktive konfig(er)`);
 
   const resultater: IndekseringResultat[] = [];
   for (const k of konfiger) {
@@ -186,7 +187,7 @@ export async function indekserRapport(rapportId: string): Promise<IndekseringRes
       resultater.push(await indekserSlicer(k.id));
     } catch (err) {
       const melding = err instanceof Error ? err.message : String(err);
-      console.error(`[indeksering] feilet for "${k.slicer_tittel}": ${melding}`);
+      logger.error(`[indeksering] feilet for "${k.slicer_tittel}": ${melding}`);
       resultater.push({
         konfig_id:       k.id,
         slicer_tittel:   k.slicer_tittel,

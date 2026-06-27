@@ -5,6 +5,7 @@ import {
   InteractionRequiredAuthError,
 } from '@azure/msal-browser';
 import { getLocalSession } from './localAuth';
+import { logger } from './logger';
 
 const INAKTIVITETS_MS = 8 * 60 * 60 * 1000; // 8 timer
 const STORAGE_KEY = 'lns-siste-aktivitet';
@@ -21,7 +22,7 @@ export class SessionGuard {
 
   start() {
     if (this.erLoginSide()) {
-      console.log('[SessionGuard] På login-side — guard deaktivert');
+      logger.debug('[SessionGuard] På login-side — guard deaktivert');
       return;
     }
     this.registrerAktivitet();
@@ -43,7 +44,7 @@ export class SessionGuard {
   private startInaktivitetsTimer = () => {
     if (this.timerId) clearTimeout(this.timerId);
     this.timerId = setTimeout(() => {
-      console.log('[SessionGuard] Inaktivitets-timeout — logger ut');
+      logger.warn('[SessionGuard] Inaktivitets-timeout — logger ut');
       this.triggerReLogin();
     }, INAKTIVITETS_MS);
   };
@@ -75,7 +76,7 @@ export class SessionGuard {
     if (siste) {
       const elapsed = Date.now() - parseInt(siste, 10);
       if (elapsed > INAKTIVITETS_MS) {
-        console.log('[SessionGuard] Session utløpt basert på inaktivitet');
+        logger.warn('[SessionGuard] Session utløpt basert på inaktivitet');
         this.triggerReLogin();
         return;
       }
@@ -96,7 +97,7 @@ export class SessionGuard {
       // MSAL-token-sjekk gjelder ikke dem. Ikke trigger re-login (ellers logges
       // alle lokale brukere ut ved hver sidelast etter init-race-fiksen).
       if (getLocalSession()) return;
-      console.log('[SessionGuard] Ingen MSAL-account funnet');
+      logger.warn('[SessionGuard] Ingen MSAL-account funnet');
       this.triggerReLogin();
       return;
     }
@@ -106,14 +107,14 @@ export class SessionGuard {
         scopes: this.loginScopes,
         account,
       });
-      console.log('[SessionGuard] ✅ Token OK');
+      logger.debug('[SessionGuard] ✅ Token OK');
       this.registrerAktivitet();
     } catch (err) {
       if (err instanceof InteractionRequiredAuthError) {
-        console.log('[SessionGuard] Silent token-refresh feilet → re-login');
+        logger.warn('[SessionGuard] Silent token-refresh feilet → re-login');
         this.triggerReLogin();
       } else {
-        console.warn('[SessionGuard] Uventet feil ved token-sjekk:', err);
+        logger.warn('[SessionGuard] Uventet feil ved token-sjekk:', err);
       }
     }
   };
@@ -121,7 +122,7 @@ export class SessionGuard {
   private triggerReLogin = () => {
     if (this.erLoginSide()) {
       // Allerede på login-side — ikke redirect igjen
-      console.log('[SessionGuard] Er allerede på login-side, ingen redirect');
+      logger.debug('[SessionGuard] Er allerede på login-side, ingen redirect');
       return;
     }
 
@@ -132,7 +133,7 @@ export class SessionGuard {
     const safeReturnTo = currentPath.startsWith('/dashboard') ? currentPath : '/dashboard';
     const loginUrl = `/?expired=true&returnTo=${encodeURIComponent(safeReturnTo)}`;
 
-    console.log('[SessionGuard] Timeout — sender til login:', loginUrl);
+    logger.warn('[SessionGuard] Timeout — sender til login:', loginUrl);
     window.location.href = loginUrl;
   };
 

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { getAzureToken } from './embedToken';
 
 type ExportFormat = 'PDF' | 'PPTX';
@@ -42,7 +43,7 @@ async function pollUntilDone(
     }
 
     const job = await response.json() as ExportJob;
-    console.log(`Eksport status [${i + 1}/${MAX_POLLS}]: ${job.status} (${job.percentComplete}%)`);
+    logger.debug(`Eksport status [${i + 1}/${MAX_POLLS}]: ${job.status} (${job.percentComplete}%)`);
 
     if (job.status === 'Succeeded') return;
     if (job.status === 'Failed') throw new Error('Power BI eksport feilet.');
@@ -95,7 +96,7 @@ export async function exportReportRoutes(fastify: FastifyInstance) {
       }
 
       const { id: exportId } = await startResponse.json() as { id: string };
-      console.log(`Eksport startet (${format}), exportId: ${exportId}`);
+      logger.debug(`Eksport startet (${format}), exportId: ${exportId}`);
 
       await pollUntilDone(workspaceId, reportId, exportId, azureToken);
 
@@ -115,7 +116,7 @@ export async function exportReportRoutes(fastify: FastifyInstance) {
         .header('Content-Disposition', `attachment; filename="rapport.${EXTENSIONS[format]}"`)
         .send(buffer);
     } catch (error) {
-      console.error('Eksport feil:', error);
+      logger.error('Eksport feil:', error);
       fastify.log.error(error);
       return reply.status(500).send({
         error: error instanceof Error ? error.message : 'Ukjent feil under eksport.',

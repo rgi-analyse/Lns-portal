@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 export { getAzureToken };
@@ -74,7 +75,7 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
     let datasetId: string | undefined;
     let workspaceId: string | undefined;
 
-    console.log('[embedToken] body mottatt:', JSON.stringify(request.body));
+    logger.debug('[embedToken] body mottatt:', JSON.stringify(request.body));
 
     if (request.body?.rapportId) {
       const db = (request as TenantRequest).tenantPrisma;
@@ -94,9 +95,9 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
       workspaceId = request.body?.pbiWorkspaceId ??                              process.env.PBI_WORKSPACE_ID;
     }
 
-    console.log('[embedToken] reportId brukt:', reportId);
-    console.log('[embedToken] workspaceId brukt:', workspaceId);
-    console.log('[embedToken] datasetId brukt:', datasetId);
+    logger.debug('[embedToken] reportId brukt:', reportId);
+    logger.debug('[embedToken] workspaceId brukt:', workspaceId);
+    logger.debug('[embedToken] datasetId brukt:', datasetId);
 
     if (!workspaceId || !reportId || !datasetId) {
       return reply.status(500).send({ error: 'Mangler Power BI-konfigurasjon på serveren.' });
@@ -112,14 +113,14 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
         scp?: string;
         appid?: string;
       };
-      console.log('Azure AD token payload:', {
+      logger.debug('Azure AD token payload:', {
         aud: payload.aud,
         roles: payload.roles,
         scp: payload.scp,
         appid: payload.appid,
       });
 
-      console.log('[embedToken] GenerateToken med:', { reportId, workspaceId, datasetId });
+      logger.debug('[embedToken] GenerateToken med:', { reportId, workspaceId, datasetId });
       const generateTokenUrl = 'https://api.powerbi.com/v1.0/myorg/GenerateToken';
       const generateTokenBody = {
         datasets: [{ id: datasetId }],
@@ -127,7 +128,7 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
         targetWorkspaces: [{ id: workspaceId }],
       };
 
-      console.log('Power BI GenerateToken-kall:', {
+      logger.debug('Power BI GenerateToken-kall:', {
         url: generateTokenUrl,
         headers: {
           Authorization: `Bearer ${azureToken.slice(0, 20)}...`,
@@ -165,7 +166,7 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
         tokenId: tokenData.tokenId,
       };
     } catch (error) {
-      console.error('Embed token feil:', error);
+      logger.error('Embed token feil:', error);
 
       if (error instanceof ApiError) {
         fastify.log.error(

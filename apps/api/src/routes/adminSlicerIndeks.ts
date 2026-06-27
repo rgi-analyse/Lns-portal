@@ -6,6 +6,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, requireBruker, requireAdmin } from '../middleware/auth';
 import { utførDax, hentTabellerViaREST } from '../services/pbiQueryService';
@@ -510,23 +511,23 @@ SELECTCOLUMNS(
           .map((rad) => (rad['[Name]'] ?? rad['Name'] ?? '') as string)
           .filter((navn) => navn.length > 0)
           .map((navn) => ({ navn }));
-        console.log(`[admin-tabeller] kilde=info_tables antall=${tabeller.length}`);
+        logger.debug(`[admin-tabeller] kilde=info_tables antall=${tabeller.length}`);
         return reply.send({ tabeller, kilde: 'info_tables' as const });
       } catch (infoErr) {
         const infoDetail = infoErr instanceof Error ? infoErr.message : String(infoErr);
-        console.log(`[admin-tabeller] INFO.TABLES feilet, prøver REST: ${infoDetail.slice(0, 200)}`);
+        logger.debug(`[admin-tabeller] INFO.TABLES feilet, prøver REST: ${infoDetail.slice(0, 200)}`);
 
         try {
           const navn = await hentTabellerViaREST(workspace_id, dataset_id);
           const tabeller = navn.map((n) => ({ navn: n }));
-          console.log(`[admin-tabeller] kilde=rest_api antall=${tabeller.length}`);
+          logger.debug(`[admin-tabeller] kilde=rest_api antall=${tabeller.length}`);
           return reply.send({ tabeller, kilde: 'rest_api' as const });
         } catch (restErr) {
           const restDetail = restErr instanceof Error ? restErr.message : String(restErr);
           const restStack  = restErr instanceof Error ? restErr.stack : undefined;
-          console.error('[admin-tabeller] REST feilet:', restErr);
-          console.error('[admin-tabeller] REST detail:', restDetail);
-          if (restStack) console.error('[admin-tabeller] REST stack:', restStack);
+          logger.error('[admin-tabeller] REST feilet:', restErr);
+          logger.error('[admin-tabeller] REST detail:', restDetail);
+          if (restStack) logger.error('[admin-tabeller] REST stack:', restStack);
           return reply.status(400).send({
             error:
               'Kan ikke liste tabeller automatisk — både INFO.TABLES og PBI REST feilet. ' +
@@ -559,7 +560,7 @@ SELECTCOLUMNS(
         }
       }
       const forslag = [...navn].sort((a, b) => a.localeCompare(b, 'nb'));
-      console.log(`[admin-tabell-forslag] ws=${workspace_id} ds=${dataset_id} konfiger=${konfiger.length} forslag=${forslag.length}`);
+      logger.debug(`[admin-tabell-forslag] ws=${workspace_id} ds=${dataset_id} konfiger=${konfiger.length} forslag=${forslag.length}`);
       return reply.send({ forslag });
     },
   );

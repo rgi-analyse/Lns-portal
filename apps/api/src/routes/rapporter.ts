@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
@@ -205,7 +206,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
       const rapportId = request.params.id.replace(/[^a-zA-Z0-9\-]/g, '');
       const dbUrl     = (request as TenantRequest).tenantDatabaseUrl;
       if (!dbUrl) return reply.status(500).send({ views: [], feil: 'Mangler tenant-kontekst.' });
-      console.log(`[Views API] henter views for rapport: ${rapportId}`);
+      logger.debug(`[Views API] henter views for rapport: ${rapportId}`);
       try {
         // Steg 1 (tenant): koblede view_id-er
         const koblinger = await queryAzureSQLForTenant(
@@ -225,10 +226,10 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           WHERE v.id IN (${inClause}) AND v.er_aktiv = 1
           ORDER BY v.visningsnavn
         `);
-        console.log(`[Views API] rapport: ${rapportId} → ${rows.length} views funnet`);
+        logger.debug(`[Views API] rapport: ${rapportId} → ${rows.length} views funnet`);
         return reply.send({ views: rows });
       } catch (err) {
-        console.error('[Views API] SQL-feil:', err);
+        logger.error('[Views API] SQL-feil:', err);
         return reply.status(500).send({ views: [], feil: String(err) });
       }
     },
@@ -363,7 +364,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           harTilgang = p !== null || (bruker !== null && workspace.opprettetAv === bruker.id);
         }
 
-        console.log(
+        logger.debug(
           `[rapporter/:id/rapporter] wsId=${safeWsId} | identities=${identities.length}` +
           ` | harTilgang=${harTilgang} | opprettetAv=${workspace.opprettetAv} | brukerId=${bruker?.id ?? 'null'}`,
         );
@@ -384,7 +385,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
               const { tilgang: _t, ...rapport } = l.rapport;
               return rapport;
             });
-          console.log(`[rapporter/:id/rapporter] tilgang-path: total=${links.length} filtrert=${filtrerte.length}`);
+          logger.debug(`[rapporter/:id/rapporter] tilgang-path: total=${links.length} filtrert=${filtrerte.length}`);
           return reply.send(await medDesignerFlagg(filtrerte));
         }
 
@@ -399,7 +400,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
           include: { rapport: true },
           orderBy: { rekkefølge: 'asc' },
         });
-        console.log(`[rapporter/:id/rapporter] kun-rapport-tilgang: total=${links.length}`);
+        logger.debug(`[rapporter/:id/rapporter] kun-rapport-tilgang: total=${links.length}`);
         return reply.send(await medDesignerFlagg(links.map((l) => l.rapport)));
       } catch (error) {
         fastify.log.error(error);

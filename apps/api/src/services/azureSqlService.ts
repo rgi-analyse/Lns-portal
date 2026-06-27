@@ -1,5 +1,6 @@
 import * as sql from 'mssql';
 import { parsePrismaUrl } from '../lib/tenantPrisma';
+import { logger } from '../lib/logger';
 
 let pool: sql.ConnectionPool | null = null;
 
@@ -70,16 +71,16 @@ const parseConnectionString = (connStr: string): sql.config => {
 const getPool = async (): Promise<sql.ConnectionPool> => {
   if (!pool) {
     const raw = process.env.DATABASE_URL ?? '';
-    console.log('[AzureSQL] DATABASE_URL:', raw.substring(0, 80));
+    logger.debug('[AzureSQL] DATABASE_URL:', raw.substring(0, 80));
     const config = parseConnectionString(raw);
-    console.log('[AzureSQL] Parsed config:', {
+    logger.debug('[AzureSQL] Parsed config:', {
       server:      config.server,
       database:    config.database,
       user:        config.user,
       hasPassword: !!config.password,
     });
     pool = await sql.connect(config);
-    console.log('[AzureSQL] Tilkobling OK');
+    logger.debug('[AzureSQL] Tilkobling OK');
   }
   return pool;
 };
@@ -121,7 +122,7 @@ export const queryAzureSQLForTenant = async (
     // første tilkoblingen, noe som ville brutt tenant-isolasjon.
     p = await new sql.ConnectionPool(parsePrismaUrl(databaseUrl)).connect();
     tenantPools.set(databaseUrl, p);
-    console.log(`[AzureSQL] Ny tenant-pool opprettet: ${maskDb(databaseUrl)}`);
+    logger.debug(`[AzureSQL] Ny tenant-pool opprettet: ${maskDb(databaseUrl)}`);
   }
   const req = p.request();
   if (params) {

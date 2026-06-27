@@ -1,6 +1,7 @@
 import { Resvg } from '@resvg/resvg-js';
 import { existsSync, statSync } from 'fs';
 import { join } from 'path';
+import { logger } from '../lib/logger';
 
 // Inter bygges inn i repoet (apps/api/fonts/) fordi Azure App Service Linux
 // mangler systemfonter — uten dette renderes all SVG-tekst tomt i prod.
@@ -15,7 +16,7 @@ for (const sti of [interRegularSti, interBoldSti]) {
     throw new Error(`[Graf] Font mangler: ${sti}. Sjekk at apps/api/fonts/ er med i deploy-pakken.`);
   }
 }
-console.log(`[Graf] Fonter funnet: Inter Regular (${statSync(interRegularSti).size} bytes), Inter Bold (${statSync(interBoldSti).size} bytes)`);
+logger.debug(`[Graf] Fonter funnet: Inter Regular (${statSync(interRegularSti).size} bytes), Inter Bold (${statSync(interBoldSti).size} bytes)`);
 
 // ─────────────────────────────────────────────
 // Typer

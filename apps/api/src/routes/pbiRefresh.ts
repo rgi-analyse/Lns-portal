@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { getAzureToken } from './embedToken';
 
 interface RefreshEntry {
@@ -192,8 +193,8 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
         const historyData  = historyRes.ok  ? await historyRes.json()  as RefreshHistoryResponse  : null;
         const scheduleData = scheduleRes.ok ? await scheduleRes.json() as RefreshScheduleResponse : null;
 
-        console.log('[RefreshInfo] history:', JSON.stringify(historyData));
-        console.log('[RefreshInfo] schedule:', JSON.stringify(scheduleData));
+        logger.debug('[RefreshInfo] history:', JSON.stringify(historyData));
+        logger.debug('[RefreshInfo] schedule:', JSON.stringify(scheduleData));
 
         const sisteEntry = historyData?.value?.[0];
 

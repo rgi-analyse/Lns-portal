@@ -1,5 +1,6 @@
 import * as mssql from 'mssql';
 import { getAzureToken } from '../lib/azureToken';
+import { logger } from '../lib/logger';
 
 const server   = process.env.FABRIC_SQL_SERVER   ?? '';
 const database = process.env.FABRIC_SQL_DATABASE ?? '';
@@ -7,7 +8,7 @@ const tenantId = process.env.PBI_TENANT_ID       ?? '';
 const clientId = process.env.PBI_CLIENT_ID       ?? '';
 const clientSecret = process.env.PBI_CLIENT_SECRET ?? '';
 
-console.log('[Fabric] Forsøker tilkobling til:', {
+logger.debug('[Fabric] Forsøker tilkobling til:', {
   server:   process.env.FABRIC_SQL_SERVER,
   database: process.env.FABRIC_SQL_DATABASE,
 });
@@ -15,9 +16,9 @@ console.log('[Fabric] Forsøker tilkobling til:', {
 async function testConnection(): Promise<void> {
   try {
     const result = await executeQuery('SELECT TOP 5 TABLE_NAME FROM INFORMATION_SCHEMA.TABLES');
-    console.log('[Fabric] Tilkobling OK, tabeller:', result);
+    logger.debug('[Fabric] Tilkobling OK, tabeller:', result);
   } catch (err) {
-    console.error('[Fabric] Tilkobling feilet:', err instanceof Error ? err.message : err);
+    logger.error('[Fabric] Tilkobling feilet:', err instanceof Error ? err.message : err);
   }
 }
 
@@ -40,14 +41,14 @@ export interface ColumnInfo {
 }
 
 async function getPool(): Promise<mssql.ConnectionPool> {
-  console.log('[Fabric] Henter Azure AD token med scope: https://database.windows.net/.default');
+  logger.debug('[Fabric] Henter Azure AD token med scope: https://database.windows.net/.default');
   const token = await getAzureToken(
     tenantId,
     clientId,
     clientSecret,
     'https://database.windows.net/.default',
   );
-  console.log('[Fabric] Token hentet, lengde:', token.length);
+  logger.debug('[Fabric] Token hentet, lengde:', token.length);
 
   const config: mssql.config = {
     server,
@@ -61,7 +62,7 @@ async function getPool(): Promise<mssql.ConnectionPool> {
       options: { token },
     },
   };
-  console.log('[Fabric] Auth-metode: azure-active-directory-access-token');
+  logger.debug('[Fabric] Auth-metode: azure-active-directory-access-token');
 
   const pool = new mssql.ConnectionPool(config);
   await pool.connect();

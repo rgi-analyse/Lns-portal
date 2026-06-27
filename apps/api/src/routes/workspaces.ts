@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
@@ -238,7 +239,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         return reply.send(merged);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
-        console.error('[workspaces] GET /api/workspaces:', error);
+        logger.error('[workspaces] GET /api/workspaces:', error);
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke hente workspaces.', detail });
       }
@@ -427,7 +428,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
             || (bruker !== null && workspace.opprettetAv === bruker.id);
         }
 
-        console.log(
+        logger.debug(
           `[workspaces/:id] id=${safeWsId} | identities=${identities.length}` +
           ` | totalRapporter=${workspace.rapporter.length} | harTilgang=${harTilgang}` +
           ` | tilgangEntraIds=[${workspace.tilgang.map((t) => t.entraId).join(',')}]` +
@@ -445,7 +446,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
 
         const ids = filtrerteRapporter.map((wr) => wr.rapport.id);
         const designerMap = await hentDesignerFlagg(dbUrl, ids);
-        console.log(`[workspaces/:id] filtrerteRapporter=${filtrerteRapporter.length} | designerFlagg=${[...designerMap.entries()].map(([k,v]) => `${k}=${v}`).join(',')}`);
+        logger.debug(`[workspaces/:id] filtrerteRapporter=${filtrerteRapporter.length} | designerFlagg=${[...designerMap.entries()].map(([k,v]) => `${k}=${v}`).join(',')}`);
 
         return reply.send({
           ...workspace,
