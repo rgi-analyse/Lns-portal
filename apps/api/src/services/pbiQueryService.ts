@@ -14,6 +14,7 @@
  */
 
 import { getAzureToken } from '../lib/azureToken';
+import { logger } from '../lib/logger';
 
 export interface DaxParametere {
   workspaceId: string;
@@ -62,7 +63,7 @@ export async function utførDax(parametere: DaxParametere): Promise<DaxResultat>
   }
 
   const t0 = Date.now();
-  console.log(`[pbi-dax] start ws=${parametere.workspaceId} ds=${parametere.datasetId} (${parametere.dax.length} chars)`);
+  logger.debug(`[pbi-dax] start ws=${parametere.workspaceId} ds=${parametere.datasetId} (${parametere.dax.length} chars)`);
 
   const token = await getAzureToken(tenantId, clientId, clientSecret);
 
@@ -90,7 +91,7 @@ export async function utførDax(parametere: DaxParametere): Promise<DaxResultat>
     else if (respons.status === 401) melding = `Token avvist (401). Detail: ${detail}`;
     else if (respons.status === 403) melding = `Service Principal mangler tilgang til datasett ${parametere.datasetId} (403). Sjekk workspace-medlemskap og tenant setting "Dataset Execute Queries REST API". Detail: ${detail}`;
     else if (respons.status === 429) melding = `Rate limit (429) — 120 queries/min per SP overskredet. Detail: ${detail}`;
-    console.error(`[pbi-dax] feil ${respons.status}: ${detail}`);
+    logger.error(`[pbi-dax] feil ${respons.status}: ${detail}`);
     throw new PbiDaxFeil(respons.status, parametere.dax, detail, melding);
   }
 
@@ -110,7 +111,7 @@ export async function utførDax(parametere: DaxParametere): Promise<DaxResultat>
 
   const rader = førsteResult?.tables?.[0]?.rows ?? [];
   const spørringMs = Date.now() - t0;
-  console.log(`[pbi-dax] ferdig ${rader.length} rader på ${spørringMs}ms`);
+  logger.debug(`[pbi-dax] ferdig ${rader.length} rader på ${spørringMs}ms`);
 
   return { rader, spørringMs };
 }
@@ -129,31 +130,31 @@ export async function hentTabellerViaREST(
   workspaceId: string,
   datasetId:   string,
 ): Promise<string[]> {
-  console.log(`[pbi-rest] hentTabellerViaREST starter ws=${workspaceId} ds=${datasetId}`);
+  logger.debug(`[pbi-rest] hentTabellerViaREST starter ws=${workspaceId} ds=${datasetId}`);
 
   const tenantId     = process.env.PBI_TENANT_ID;
   const clientId     = process.env.PBI_CLIENT_ID;
   const clientSecret = process.env.PBI_CLIENT_SECRET;
 
   if (!tenantId || !clientId || !clientSecret) {
-    console.error('[pbi-rest] env-variabler mangler', {
+    logger.error('[pbi-rest] env-variabler mangler', {
       hasTenantId: !!tenantId, hasClientId: !!clientId, hasClientSecret: !!clientSecret,
     });
     throw new Error('PBI Service Principal env-variabler mangler.');
   }
 
-  console.log('[pbi-rest] henter token...');
+  logger.debug('[pbi-rest] henter token...');
   let token: string;
   try {
     token = await getAzureToken(tenantId, clientId, clientSecret);
-    console.log(`[pbi-rest] token OK (length=${token.length})`);
+    logger.debug(`[pbi-rest] token OK (length=${token.length})`);
   } catch (err) {
-    console.error('[pbi-rest] token-utveksling feilet:', err);
+    logger.error('[pbi-rest] token-utveksling feilet:', err);
     throw err;
   }
 
   const url = `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/datasets/${datasetId}/tables`;
-  console.log(`[pbi-rest] GET ${url}`);
+  logger.debug(`[pbi-rest] GET ${url}`);
 
   let respons: Response;
   try {
@@ -162,14 +163,14 @@ export async function hentTabellerViaREST(
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (err) {
-    console.error(`[pbi-rest] nettverk-feil ved fetch:`, err);
+    logger.error(`[pbi-rest] nettverk-feil ved fetch:`, err);
     throw err;
   }
 
   if (!respons.ok) {
     const body = await respons.text();
     const detail = body.slice(0, 500);
-    console.error(`[pbi-rest] HTTP ${respons.status} ${respons.statusText} — body: ${detail}`);
+    logger.error(`[pbi-rest] HTTP ${respons.status} ${respons.statusText} — body: ${detail}`);
     throw new PbiDaxFeil(
       respons.status,
       `GET ${url}`,
@@ -182,13 +183,13 @@ export async function hentTabellerViaREST(
   try {
     json = await respons.json() as { value?: Array<{ name?: string }> };
   } catch (err) {
-    console.error('[pbi-rest] kunne ikke parse JSON-respons:', err);
+    logger.error('[pbi-rest] kunne ikke parse JSON-respons:', err);
     throw err;
   }
 
   const tabeller = (json.value ?? [])
     .map((t) => t.name ?? '')
     .filter((navn) => navn.length > 0);
-  console.log(`[pbi-rest] suksess: ${tabeller.length} tabeller (av ${json.value?.length ?? 0} rader)`);
+  logger.debug(`[pbi-rest] suksess: ${tabeller.length} tabeller (av ${json.value?.length ?? 0} rader)`);
   return tabeller;
 }

@@ -1,4 +1,5 @@
 import { queryAzureSQL, executeAzureSQL } from './azureSqlService';
+import { logger } from '../lib/logger';
 
 const sanitize = (name: string): string => name.replace(/[^a-zA-Z0-9_æøåÆØÅ]/g, '');
 const esc = (val: string): string => val.replace(/'/g, "''");
@@ -100,7 +101,7 @@ export async function syncViewColumns(
     .filter(navn => !kolonnerFraView.has(navn));
 
   if (utgåtte.length > 0) {
-    console.log(`[MetadataSync] sletter ${utgåtte.length} utgåtte kolonner:`, utgåtte);
+    logger.debug(`[MetadataSync] sletter ${utgåtte.length} utgåtte kolonner:`, utgåtte);
     const inClause = utgåtte.map(n => `'${esc(n)}'`).join(', ');
     await executeAzureSQL(`
       DELETE FROM ai_metadata_kolonner
@@ -135,9 +136,9 @@ export async function syncAllViews(): Promise<MetadataSyncResult[]> {
         view['view_name'] as string,
       );
       results.push(result);
-      console.log(`[MetadataSync] Synkronisert: ${result.view} — ${result.kolonner} kolonner`);
+      logger.debug(`[MetadataSync] Synkronisert: ${result.view} — ${result.kolonner} kolonner`);
     } catch (err) {
-      console.error(`[MetadataSync] Feil: ${view['schema_name']}.${view['view_name']}:`, err);
+      logger.error(`[MetadataSync] Feil: ${view['schema_name']}.${view['view_name']}:`, err);
     }
   }
 

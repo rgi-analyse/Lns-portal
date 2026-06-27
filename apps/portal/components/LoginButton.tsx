@@ -2,6 +2,7 @@
 
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
+import { logger } from '@/lib/logger';
 
 export default function LoginButton() {
   const { instance, accounts } = useMsal();
@@ -11,7 +12,7 @@ export default function LoginButton() {
     try {
       await instance.loginPopup(loginRequest);
     } catch (error) {
-      console.error('Login failed:', error);
+      logger.error('Login failed:', error);
     }
   };
 
