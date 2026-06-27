@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Download, FileSpreadsheet, Save } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -173,11 +174,11 @@ function parseFiltreTilObjekter(
       const kolLower = f.kolonne.toLowerCase().replace(/[\[\]]/g, '');
       // Fjern filtre på prosjektkolonnen (eksplisitt navn eller kjente prosjekt-nøkkelkolonner)
       if (prosjektKolonne && kolLower === prosjektKolonne.toLowerCase()) {
-        console.log('[parseFiltre] fjerner prosjektkolonne-filter:', f.kolonne);
+        logger.debug('[parseFiltre] fjerner prosjektkolonne-filter:', f.kolonne);
         return false;
       }
       if (PROSJEKT_KOLONNER.has(kolLower)) {
-        console.log('[parseFiltre] fjerner kjent prosjektnøkkel-filter:', f.kolonne);
+        logger.debug('[parseFiltre] fjerner kjent prosjektnøkkel-filter:', f.kolonne);
         return false;
       }
       return true;
@@ -480,12 +481,6 @@ function beregnDomain(
   // Fjern eventuelle JSON-encoded anførselstegn og SQL-brackets som kan følge med kolonnenavnet
   const renYKol = yKol.replace(/^["'\[\]]+|["'\[\]]+$/g, '').trim();
 
-  console.log('[beregnDomain] yKol input:', yKol, '| renYKol:', renYKol);
-  console.log('[beregnDomain] data.length:', data.length);
-  if (data.length > 0) {
-    console.log('[beregnDomain] første rad nøkler:', Object.keys(data[0]));
-    console.log('[beregnDomain] første rad[renYKol]:', data[0][renYKol]);
-  }
   if (!renYKol) return ['auto', 'auto'];
   const radNøkler0 = data.length > 0 ? Object.keys(data[0]) : [];
   const verdier = data.map(d => {
@@ -502,7 +497,7 @@ function beregnDomain(
   }).filter((v): v is number => isFinite(v) && !isNaN(v));
 
   if (verdier.length === 0) {
-    console.warn('[beregnDomain] ingen gyldige verdier for renYKol:', renYKol,
+    logger.warn('[beregnDomain] ingen gyldige verdier for renYKol:', renYKol,
       '| faktiske nøkler:', radNøkler0.join(', '));
     return ['auto', 'auto'];
   }
@@ -514,7 +509,6 @@ function beregnDomain(
     yMin < 0 ? yMin - pad : 0,
     yMax > 0 ? yMax + pad : pad,
   ];
-  console.log('[beregnDomain] domain:', domain, '| yMin:', yMin, '| yMax:', yMax);
   return domain;
 }
 
@@ -862,12 +856,6 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier, referanseLinj
   const stolpeDomain   = beregnFlereKolonner(stolpeKolonner);
   const linjeDomain    = beregnFlereKolonner(linjeKolonner);
 
-  console.log('[KombinertChart] sender domain til YAxis:');
-  console.log('  stolpeDomain:', stolpeDomain, '| stolpeKolonner:', stolpeKolonner);
-  console.log('  linjeDomain:', linjeDomain, '| linjeKolonner:', linjeKolonner);
-  console.log('  harLinjeAkse:', harLinjeAkse, '| behandletData.length:', behandletData.length);
-  console.log('  allowDataOverflow satt: true | type="number" satt: true');
-
   return (
     <ResponsiveContainer width="100%" height={400}>
       <ComposedChart data={behandletData} margin={{ top: 10, right: 40, left: 10, bottom: 60 }} stackOffset="sign">
@@ -896,10 +884,7 @@ function KombinertChart({ data, xCol, stolpeKol, linjeKol, serier, referanseLinj
             domain={linjeDomain}
             allowDataOverflow={true}
             tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-            tickFormatter={(v) => {
-              console.log('[KombinertChart] linjeDomain ved render:', linjeDomain, '| tick-verdi:', v);
-              return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v);
-            }}
+            tickFormatter={(v) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(v)}
           />
         )}
         <Tooltip
@@ -1276,14 +1261,14 @@ function FilterVerdiInput({
   const erMeasure   = type === 'measure'; // kun eksplisitte measures → tall-input
   const erTekst     = !erDato && !erMeasure; // dimensjon, id og ukjente → dropdown
 
-  console.log('[FilterVerdi] kolonne:', kolonne, '| type:', type, '| datatype:', kolonneMeta?.datatype ?? '?', '| erTekst:', erTekst);
+  logger.debug('[FilterVerdi] kolonne:', kolonne, '| type:', type, '| datatype:', kolonneMeta?.datatype ?? '?', '| erTekst:', erTekst);
 
   // Hent verdier med lazy-loading-støtte (offset-basert paginering)
   // søkTekst sendes til server når angitt (≥3 tegn) for server-side filtrering
   const hentVerdier = useCallback(async (offset: number, reset: boolean, søkTekst?: string) => {
-    console.log('[hentVerdier] kolonne:', kolonne, '| viewNavn:', viewNavn, '| erTekst:', erTekst, '| offset:', offset, '| søk:', søkTekst ?? '—');
+    logger.debug('[hentVerdier] kolonne:', kolonne, '| viewNavn:', viewNavn, '| erTekst:', erTekst, '| offset:', offset, '| søk:', søkTekst ?? '—');
     if (!erTekst || !kolonne || !viewNavn) {
-      console.warn('[hentVerdier] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
+      logger.warn('[hentVerdier] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
       return;
     }
     if (offset === 0) setLaster(true); else setLasterFlere(true);
@@ -1296,16 +1281,15 @@ function FilterVerdiInput({
 
     try {
       const r = await apiFetch(`/api/rapport-designer/kolonneverdier?${params.toString()}`, { credentials: 'include' });
-      console.log('[hentVerdier] HTTP status:', r.status);
+      logger.debug('[hentVerdier] HTTP status:', r.status);
       if (!r.ok) { if (reset) setVerdier([]); return; }
       const d = await r.json() as { verdier: unknown[] };
-      console.log('[hentVerdier] d.verdier (første 5):', (d.verdier ?? []).slice(0, 5));
       const nyeVerdier = (d.verdier ?? []).map(String);
       if (reset) setVerdier(nyeVerdier); else setVerdier(prev => [...prev, ...nyeVerdier]);
       setHarFlere(nyeVerdier.length === 200);
       setSide(Math.floor(offset / 200) + 1);
     } catch (err) {
-      console.error('[FilterVerdi] fetch feil:', err);
+      logger.error('[FilterVerdi] fetch feil:', err);
       if (reset) setVerdier([]);
     } finally {
       if (offset === 0) setLaster(false); else setLasterFlere(false);
@@ -1316,7 +1300,7 @@ function FilterVerdiInput({
   // Initial last ved endring av kolonne, view, operator eller aktive filtre
   useEffect(() => {
     if (!erTekst || !kolonne || !viewNavn) {
-      console.warn('[FilterVerdi useEffect] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
+      logger.warn('[FilterVerdi useEffect] avbrutt — mangler:', { erTekst, kolonne, viewNavn });
       setVerdier([]); return;
     }
     if (operator === 'LIKE' || operator === 'NOT LIKE' || operator === 'BETWEEN') { setVerdier([]); return; }
@@ -1626,17 +1610,6 @@ export default function RapportInteraktivPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // ── Debug: log forslag og config ved endring ──
-  useEffect(() => {
-    console.log('[Designer] forslag oppdatert:', {
-      viewNavn: forslag?.viewNavn,
-      prosjektNr: forslag?.prosjektNr,
-      prosjektKolonne: forslag?.prosjektKolonne,
-      prosjektFilter: forslag?.prosjektFilter,
-      alleViewKolonnerAntall: forslag?.alleViewKolonner?.length,
-    });
-  }, [forslag]);
-
   // ── Sett filtre fra forslag.sql når SQL ankommer eller endres ──
   // Dekker alle paths: sessionStorage, fraLagret og URL-params.
   // Alle SQL-filtre er redigerbare (erLåst = false).
@@ -1654,18 +1627,10 @@ export default function RapportInteraktivPage() {
       return match ? { ...f, kolonne: match } : f;
     });
 
-    console.log('[filtre fra SQL] setter', normalisert.length, 'filtre:', normalisert.map(f => f.kolonne));
+    logger.debug('[filtre fra SQL] setter', normalisert.length, 'filtre:', normalisert.map(f => f.kolonne));
     setAktiveFiltre(normalisert);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forslag?.sql]);
-
-  useEffect(() => {
-    console.log('[Designer] config oppdatert:', {
-      xAkse: config?.xAkse,
-      yAkse: config?.yAkse,
-      aggregering: config?.aggregering,
-    });
-  }, [config]);
 
   // ── Hent alle viewkolonner fra metadata når forslag.viewNavn endres ──
   useEffect(() => {
@@ -1692,7 +1657,7 @@ export default function RapportInteraktivPage() {
           const kolonner = view.kolonner?.map(k => k.kolonne_navn) ?? [];
           const kpier = view.kpi?.map(k => k.navn) ?? [];
           setViewKolonner([...kolonner, ...kpier]);
-          console.log('[viewKolonner] lastet:', kolonner.length, 'kolonner +', kpier.length, 'KPI-er for', vn);
+          logger.debug('[viewKolonner] lastet:', kolonner.length, 'kolonner +', kpier.length, 'KPI-er for', vn);
 
           // Hydrér kpiUttrykk/format/visningsnavn fra metadata. Nødvendig når
           // en KPI er lagret etter at AI bygde rapporten — da mangler den i
@@ -1722,25 +1687,22 @@ export default function RapportInteraktivPage() {
             });
           }
         } else {
-          console.warn('[viewKolonner] fant ikke view:', vn, 'blant', views.map(v => v.view_name));
+          logger.warn('[viewKolonner] fant ikke view:', vn, 'blant', views.map(v => v.view_name));
         }
       })
-      .catch(e => console.error('[viewKolonner] feil:', e));
+      .catch(e => logger.error('[viewKolonner] feil:', e));
   // authHeaders er memoized i usePortalAuth — ny referanse kun når entraObjectId faktisk endres
   }, [forslag?.viewNavn, authHeaders]);
 
   // ── Sekvensielt initialiser fra URL-parametre (Ny rapport-wizard → rapport-interaktiv) ──
   useEffect(() => {
     async function initialiserDesigner() {
-      console.log('[init] starter initialiserDesigner | harInitialisert:', harInitialisert.current);
+      logger.debug('[init] starter initialiserDesigner | harInitialisert:', harInitialisert.current);
       const urlParams = new URLSearchParams(window.location.search);
 
-      // Logg ALLE query-params for diagnostikk
-      console.log('[init] ALLE query-params:');
-      urlParams.forEach((value, key) => { console.log(`  ${key} = ${value}`); });
 
       const viewNavn = urlParams.get('viewNavn');
-      if (!viewNavn) { console.error('[Designer] viewNavn mangler i URL!'); return; }
+      if (!viewNavn) { logger.error('[Designer] viewNavn mangler i URL!'); return; }
 
       // Nullstill alltid config ved ny sesjon — forhindrer at forrige rapport sine kolonner lever videre
       sessionStorage.removeItem('rapport_forslag');
@@ -1761,56 +1723,51 @@ export default function RapportInteraktivPage() {
       prosjektKolonneRef.current     = prosjektKolonne;
       prosjektKolonneTypeRef.current = prosjektKolonneType;
 
-      console.log('[init] refs satt synkront:', {
-        prosjektNr:      prosjektNrRef.current,
-        prosjektKolonne: prosjektKolonneRef.current,
-        viewNavn:        viewNavnRef.current,
-      });
 
       // Steg 1: Bygg prosjektfilter
       let prosjektFilter = '';
       if (prosjektKolonne && prosjektNr) {
         const verdi = prosjektKolonneType === 'number' ? prosjektNr : `'${prosjektNr}'`;
         prosjektFilter = `WHERE [${prosjektKolonne}] = ${verdi}`;
-        console.log('[Designer] prosjektFilter:', prosjektFilter);
+        logger.debug('[Designer] prosjektFilter:', prosjektFilter);
       } else {
-        console.warn('[Designer] INGEN prosjektfilter — prosjektKolonne:', prosjektKolonne, '| prosjektNr:', prosjektNr);
+        logger.warn('[Designer] INGEN prosjektfilter — prosjektKolonne:', prosjektKolonne, '| prosjektNr:', prosjektNr);
       }
 
       // Steg 2: Hent kolonner FØR state settes — lokale variabler kun
       let alleKolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[] = [];
-      console.log('[Designer] henter kolonner for viewNavn:', viewNavn);
+      logger.debug('[Designer] henter kolonner for viewNavn:', viewNavn);
       try {
         const r = await apiFetch(
           `/api/rapport-designer/view-kolonner?viewNavn=${encodeURIComponent(viewNavn)}`,
           { credentials: 'include' },
         );
-        console.log('[Designer] kolonner API status:', r.status);
+        logger.debug('[Designer] kolonner API status:', r.status);
         if (r.ok) {
           const d = await r.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[]; kilde: string };
           alleKolonner = d.kolonner ?? [];
-          console.log('[Designer] kolonner kilde:', d.kilde, '| antall:', alleKolonner.length);
-          console.log('[Designer] measures:', alleKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
-          console.log('[Designer] dimensjoner:', alleKolonner.filter(k => k.kolonne_type === 'dimensjon').map(k => k.kolonne_navn));
+          logger.debug('[Designer] kolonner kilde:', d.kilde, '| antall:', alleKolonner.length);
+          logger.debug('[Designer] measures:', alleKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
+          logger.debug('[Designer] dimensjoner:', alleKolonner.filter(k => k.kolonne_type === 'dimensjon').map(k => k.kolonne_navn));
         } else {
           const errText = await r.text();
-          console.error('[Designer] kolonner API feil:', r.status, errText);
+          logger.error('[Designer] kolonner API feil:', r.status, errText);
         }
       } catch (err) {
-        console.error('[Designer] kolonner fetch-feil:', err);
+        logger.error('[Designer] kolonner fetch-feil:', err);
       }
 
       // Steg 3: Finn xAkse/yAkse fra kolonnetyper (lokale variabler)
       const alleKolonnerMedDatatype = alleKolonner as (typeof alleKolonner[0] & { datatype?: string })[];
-      console.log('[Designer] alle kolonnetyper:', alleKolonnerMedDatatype.map(k => `${k.kolonne_navn}:${k.kolonne_type}(${k.datatype ?? '?'})`).join(', '));
+      logger.debug('[Designer] alle kolonnetyper:', alleKolonnerMedDatatype.map(k => `${k.kolonne_navn}:${k.kolonne_type}(${k.datatype ?? '?'})`).join(', '));
       const xAkse = renKolNavn(alleKolonner.find(k => k.kolonne_type === 'dimensjon')?.kolonne_navn);
       const numericDatatypes = ['int','bigint','decimal','float','numeric','money','smallmoney','smallint','tinyint','real'];
       const yAkse = renKolNavn(alleKolonner.find(k => k.kolonne_type === 'measure')?.kolonne_navn
         ?? alleKolonnerMedDatatype.find(k => numericDatatypes.includes((k.datatype ?? '').toLowerCase()))?.kolonne_navn);
-      console.log('[Designer] valgte kolonner:', { xAkse, yAkse });
+      logger.debug('[Designer] valgte kolonner:', { xAkse, yAkse });
 
       if (!xAkse || !yAkse) {
-        console.error('[Designer] KRITISK: mangler kolonner — kan ikke hente data');
+        logger.error('[Designer] KRITISK: mangler kolonner — kan ikke hente data');
       }
 
       const typemap: Record<string, string> = {};
@@ -1886,7 +1843,7 @@ export default function RapportInteraktivPage() {
         const initialGroupBy = erMånedInitial ? `GROUP BY [${xAkse}], [måned], [årmåned]` : `GROUP BY [${xAkse}]`;
         const initialOrder   = erMånedInitial ? `ORDER BY CAST([årmåned] AS INT) ASC` : `ORDER BY ${initialKpiExpr ?? `SUM([${yAkse}])`} DESC`;
         const sql = `SELECT TOP 50 [${xAkse}], ${yUttrykk} FROM ${viewNavn} ${whereKlausul} ${initialGroupBy} ${initialOrder}`;
-        console.log('[Designer] initial SQL:', sql);
+        logger.debug('[Designer] initial SQL:', sql);
         setLasterData(true);
         try {
           const res = await apiFetch('/api/pbi/query-sql', {
@@ -1894,20 +1851,20 @@ export default function RapportInteraktivPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sql }),
           });
-          console.log('[Designer] data API status:', res.status);
+          logger.debug('[Designer] data API status:', res.status);
           if (res.ok) {
             const d = await res.json() as { rows: Record<string, unknown>[] };
             setAktivData(d.rows ?? []);
             setForslag(prev => prev ? { ...prev, data: d.rows ?? [] } : prev);
-            console.log('[Designer] data lastet:', d.rows?.length, 'rader');
+            logger.debug('[Designer] data lastet:', d.rows?.length, 'rader');
           } else {
             const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}`, detail: '' })) as { error?: string; detail?: string };
             const melding = errBody.detail || errBody.error || `HTTP ${res.status}`;
-            console.error('[Designer] data API feil:', res.status, melding);
+            logger.error('[Designer] data API feil:', res.status, melding);
             setQueryFeil(melding);
           }
         } catch (err) {
-          console.error('[Designer] initial datahenting feil:', err);
+          logger.error('[Designer] initial datahenting feil:', err);
         } finally {
           setLasterData(false);
           nyRapportAutoFetch.current = false;
@@ -1916,7 +1873,7 @@ export default function RapportInteraktivPage() {
           // rekker å kjøre og blokkeres FØR flagget settes
           setTimeout(() => {
             initialiseringFerdig.current = true;
-            console.log('[Designer] initialisering ferdig, hentData aktivert');
+            logger.debug('[Designer] initialisering ferdig, hentData aktivert');
           }, 200);
         }
       } else {
@@ -1926,14 +1883,14 @@ export default function RapportInteraktivPage() {
       }
     }
 
-    console.log('[init] useEffect kjører | harInitialisert:', harInitialisert.current);
+    logger.debug('[init] useEffect kjører | harInitialisert:', harInitialisert.current);
     if (harInitialisert.current) {
-      console.log('[init] allerede initialisert, skipper');
+      logger.debug('[init] allerede initialisert, skipper');
       return;
     }
     // fraLagret-path: håndteres av eget useEffect som venter på entraObjectId
     if (new URLSearchParams(window.location.search).get('fraLagret') === 'true') {
-      console.log('[init] fraLagret=true — skippes her, håndteres av fraLagret-effect');
+      logger.debug('[init] fraLagret=true — skippes her, håndteres av fraLagret-effect');
       return () => { harInitialisert.current = false; };
     }
     harInitialisert.current = true;
@@ -1946,13 +1903,13 @@ export default function RapportInteraktivPage() {
   const hentData = useCallback(async (cfg: RedigertConfig, overstyrFiltre?: AktivFilter[], overstyrKolonner?: string[]) => {
     setVentendePåRefresh(false);
     if (!initialiseringFerdig.current) {
-      console.log('[hentData] blokkert — initialisering pågår');
+      logger.debug('[hentData] blokkert — initialisering pågår');
       return;
     }
     // Tabell-modus trenger ikke xAkse/yAkse — den bruker valgteKolonner
     const harTabellKolonner = cfg.visualType === 'table' && (overstyrKolonner ?? valgteKolonnerRef.current).length > 0;
     if (!harTabellKolonner && (!cfg.xAkse || !cfg.yAkse)) {
-      console.log('[hentData] blokkert — mangler kolonner:', { xAkse: cfg.xAkse, yAkse: cfg.yAkse });
+      logger.debug('[hentData] blokkert — mangler kolonner:', { xAkse: cfg.xAkse, yAkse: cfg.yAkse });
       return;
     }
     // Les direkte fra URL-params (primær) med refs som fallback — begge er synkrone og closure-frie
@@ -1960,10 +1917,10 @@ export default function RapportInteraktivPage() {
     const pNr  = live.get('prosjektNr')      ?? prosjektNrRef.current;
     const pKol = live.get('prosjektKolonne') ?? prosjektKolonneRef.current;
     const vn   = live.get('viewNavn')        ?? viewNavnRef.current ?? forslag?.viewNavn ?? null;
-    if (!vn) { console.error('[hentData] viewNavn mangler!'); return; }
+    if (!vn) { logger.error('[hentData] viewNavn mangler!'); return; }
 
-    console.log('[hentData] fra searchParams+refs:', { pNr, pKol, viewNavn: vn });
-    if (pKol && !pNr) console.error('[hentData] FEIL: prosjektKolonne satt men prosjektNr mangler!');
+    logger.debug('[hentData] fra searchParams+refs:', { pNr, pKol, viewNavn: vn });
+    if (pKol && !pNr) logger.error('[hentData] FEIL: prosjektKolonne satt men prosjektNr mangler!');
 
     setLasterData(true);
     setQueryFeil(null);
@@ -1981,16 +1938,16 @@ export default function RapportInteraktivPage() {
       if (cfg.visualType === 'table') {
         const alleKolMeta = forslag?.alleViewKolonner ?? [];
         const valgteKol   = overstyrKolonner ?? valgteKolonnerRef.current;
-        console.log('[hentData] tabell-modus | valgte kolonner:', valgteKol.join(', '));
+        logger.debug('[hentData] tabell-modus | valgte kolonner:', valgteKol.join(', '));
 
         // Slå opp type fra metadata, fall tilbake på kolonnTyper-ref (alltid oppdatert)
         const getType = (k: string) => alleKolMeta.find(m => m.kolonne_navn === k)?.kolonne_type ?? kolonnTyperRef.current[k] ?? 'dimensjon';
         const valgteKpiKol      = valgteKol.filter(k => getType(k) === 'kpi');
         const valgteDimensjoner = valgteKol.filter(k => getType(k) !== 'measure' && getType(k) !== 'kpi');
         const valgteMeasures    = valgteKol.filter(k => getType(k) === 'measure');
-        console.log('[TabellSQL] dimensjoner i GROUP BY:', valgteDimensjoner);
-        console.log('[TabellSQL] measures med SUM:', valgteMeasures);
-        console.log('[TabellSQL] KPI-kolonner:', valgteKpiKol);
+        logger.debug('[TabellSQL] dimensjoner i GROUP BY:', valgteDimensjoner);
+        logger.debug('[TabellSQL] measures med SUM:', valgteMeasures);
+        logger.debug('[TabellSQL] KPI-kolonner:', valgteKpiKol);
 
         const selectListe = [
           ...valgteDimensjoner.map(k => `[${k}]`),
@@ -2049,7 +2006,7 @@ export default function RapportInteraktivPage() {
             baseUtenOrder = `${baseUtenOrder} ${where}`.trim();
           }
         }
-        console.log('[hentData] where fra aktiveFiltre:', where || '(ingen)');
+        logger.debug('[hentData] where fra aktiveFiltre:', where || '(ingen)');
 
         // Legg til sorteringskolonne i GROUP BY (og SELECT) hvis den mangler.
         // Azure SQL krever at ORDER BY-kolonner er i SELECT/GROUP BY.
@@ -2093,14 +2050,14 @@ export default function RapportInteraktivPage() {
           : '';
 
         sql = (baseUtenOrder + (orderByStr ? ' ' + orderByStr : '')).replace(/\s+/g, ' ').trim();
-        console.log('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
+        logger.debug('[hentData] bruker original AI-SQL som base, ORDER BY:', orderByStr || '(ingen)');
       } else {
         // Manuell modus ELLER x/y/grupperPaa endret fra original forslag → bygg SQL fra cfg
-        console.log('[hentData] bygger SQL fra cfg (xAkse/yAkse endret eller ingen forslag.sql)');
+        logger.debug('[hentData] bygger SQL fra cfg (xAkse/yAkse endret eller ingen forslag.sql)');
         sql = byggSQL(cfg, vn, where, kolonnTyperRef.current, kpiUtrykkRef.current);
-        console.log('[hentData manuell] SQL:', sql);
+        logger.debug('[hentData manuell] SQL:', sql);
       }
-      console.log('[rapport-interaktiv] hentData SQL:', sql);
+      logger.debug('[rapport-interaktiv] hentData SQL:', sql);
       const res = await apiFetch('/api/pbi/query-sql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2112,11 +2069,11 @@ export default function RapportInteraktivPage() {
       } else {
         const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}`, detail: '' })) as { error?: string; detail?: string };
         const melding = errBody.detail || errBody.error || `HTTP ${res.status}`;
-        console.error('[rapport-interaktiv] hentData SQL-feil:', res.status, melding);
+        logger.error('[rapport-interaktiv] hentData SQL-feil:', res.status, melding);
         setQueryFeil(melding);
       }
     } catch (e) {
-      console.warn('[rapport-interaktiv] hentData feil:', e);
+      logger.warn('[rapport-interaktiv] hentData feil:', e);
       setQueryFeil(e instanceof Error ? e.message : 'Ukjent feil');
     } finally {
       setLasterData(false);
@@ -2133,7 +2090,7 @@ export default function RapportInteraktivPage() {
         headers: { 'X-Entra-Object-Id': oid },
       });
       if (!res.ok) {
-        console.error('[Designer] fant ikke lagret rapport:', rapportId, res.status);
+        logger.error('[Designer] fant ikke lagret rapport:', rapportId, res.status);
         return;
       }
       const data = await res.json() as { id: string; navn: string; beskrivelse: string | null; config: Record<string, unknown> };
@@ -2176,13 +2133,13 @@ export default function RapportInteraktivPage() {
           if (kolRes.ok) {
             const kolData = await kolRes.json() as { kolonner: { kolonne_navn: string; kolonne_type: string; sql_uttrykk?: string; format?: string; visningsnavn?: string }[]; kilde: string };
             alleViewKolonner = kolData.kolonner ?? alleViewKolonner;
-            console.log('[Designer] ferske kolonnetyper lastet | kilde:', kolData.kilde,
+            logger.debug('[Designer] ferske kolonnetyper lastet | kilde:', kolData.kilde,
               '| measures:', alleViewKolonner.filter(k => k.kolonne_type === 'measure').map(k => k.kolonne_navn));
           } else {
-            console.warn('[Designer] view-kolonner feilet, bruker lagret config');
+            logger.warn('[Designer] view-kolonner feilet, bruker lagret config');
           }
         } catch {
-          console.warn('[Designer] view-kolonner fetch-feil, bruker lagret config');
+          logger.warn('[Designer] view-kolonner fetch-feil, bruker lagret config');
         }
       }
 
@@ -2202,7 +2159,7 @@ export default function RapportInteraktivPage() {
       setConfig(nyConfig);
       setAktivData([]);
       const lagretFiltre = (cfg.aktiveFiltre as AktivFilter[] | undefined) ?? [];
-      console.log('[lastLagret] config.aktiveFiltre:', lagretFiltre);
+      logger.debug('[lastLagret] config.aktiveFiltre:', lagretFiltre);
       setAktiveFiltre(lagretFiltre);
       setTilgjengeligeKolonner(alleViewKolonner.map(k => k.kolonne_navn));
       setKolonnTyper(typemap);
@@ -2225,23 +2182,23 @@ export default function RapportInteraktivPage() {
       const lagretValgteKolonner = (cfg.valgteKolonner as string[] | undefined) ?? [];
       const gjenopprettedeKolonner = lagretValgteKolonner.filter(k => gyldigeNavn.has(k));
       if (gjenopprettedeKolonner.length > 0) {
-        console.log('[Designer] gjenoppretter valgteKolonner:', gjenopprettedeKolonner);
+        logger.debug('[Designer] gjenoppretter valgteKolonner:', gjenopprettedeKolonner);
         setValgteKolonner(gjenopprettedeKolonner);
       } else if (nyConfig.visualType === 'table') {
         // Fallback: xAkse + yAkse
         const fallback = [nyConfig.xAkse, nyConfig.yAkse].filter(Boolean);
-        console.log('[Designer] valgteKolonner fallback:', fallback);
+        logger.debug('[Designer] valgteKolonner fallback:', fallback);
         setValgteKolonner(fallback);
       }
 
-      console.log('[Designer] lagret rapport lastet:', data.navn, '| viewNavn:', vn, '| prosjektNr:', pNr);
+      logger.debug('[Designer] lagret rapport lastet:', data.navn, '| viewNavn:', vn, '| prosjektNr:', pNr);
 
       setTimeout(() => {
         initialiseringFerdig.current = true;
         void hentData(nyConfig, lagretFiltre);
       }, 200);
     } catch (err) {
-      console.error('[Designer] feil ved lasting av lagret rapport:', err);
+      logger.error('[Designer] feil ved lasting av lagret rapport:', err);
     }
   }
 
@@ -2253,7 +2210,7 @@ export default function RapportInteraktivPage() {
     if (harInitialisert.current) return;
     harInitialisert.current = true;
     const rapportId = urlParams.get('rapportId');
-    if (!rapportId) { console.error('[Designer] fraLagret=true men rapportId mangler!'); return; }
+    if (!rapportId) { logger.error('[Designer] fraLagret=true men rapportId mangler!'); return; }
     void lastLagretRapport(rapportId, entraObjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entraObjectId]);
@@ -2274,7 +2231,7 @@ export default function RapportInteraktivPage() {
       return;
     }
 
-    console.log('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
+    logger.debug('[re-fetch effect] visualType:', cfg.visualType, '| xAkse:', cfg.xAkse, '| yAkse:', cfg.yAkse);
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.xAkse, config?.yAkse, config?.visualType, config?.aggregering, config?.sorterPaa, config?.sorterRetning, config?.maksRader, config?.ekstraKolonner, config?.kombinertSerier, config?.visAbsoluttverdi, aktiveFiltre, autoRefresh]);
@@ -2300,7 +2257,7 @@ export default function RapportInteraktivPage() {
     if (valgteKolonner.length > 0) return;
     // Bruk xAkse + yAkse fra forrige visual som startpunkt — aldri auto-velg alle kolonner
     const startKolonner = [config.xAkse, config.yAkse].filter(Boolean);
-    console.log('[Tabell] initialiserer med:', startKolonner);
+    logger.debug('[Tabell] initialiserer med:', startKolonner);
     setValgteKolonner(startKolonner);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config?.visualType]);
@@ -2312,7 +2269,7 @@ export default function RapportInteraktivPage() {
     if (valgteKolonnerRef.current.length === 0) return;
     const cfg = configRef.current;
     if (!autoRefresh) { setVentendePåRefresh(true); return; }
-    console.log('[Designer] valgteKolonner endret, oppdaterer tabell');
+    logger.debug('[Designer] valgteKolonner endret, oppdaterer tabell');
     hentData(cfg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valgteKolonner, autoRefresh]);
@@ -2583,11 +2540,11 @@ export default function RapportInteraktivPage() {
       const element  = erTabell ? tabellEl : chartEl;
 
       if (!element) {
-        console.error('[PDF] fant ikke rapport-innhold');
+        logger.error('[PDF] fant ikke rapport-innhold');
         return;
       }
 
-      console.log('[PDF] eksporterer:', erTabell ? 'tabell' : 'chart');
+      logger.debug('[PDF] eksporterer:', erTabell ? 'tabell' : 'chart');
 
       // For tabell: fjern overflow-avskjæring midlertidig så alt rendres
       const origMaxHeight = element.style.maxHeight;
@@ -2669,7 +2626,7 @@ export default function RapportInteraktivPage() {
       const filnavn = `${forslag!.tittel.replace(/[^a-zA-Z0-9æøåÆØÅ\s]/g, '').trim().replace(/\s+/g, '_')}.pdf`;
       pdf.save(filnavn);
     } catch (err) {
-      console.error('[PDF] feil:', err);
+      logger.error('[PDF] feil:', err);
       alert('PDF-eksport feilet: ' + (err as Error).message);
     } finally {
       setEksporterer(false);
@@ -2700,7 +2657,7 @@ export default function RapportInteraktivPage() {
       if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
 
       const erOppdatering = !!eksisterendeRapportId;
-      console.log('[Lagre] modus:', erOppdatering ? 'oppdater' : 'ny', '| id:', eksisterendeRapportId);
+      logger.debug('[Lagre] modus:', erOppdatering ? 'oppdater' : 'ny', '| id:', eksisterendeRapportId);
 
       const configPayload = {
         sql: forslag.sql,
@@ -2729,8 +2686,6 @@ export default function RapportInteraktivPage() {
         aktiveFiltre,
         visAbsoluttverdi: config.visAbsoluttverdi ?? false,
       };
-      console.log('[Lagre] aktiveFiltre:', JSON.stringify(aktiveFiltre));
-      console.log('[Lagre] valgteKolonner:', JSON.stringify(valgteKolonner));
 
       const url = erOppdatering
         ? `${API}/api/rapport-designer/${eksisterendeRapportId}`
@@ -2751,11 +2706,11 @@ export default function RapportInteraktivPage() {
       if (data.success) {
         setLagret(true);
         if (erOppdatering) {
-          console.log('[Lagre] oppdatert:', eksisterendeRapportId);
+          logger.debug('[Lagre] oppdatert:', eksisterendeRapportId);
           setTimeout(() => setLagret(false), 2000);
         } else {
           if (data.rapportId) setEksisterendeRapportId(data.rapportId);
-          console.log('[Lagre] ny rapport:', data.rapportId, '→ workspace:', data.workspaceId);
+          logger.debug('[Lagre] ny rapport:', data.rapportId, '→ workspace:', data.workspaceId);
           setTimeout(() => {
             setLagret(false);
             if (data.workspaceId) router.push(`/dashboard/workspace/${data.workspaceId}`);
@@ -2765,7 +2720,7 @@ export default function RapportInteraktivPage() {
         alert('Lagring feilet: ' + (data.error ?? 'Ukjent feil'));
       }
     } catch (err) {
-      console.error('[Lagre] feil:', err);
+      logger.error('[Lagre] feil:', err);
       alert('Lagring feilet: ' + (err as Error).message);
     } finally {
       setLagrer(false);
