@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
 import SammendragVisning from '@/components/analyse/SammendragVisning';
@@ -158,7 +159,7 @@ export default function AnalyseDetaljPage() {
     } catch (err) {
       const melding = err instanceof Error ? err.message : 'Ukjent feil';
       setNedlastingFeil(melding);
-      console.error('[Nedlasting] Feilet:', err);
+      logger.error('[Nedlasting] Feilet:', err);
     } finally {
       setLasterNed(false);
     }

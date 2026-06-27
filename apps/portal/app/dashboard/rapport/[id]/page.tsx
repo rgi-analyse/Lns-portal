@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
@@ -77,7 +78,7 @@ export default function RapportPage() {
     if (!id) return;
 
     async function load() {
-      console.log('[RapportPage] laster rapport id:', id);
+      logger.debug('[RapportPage] laster rapport id:', id);
       // Hent rapport
       const rapportRes = await apiFetch(`/api/rapporter/${id}`);
       if (!rapportRes.ok) throw new Error(`HTTP ${rapportRes.status}`);
@@ -99,9 +100,9 @@ export default function RapportPage() {
       }
 
       // Sjekk om dette er en designer-rapport (flagget returneres direkte fra /api/rapporter/:id)
-      console.log('[RapportPage] erDesignerRapport:', loadedRapport.erDesignerRapport, '| pbiReportId:', loadedRapport.pbiReportId || '(tom)');
+      logger.debug('[RapportPage] erDesignerRapport:', loadedRapport.erDesignerRapport, '| pbiReportId:', loadedRapport.pbiReportId || '(tom)');
       if (loadedRapport.erDesignerRapport) {
-        console.log('[RapportPage] omdirigerer til rapport-interaktiv (designer)');
+        logger.debug('[RapportPage] omdirigerer til rapport-interaktiv (designer)');
         router.replace(`/dashboard/rapport-interaktiv?rapportId=${loadedRapport.id}&fraLagret=true`);
         return;
       }
@@ -112,7 +113,7 @@ export default function RapportPage() {
           const megRes = await apiFetch('/api/meg', { headers: authHeaders, credentials: 'include' });
           if (megRes.ok) {
             const meg = await megRes.json() as { rolle?: string; chatAktivert?: boolean; displayName?: string | null };
-            console.log('[RapportPage] meg.rolle:', meg?.rolle);
+            logger.debug('[RapportPage] meg.rolle:', meg?.rolle);
             const r = meg.rolle ?? '';
             setBrukerRolleState(r);
             setKanLageRapport(['admin', 'tenantadmin'].includes(r) || r === 'redaktør');
@@ -122,12 +123,6 @@ export default function RapportPage() {
         } catch { /* ikke kritisk */ }
       }
 
-      console.log('[RapportPage] rapport fra API:', loadedRapport);
-      console.log('[RapportPage] props til PowerBIReport:', {
-        pbiReportId: loadedRapport.pbiReportId,
-        pbiDatasetId: loadedRapport.pbiDatasetId,
-        pbiWorkspaceId: loadedRapport.pbiWorkspaceId,
-      });
       setRapport(loadedRapport);
       loggHendelse(
         { hendelsesType: 'åpnet_rapport', referanseId: loadedRapport.id, referanseNavn: loadedRapport.navn },
@@ -151,11 +146,6 @@ export default function RapportPage() {
 
   if (!rapport) return null;
 
-  console.log('[RapportPage] AIChat props:', {
-    rapportId:   rapport?.id,
-    pbiReportId: rapport?.pbiReportId,
-    rapportNavn: rapport?.navn,
-  });
 
   return (
     <div className="h-full overflow-hidden" style={{ position: 'relative', width: '100%', height: '100%' }}>
