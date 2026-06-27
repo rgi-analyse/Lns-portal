@@ -7,6 +7,7 @@ import {
   hentKompleteBasicVerdier,
 } from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { erAdmin } from '../middleware/auth';
@@ -274,7 +275,7 @@ function rankViews(
   spørsmål: string,
   profilViews?: string[],
 ): Record<string, unknown>[] {
-  console.log('[rankViews] spørsmål:', spørsmål);
+  logger.debug('[rankViews] spørsmål:', spørsmål);
   if (!spørsmål) return views;
   const s = spørsmål.toLowerCase();
   const ord = s.split(/\s+/).filter(o => o.length > 2);
@@ -308,7 +309,7 @@ function rankViews(
     return { view: v, score, view_name: v['view_name'] };
   });
 
-  console.log('[rankViews] scores:', rangeringer.map(r => `${r.score} — ${r.view_name}`).join(', '));
+  logger.debug('[rankViews] scores:', rangeringer.map(r => `${r.score} — ${r.view_name}`).join(', '));
 
   return rangeringer.sort((a, b) => b.score - a.score).map(x => x.view);
 }
@@ -334,7 +335,7 @@ async function buildDynamicViewsSection(
   } else {
     viewsFilter = `WHERE v.er_aktiv = 1`;
   }
-  console.log('[buildSystemPrompt] viewsFilter:', viewsFilter);
+  logger.debug('[buildSystemPrompt] viewsFilter:', viewsFilter);
 
   const [views, kolonner, regler, eksempler, kpi] = await Promise.all([
     queryAzureSQL(`
@@ -373,17 +374,16 @@ async function buildDynamicViewsSection(
     `).catch(() => [] as Record<string, unknown>[]),
   ]);
 
-  console.log(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
-  console.log('[buildSystemPrompt] regler fra SQL (første 3):', JSON.stringify(regler.slice(0, 3)));
-  console.log('[buildSystemPrompt] antall regler totalt:', regler.length);
-  console.log('[buildSystemPrompt] views funnet:', views.length);
+  logger.debug(`[Chat] views fra metadata (område=${område ?? 'alle'}):`, views.map(v => v['view_name']));
+  logger.debug('[buildSystemPrompt] antall regler totalt:', regler.length);
+  logger.debug('[buildSystemPrompt] views funnet:', views.length);
   const regnskapsView = views.find(v => String(v['view_name'] ?? '').includes('Regnskaps'));
   if (regnskapsView) {
     const regnskapsKolonner = kolonner.filter(k => k['view_id'] === regnskapsView['id']);
-    console.log('[buildSystemPrompt] Regnskaps kolonner:', regnskapsKolonner.map(k => k['kolonne_navn']));
+    logger.debug('[buildSystemPrompt] Regnskaps kolonner:', regnskapsKolonner.map(k => k['kolonne_navn']));
   }
   const kolonnerMedBeskrivelse = kolonner.filter(k => k['beskrivelse']);
-  console.log(`[Chat] kolonner med beskrivelse: ${kolonnerMedBeskrivelse.length}`,
+  logger.debug(`[Chat] kolonner med beskrivelse: ${kolonnerMedBeskrivelse.length}`,
     kolonnerMedBeskrivelse.map(k => `${k['kolonne_navn']} (view_id=${k['view_id']})`));
 
   if (views.length === 0) throw new Error('Ingen aktive views funnet for dette området');
@@ -409,8 +409,8 @@ async function buildDynamicViewsSection(
       .filter(v => !viewsForPrompt.includes(v))
       .map(v => v['visningsnavn'] as string);
 
-    console.log('[buildSystemPrompt] sender til AI:', viewsForPrompt.map(v => v['view_name']).join(', '));
-    console.log('[buildSystemPrompt] utelatte views:', utelatte.join(', '));
+    logger.debug('[buildSystemPrompt] sender til AI:', viewsForPrompt.map(v => v['view_name']).join(', '));
+    logger.debug('[buildSystemPrompt] utelatte views:', utelatte.join(', '));
   } else {
     viewsForPrompt = alleViews;
   }
@@ -426,8 +426,7 @@ async function buildDynamicViewsSection(
     }).join('\n');
 
     if (String(view['view_name'] ?? '').includes('Regnskaps')) {
-      console.log('[prompt] Regnskaps kolonner i prompt:', kolonnerTekst.slice(0, 500));
-    }
+      }
 
     const viewRegler = regler
       .filter(r => r['view_id'] === view['id'])
@@ -488,8 +487,8 @@ async function buildSystemPrompt(
   profilViews?: string[],
   dbUrl?: string | null,
 ): Promise<string> {
-  console.log('[buildSystemPrompt] rapportId:', rapportId);
-  console.log('[buildSystemPrompt] tillatteViewIds:', tillatteViewIds);
+  logger.debug('[buildSystemPrompt] rapportId:', rapportId);
+  logger.debug('[buildSystemPrompt] tillatteViewIds:', tillatteViewIds);
 
   // Prøv rapport-spesifikk kobling først. ai_rapport_view_kobling er per-tenant
   // (rapport_id er tenant-lokal) — spørres mot tenant-DB via dbUrl.
@@ -503,14 +502,14 @@ async function buildSystemPrompt(
       `);
       if (kobling.length > 0) {
         kobletViewIds = kobling.map(r => r['view_id'] as string);
-        console.log(`[Chat] bruker ${kobletViewIds.length} koblede views for rapport ${rapportId}`);
+        logger.debug(`[Chat] bruker ${kobletViewIds.length} koblede views for rapport ${rapportId}`);
       }
     } catch {
       // Tom kobling-tabell / feil — fallback til område-filter
     }
   }
 
-  console.log('[buildSystemPrompt] kobletViewIds:', kobletViewIds);
+  logger.debug('[buildSystemPrompt] kobletViewIds:', kobletViewIds);
 
   // Når brukerSpørsmål er satt bruker vi dynamisk ranking — hopp over cache
   const cacheKey = brukerSpørsmål ? null : (kobletViewIds ? `rapport:${rapportId}` : (område ?? 'all'));
@@ -540,14 +539,13 @@ ${viewsSection}
 
 ---
 ${BASIS_REGLER}`;
-    console.log('[buildSystemPrompt] prompt lengde:', prompt.length);
-    console.log('[buildSystemPrompt] PROMPT PREVIEW:\n', prompt.slice(0, 2000));
+    logger.debug('[buildSystemPrompt] prompt lengde:', prompt.length);
     if (cacheKey) {
       promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
     }
     return prompt;
   } catch (err) {
-    console.warn('[Chat] Bruker fallback til hardkodet prompt:', err instanceof Error ? err.message : err);
+    logger.warn('[Chat] Bruker fallback til hardkodet prompt:', err instanceof Error ? err.message : err);
     return FALLBACK_BASIS_PROMPT;
   }
 }
@@ -622,7 +620,7 @@ async function sikreTittelGenerert(
       select: { tittel: true },
     });
     if (eksisterende?.tittel) {
-      console.log('[tittel] allerede satt for øktId:', øktId, '→', eksisterende.tittel);
+      logger.debug('[tittel] allerede satt for øktId:', øktId, '→', eksisterende.tittel);
       return;
     }
 
@@ -633,7 +631,7 @@ async function sikreTittelGenerert(
       select: { innhold: true },
     });
     if (!førsteUser?.innhold) {
-      console.warn('[tittel] ingen brukermelding funnet for øktId:', øktId);
+      logger.warn('[tittel] ingen brukermelding funnet for øktId:', øktId);
       return;
     }
 
@@ -643,7 +641,7 @@ async function sikreTittelGenerert(
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (openaiApiKey) {
       try {
-        console.log('[tittel] kaller gpt-4o-mini for øktId:', øktId);
+        logger.debug('[tittel] kaller gpt-4o-mini for øktId:', øktId);
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiApiKey}` },
@@ -662,18 +660,18 @@ async function sikreTittelGenerert(
           const fraAPI = json.choices?.[0]?.message?.content?.trim().replace(/[".]/g, '').slice(0, 100);
           if (fraAPI) {
             nyTittel = fraAPI;
-            console.log('[tittel] gpt-4o-mini svarte:', nyTittel);
+            logger.debug('[tittel] gpt-4o-mini svarte:', nyTittel);
           } else {
-            console.warn('[tittel] gpt-4o-mini returnerte tom respons, bruker fallback');
+            logger.warn('[tittel] gpt-4o-mini returnerte tom respons, bruker fallback');
           }
         } else {
-          console.warn('[tittel] gpt-4o-mini HTTP', response.status, '— bruker fallback');
+          logger.warn('[tittel] gpt-4o-mini HTTP', response.status, '— bruker fallback');
         }
       } catch (err) {
-        console.error('[tittel] gpt-4o-mini kall feilet:', err, '— bruker fallback');
+        logger.error('[tittel] gpt-4o-mini kall feilet:', err, '— bruker fallback');
       }
     } else {
-      console.warn('[tittel] OPENAI_API_KEY mangler — bruker fallback');
+      logger.warn('[tittel] OPENAI_API_KEY mangler — bruker fallback');
     }
 
     await prisma.$executeRawUnsafe(
@@ -683,9 +681,9 @@ async function sikreTittelGenerert(
       øktId,
       tenantSlug,
     );
-    console.log('[tittel] lagret tittel for øktId:', øktId, '→', nyTittel);
+    logger.debug('[tittel] lagret tittel for øktId:', øktId, '→', nyTittel);
   } catch (err) {
-    console.error('[tittel] uventet feil:', err);
+    logger.error('[tittel] uventet feil:', err);
   }
 }
 
@@ -772,7 +770,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
       const loggTiming = (mode: 'global' | 'rapport') => {
         const tSlutt = Date.now();
         const entraId = (request.headers['x-entra-object-id'] as string | undefined)?.trim() ?? '';
-        console.log('[chat-timing]', JSON.stringify({
+        logger.debug('[chat-timing]', JSON.stringify({
           mode,
           entraObjectId: entraId.length > 6 ? '***' + entraId.slice(-6) : entraId,
           rapportId: rapportId ?? null,
@@ -787,12 +785,6 @@ export async function chatRoutes(fastify: FastifyInstance) {
         }));
       };
 
-      // Logg mottatt history
-      console.log('[Chat] history mottatt:', rawMessages?.map((m) => ({
-        role: m.role,
-        innhold: (m.content as string | null)?.substring(0, 50),
-      })));
-
       // Rens ufullstendige tool-sekvenser — to pass + slice(-10) + andre pass etter slice
       let messages: ChatMessage[] = [];
       try {
@@ -801,13 +793,13 @@ export async function chatRoutes(fastify: FastifyInstance) {
         // Andre pass: slice kan ha kuttet midt i en sekvens — rens igjen
         messages = rensConversationHistory(begrenset);
       } catch (err) {
-        console.error('[Chat] history rensing feil:', err);
+        logger.error('[Chat] history rensing feil:', err);
         // Fallback: tom history (kun system prompt)
         messages = [];
       }
 
-      console.log('[Chat] history roller:', messages.map((m) => m.role));
-      console.log('[Chat] history etter rensing:', messages.map((m) => ({
+      logger.debug('[Chat] history roller:', messages.map((m) => m.role));
+      logger.debug('[Chat] history etter rensing:', messages.map((m) => ({
         role: m.role,
         harToolCalls: !!(m.tool_calls?.length),
         toolCallId: m.tool_call_id,
@@ -858,16 +850,16 @@ export async function chatRoutes(fastify: FastifyInstance) {
             `);
             if (koblinger.length > 0) {
               tillatteViewIds = koblinger.map(r => r['view_id'] as string);
-              console.log('[Chat] tilgjengelige views via workspace:', tillatteViewIds.length);
+              logger.debug('[Chat] tilgjengelige views via workspace:', tillatteViewIds.length);
             } else {
-              console.log('[Chat] ingen view-koblinger funnet for brukerens rapporter — viser alle views');
+              logger.warn('[Chat] ingen view-koblinger funnet for brukerens rapporter — viser alle views');
             }
           }
         } catch (err) {
-          console.warn('[Chat] workspace-view tilgang feil — fortsetter uten begrensning:', err instanceof Error ? err.message : err);
+          logger.warn('[Chat] workspace-view tilgang feil — fortsetter uten begrensning:', err instanceof Error ? err.message : err);
         }
       } else if (chatContext.isAdmin) {
-        console.log('[Chat] admin-bruker — ingen view-tilgangsbegrensning');
+        logger.debug('[Chat] admin-bruker — ingen view-tilgangsbegrensning');
       }
 
       // Hent view-navn for tilgangskontroll i query_database (brukes i openaiService)
@@ -879,9 +871,9 @@ export async function chatRoutes(fastify: FastifyInstance) {
           `);
           const tillatteViewNavn = viewNavnRows.map(r => String(r['view_name'] ?? '').toLowerCase()).filter(Boolean);
           chatContext = { ...chatContext, tillatteViewNavn };
-          console.log('[tilgang] workspace-views:', tillatteViewNavn);
+          logger.debug('[tilgang] workspace-views:', tillatteViewNavn);
         } catch (err) {
-          console.warn('[Chat] view-navn fetch feil:', err instanceof Error ? err.message : err);
+          logger.warn('[Chat] view-navn fetch feil:', err instanceof Error ? err.message : err);
         }
       }
 
@@ -927,13 +919,13 @@ export async function chatRoutes(fastify: FastifyInstance) {
                     const navnRows = await queryAzureSQL(`SELECT view_name FROM ai_metadata_views WHERE id IN (${inClause})`);
                     profilViews = navnRows.map(r => String(r['view_name'] ?? '')).filter(Boolean);
                   }
-                  console.log('[Chat] profilViews fra topRapporter:', profilViews);
+                  logger.debug('[Chat] profilViews fra topRapporter:', profilViews);
                 }
               } catch { /* ignorerer ugyldig JSON */ }
             }
           }
         } catch (err) {
-          console.warn('[Chat] profil-fetch feil:', err instanceof Error ? err.message : err);
+          logger.warn('[Chat] profil-fetch feil:', err instanceof Error ? err.message : err);
         }
       }
 
@@ -966,12 +958,12 @@ export async function chatRoutes(fastify: FastifyInstance) {
               tidligereHistorikk.map(h =>
                 `${h.rolle === 'user' ? 'Bruker' : 'AI'}: ${h.innhold.slice(0, 200)}`
               ).join('\n') + '\n\n';
-            console.log('[Chat] historikk fra forrige økt:', tidligereHistorikk.length, 'meldinger');
+            logger.debug('[Chat] historikk fra forrige økt:', tidligereHistorikk.length, 'meldinger');
           }
         } catch { /* ikke kritisk — fortsett uten historikk */ }
       }
 
-      console.log('[Chat] mottatt:', {
+      logger.debug('[Chat] mottatt:', {
         rapportId:       request.body.rapportId,
         pbiReportId:     request.body.pbiReportId,
         rapportNavn:     request.body.rapportNavn,
@@ -979,19 +971,18 @@ export async function chatRoutes(fastify: FastifyInstance) {
         antallMeldinger: request.body.messages?.length,
       });
       // STEG 5: Logg aktiv rapportside
-      console.log('[Chat] aktiv rapportside:', aktivSide ?? '(ingen)');
+      logger.debug('[Chat] aktiv rapportside:', aktivSide ?? '(ingen)');
 
       // Ingen rapport valgt — vis alle views
       if (!pbiReportId) {
-        console.log('[Chat] prosjektNr:', 'ingen (forside)');
-        console.log('[Chat] kontekst:', 'global');
+        logger.debug('[Chat] prosjektNr:', 'ingen (forside)');
+        logger.debug('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
         const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
-        console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
-        console.log('[systemPrompt] lengde:', basisPrompt.length);
+        logger.debug('[systemPrompt] lengde:', basisPrompt.length);
         // FIX 4: token-estimat (ingen-rapport branch)
-        console.log('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
-        console.log('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
+        logger.debug('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
+        logger.debug('[Chat] ingen-rapport estimert tokens:', Math.round(basisPrompt.length / 4));
 
         // Bygg rapport-liste basert på brukerens workspace-tilgang
         let rapportListeSection = '';
@@ -1000,7 +991,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             const db = (request as TenantRequest).tenantPrisma;
             const grupper: string[] = request.body.grupper ?? [];
             const identities = [entraObjectId, ...grupper].filter(Boolean);
-            console.log('[Chat] rapport-liste | entraId:', entraObjectId,
+            logger.debug('[Chat] rapport-liste | entraId:', entraObjectId,
               '| grupper:', grupper.length, '| identities:', identities.length);
             const orFilter = [];
             if (identities.length > 0) {
@@ -1024,7 +1015,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             const rapporter = tilgjengeligeWorkspaces.flatMap(ws =>
               ws.rapporter.map(wr => ({ ...wr.rapport, workspace_navn: ws.navn }))
             );
-            console.log('[Chat] tilgjengeligeWorkspaces:', tilgjengeligeWorkspaces.length);
+            logger.debug('[Chat] tilgjengeligeWorkspaces:', tilgjengeligeWorkspaces.length);
             if (rapporter.length > 0) {
               rapportListeSection = '\n\n## Tilgjengelige rapporter\n' +
                 'Du kan hjelpe brukeren med å finne og navigere til disse:\n\n' +
@@ -1033,12 +1024,12 @@ export async function chatRoutes(fastify: FastifyInstance) {
                   return `${i + 1}. **${r.navn}** — ${kontekst} [rapport_id:${r.id}]` +
                     (r.beskrivelse ? `\n   ${r.beskrivelse}` : '');
                 }).join('\n');
-              console.log(`[Chat] rapport-liste: ${rapporter.length} rapporter for bruker`);
+              logger.debug(`[Chat] rapport-liste: ${rapporter.length} rapporter for bruker`);
             } else {
-              console.log('[Chat] rapport-liste: ingen rapporter funnet');
+              logger.debug('[Chat] rapport-liste: ingen rapporter funnet');
             }
           } catch (err) {
-            console.warn('[Chat] rapport-liste feil:', err);
+            logger.warn('[Chat] rapport-liste feil:', err);
           }
         }
         // Bygg personlig velkomst fra pre-fetched profildata
@@ -1060,7 +1051,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
             profilTekst += `Foretrukkede datakilder basert på brukerprofil: ${profilViews.join(', ')}\n`;
           }
         }
-        console.log('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
+        logger.debug('[buildSystemPrompt] profilTekst:', profilTekst || '(tom)');
         velkomstTekst += profilTekst;
 
         let ingenRapportPrompt = `${historikkTekst}${velkomstTekst}Du er en dataassistent for LNS Dataportal.
@@ -1133,7 +1124,7 @@ Tilgjengelige visualiseringstyper:
         const iDagDatoGlobal = new Date().toISOString().slice(0, 10);
         const øktIdGlobal = request.body.øktId ?? `${innloggetBruker.id}-${iDagDatoGlobal}`;
         const chatRapportIdGlobal = request.body.chatRapportId ?? null;
-        console.log('[Chat] global stream | øktId:', øktIdGlobal, '| chatRapportId:', chatRapportIdGlobal);
+        logger.debug('[Chat] global stream | øktId:', øktIdGlobal, '| chatRapportId:', chatRapportIdGlobal);
         if (entraObjectId && String(sisteBrukermelding).trim()) {
           await prisma.chatHistorikk.create({
             data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
@@ -1258,9 +1249,9 @@ Tilgjengelige visualiseringstyper:
             tenant:    tenantSlug,
             rapportId: rapportId ?? undefined,
           };
-          console.log('[Chat] rapport område (Prisma):', rapportOmråde);
-          console.log('[Chat] prosjektNr:', prosjektNr ?? 'ingen');
-          console.log('[Chat] kontekst:', prosjektNr ? 'rapport' : 'global');
+          logger.debug('[Chat] rapport område (Prisma):', rapportOmråde);
+          logger.debug('[Chat] prosjektNr:', prosjektNr ?? 'ingen');
+          logger.debug('[Chat] kontekst:', prosjektNr ? 'rapport' : 'global');
         } else {
           // Fallback: vw_Chat_ReportCatalog
           const rows = await queryAzureSQL(`
@@ -1273,18 +1264,17 @@ Tilgjengelige visualiseringstyper:
             rapportOmråde      = (rc['SubjectArea'] as string) ?? null;
             rapportBeskrivelse = (rc['BusinessDescription'] as string) ?? null;
             rapportNøkkelord   = (rc['Keywords'] as string) ?? null;
-            console.log('[Chat] rapport område (ReportCatalog):', rapportOmråde);
+            logger.debug('[Chat] rapport område (ReportCatalog):', rapportOmråde);
           }
         }
       } catch (err) {
-        console.warn('[Chat] Rapport-kontekst feil:', err instanceof Error ? err.message : err);
+        logger.warn('[Chat] Rapport-kontekst feil:', err instanceof Error ? err.message : err);
       }
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
       const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
-      console.log('[systemPrompt] har Leverandørtransaksjoner:', basisPrompt.includes('Leverandørtransaksjoner'));
-      console.log('[systemPrompt] lengde:', basisPrompt.length);
+      logger.debug('[systemPrompt] lengde:', basisPrompt.length);
 
       // Formater PBI visual-data (CSV fra exportData) til lesbar tekst for AI-kontekst
       // Sjekk om prompten har minst ett reelt SQL-view (format: "   View: schema.navn")
@@ -1306,8 +1296,8 @@ Tilgjengelige visualiseringstyper:
         }
         return deler.length > 0 ? deler.join('\n\n') : null;
       })();
-      console.log('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
-      console.log('[Chat] harKobletView:', harKobletView);
+      logger.debug('[Chat] visualData mottatt:', visualData ? Object.keys(visualData).length : 0, 'visuals');
+      logger.debug('[Chat] harKobletView:', harKobletView);
 
       // Bygg lese-vennlig slicer-oversikt for prompten — bullet-list per slicer.
       // AI parser dette mer pålitelig enn nestet JSON. Begrenser verdier per
@@ -1325,7 +1315,7 @@ Tilgjengelige visualiseringstyper:
           const status = await slicerErIndeksert(tenantSlug, rapportId, s.tittel);
           indeksert = status.indeksert;
         } catch (err) {
-          console.warn(`[Chat] slicerErIndeksert feilet for "${s.tittel}":`, err);
+          logger.warn(`[Chat] slicerErIndeksert feilet for "${s.tittel}":`, err);
           return { s, indeksert };
         }
         if (!indeksert) return { s, indeksert };
@@ -1337,21 +1327,21 @@ Tilgjengelige visualiseringstyper:
             const komplett = await hentKompleteSlicerVerdier(tenantSlug, rapportId, s.tittel);
             if (komplett) {
               const augmented = { ...s, toppNivåVerdier: komplett.topp, barnPerForelder: komplett.barn };
-              console.log(`[Chat] overstyrte "${s.tittel}" (hierarchy): topp ${s.toppNivåVerdier.length}→${komplett.topp.length}, forelder-noder ${Object.keys(s.barnPerForelder).length}→${Object.keys(komplett.barn).length}`);
+              logger.debug(`[Chat] overstyrte "${s.tittel}" (hierarchy): topp ${s.toppNivåVerdier.length}→${komplett.topp.length}, forelder-noder ${Object.keys(s.barnPerForelder).length}→${Object.keys(komplett.barn).length}`);
               return { s: augmented, indeksert };
             }
-            console.log(`[Chat] hentKompleteSlicerVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
+            logger.warn(`[Chat] hentKompleteSlicerVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
           } else {
             const komplett = await hentKompleteBasicVerdier(tenantSlug, rapportId, s.tittel);
             if (komplett) {
               const augmented = { ...s, verdier: komplett };
-              console.log(`[Chat] overstyrte "${s.tittel}" (basic): verdier ${s.verdier.length}→${komplett.length}`);
+              logger.debug(`[Chat] overstyrte "${s.tittel}" (basic): verdier ${s.verdier.length}→${komplett.length}`);
               return { s: augmented, indeksert };
             }
-            console.log(`[Chat] hentKompleteBasicVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
+            logger.warn(`[Chat] hentKompleteBasicVerdier returnerte null for "${s.tittel}" — beholder frontend-state`);
           }
         } catch (err) {
-          console.warn(`[Chat] indeks-overstyring feilet for "${s.tittel}":`, err);
+          logger.warn(`[Chat] indeks-overstyring feilet for "${s.tittel}":`, err);
         }
         return { s, indeksert };
       }));
@@ -1379,9 +1369,9 @@ Tilgjengelige visualiseringstyper:
         return linjer.join('\n');
       }).join('\n');
 
-      console.log('[Chat] slicere mottatt:', slicere?.length ?? 0,
+      logger.debug('[Chat] slicere mottatt:', slicere?.length ?? 0,
         slicere?.map((s) => `${s.tittel}(${s.type})`).join(', ') ?? '(ingen)');
-      console.log('[Chat] slicereTekst-lengde:', slicereTekst.length, 'tegn');
+      logger.debug('[Chat] slicereTekst-lengde:', slicereTekst.length, 'tegn');
 
       const aktivKontekst = prosjektNr
         ? `
@@ -1595,22 +1585,21 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       }
 
       // Logg token-estimat og verifiser kolonne-instruksjoner
-      console.log('[Chat] system prompt lengde (tegn):', rapportKontekst.length);
-      console.log('[Chat] estimert tokens:', Math.round(rapportKontekst.length / 4));
-      console.log('[Chat] antall meldinger i history:', messages.length);
+      logger.debug('[Chat] system prompt lengde (tegn):', rapportKontekst.length);
+      logger.debug('[Chat] estimert tokens:', Math.round(rapportKontekst.length / 4));
+      logger.debug('[Chat] antall meldinger i history:', messages.length);
       const harKolonneInstruksjoner = rapportKontekst.includes('VIKTIGE KOLONNE-INSTRUKSJONER');
-      console.log('[Chat] kolonne-instruksjoner i prompt:', harKolonneInstruksjoner ? 'INKLUDERT' : 'MANGLER');
+      logger.debug('[Chat] kolonne-instruksjoner i prompt:', harKolonneInstruksjoner ? 'INKLUDERT' : 'MANGLER');
       if (harKolonneInstruksjoner) {
         const start = rapportKontekst.indexOf('VIKTIGE KOLONNE-INSTRUKSJONER');
-        console.log('[Chat] kolonne-seksjon (første 400 tegn):', rapportKontekst.slice(start, start + 400));
-      }
+        }
 
       // Bestem øktId og lagre brukermelding FØR AI-stream starter
       const iDagDatoRapport = new Date().toISOString().slice(0, 10);
       const øktIdRapport = request.body.øktId ?? `${innloggetBruker.id}-${iDagDatoRapport}`;
       // Kun chatRapportId (portal UUID) — IKKE fallback til rapportId (PBI GUID)
       const chatRapportIdRapport = request.body.chatRapportId ?? null;
-      console.log('[Chat] rapport stream | øktId:', øktIdRapport, '| chatRapportId:', chatRapportIdRapport);
+      logger.debug('[Chat] rapport stream | øktId:', øktIdRapport, '| chatRapportId:', chatRapportIdRapport);
       if (entraObjectId && String(sisteBrukermelding).trim()) {
         await prisma.chatHistorikk.create({  // rapport-stream brukermelding
           data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
@@ -1625,7 +1614,6 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       reply.hijack();
 
       const write = (chunk: unknown) => {
-        console.log('[Chat] sender SSE event:', chunk);
         reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
       };
       let fullAiTekstRapport = '';
@@ -1659,7 +1647,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       try {
         await chat(messages, rapportKontekst, writeOgCapture, chatContext);
       } catch (err) {
-        console.error('[chat] feil:', err);
+        logger.error('[chat] feil:', err);
         write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
       } finally {
         loggTiming('rapport');

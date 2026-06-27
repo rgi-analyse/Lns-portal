@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 
 interface Workspace {
   id:              string;
@@ -50,14 +51,14 @@ export default function RedigerWorkspacePage() {
     if (!authAvklart) return;
     if (!isAuthenticated) { setLoading(false); return; }
     const load = async () => {
-      console.log('[RedigerWorkspacePage] API URL:', process.env.NEXT_PUBLIC_API_URL);
-      console.log('[RedigerWorkspacePage] Henter workspace:', `/api/workspaces/${id}`);
+      logger.debug('[RedigerWorkspacePage] API URL:', process.env.NEXT_PUBLIC_API_URL);
+      logger.debug('[RedigerWorkspacePage] Henter workspace:', `/api/workspaces/${id}`);
       try {
         const r = await apiFetch(`/api/workspaces/${id}`, { headers: authHeaders });
-        console.log('[RedigerWorkspacePage] Response status:', r.status);
+        logger.debug('[RedigerWorkspacePage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
-          console.error('[RedigerWorkspacePage] Feil fra API:', body);
+          logger.error('[RedigerWorkspacePage] Feil fra API:', body);
           throw new Error(`HTTP ${r.status}`);
         }
         const ws = await r.json() as Workspace;
@@ -69,7 +70,7 @@ export default function RedigerWorkspacePage() {
         setKontekstLabel(ws.kontekstLabel ?? '');
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Ukjent feil';
-        console.error('[RedigerWorkspacePage] feil ved henting av workspace:', msg);
+        logger.error('[RedigerWorkspacePage] feil ved henting av workspace:', msg);
         toast({ title: 'Workspace ikke funnet', description: msg, variant: 'destructive' });
       } finally {
         setLoading(false);

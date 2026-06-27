@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Report } from 'powerbi-client';
 import { ArrowLeft, Save, Trash2, Loader2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 
 // Visual type mapping: AI forslag → PBI visual type string
@@ -105,16 +106,16 @@ export default function RapportPreviewPage() {
 
     // Legg til visual automatisk etter lasting
     rapport.on('loaded', async () => {
-      console.log('[Preview] rapport lastet');
+      logger.debug('[Preview] rapport lastet');
       if (!visualType) return;
       const pbiType = VISUAL_TYPE_MAP[visualType] ?? visualType;
       try {
         const pages = await (rapport as Report).getPages();
         const page  = pages[0] as unknown as { addVisual: (type: string, layout: object) => Promise<void> };
         await page.addVisual(pbiType, { x: 20, y: 20, width: 500, height: 350 });
-        console.log('[Preview] visual lagt til:', pbiType);
+        logger.debug('[Preview] visual lagt til:', pbiType);
       } catch (err) {
-        console.warn('[Preview] Kunne ikke legge til visual automatisk:', err);
+        logger.warn('[Preview] Kunne ikke legge til visual automatisk:', err);
       }
     });
 
@@ -123,7 +124,7 @@ export default function RapportPreviewPage() {
       const savedData = (event as CustomEvent).detail as { reportObjectId?: string; reportName?: string };
       const pbiReportId = savedData?.reportObjectId;
       const reportNavn  = savedData?.reportName ?? tittel;
-      console.log('[Preview] saved event:', savedData);
+      logger.debug('[Preview] saved event:', savedData);
       if (!pbiReportId) return;
 
       try {
@@ -140,7 +141,7 @@ export default function RapportPreviewPage() {
           router.push(`/dashboard/rapport/${data.id}`);
         }
       } catch (err) {
-        console.error('[Preview] register-rapport feil:', err);
+        logger.error('[Preview] register-rapport feil:', err);
       } finally {
         setLagrer(false);
       }
@@ -154,7 +155,7 @@ export default function RapportPreviewPage() {
       // Trigger PBI save — utløser 'saved' event som håndterer navigasjon
       await reportRef.current.save();
     } catch (err) {
-      console.error('[Preview] save feil:', err);
+      logger.error('[Preview] save feil:', err);
       setLagrer(false);
     }
   }

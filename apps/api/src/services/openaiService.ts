@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { executeQuery } from './fabricService';
 import { queryAzureSQL } from './azureSqlService';
 import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 import {
   søk as søkSlicerKatalog,
   erIndeksert as slicerErIndeksert,
@@ -11,7 +12,7 @@ import {
 import { validerKpiUttrykk } from './kpiValidator';
 import { detekterKpiKandidater, type KpiForslag } from './kpiDetektor';
 
-console.log('[OpenAI] Konfigurasjon:', {
+logger.debug('[OpenAI] Konfigurasjon:', {
   endpoint:   process.env.AZURE_OPENAI_ENDPOINT,
   deployment: process.env.AZURE_OPENAI_DEPLOYMENT,
   hasKey:     !!process.env.AZURE_OPENAI_KEY,
@@ -32,7 +33,7 @@ function sanitizeSQL(sql: string): string {
       fixed = fixed.trimEnd() + ' ORDER BY (SELECT NULL)';
     }
     fixed = fixed.trimEnd() + ` OFFSET ${skip} ROWS FETCH NEXT ${antall} ROWS ONLY`;
-    console.log('[SQL] konverterte LIMIT/OFFSET til OFFSET/FETCH:', fixed);
+    logger.debug('[SQL] konverterte LIMIT/OFFSET til OFFSET/FETCH:', fixed);
     return fixed;
   }
 
@@ -42,7 +43,7 @@ function sanitizeSQL(sql: string): string {
     const antall = limitMatch[1];
     let fixed = sql.replace(/\s*\bLIMIT\s+\d+\b/i, '');
     fixed = fixed.replace(/\bSELECT\s+/i, `SELECT TOP ${antall} `);
-    console.log('[SQL] konverterte LIMIT til TOP:', fixed);
+    logger.debug('[SQL] konverterte LIMIT til TOP:', fixed);
     return fixed;
   }
 
@@ -277,11 +278,11 @@ async function matchEnBasicVerdi(
   // 1. Lokal eksakt/prefiks
   const lokal = finnBesteMatch(verdi, info.verdier);
   if (lokal.type === 'exact') {
-    console.log(`[validator] eksakt (basic): "${lokal.treff}" i "${info.tittel}"`);
+    logger.debug(`[validator] eksakt (basic): "${lokal.treff}" i "${info.tittel}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'prefix') {
-    console.log(`[validator] prefiks (basic): "${verdi}" → "${lokal.treff}" i "${info.tittel}"`);
+    logger.debug(`[validator] prefiks (basic): "${verdi}" → "${lokal.treff}" i "${info.tittel}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'ambiguous') {
@@ -300,19 +301,19 @@ async function matchEnBasicVerdi(
     try {
       const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
       if (status.indeksert) {
-        console.log(`[validator] ingen lokal match for "${verdi}", prøver AI Search`);
+        logger.debug(`[validator] ingen lokal match for "${verdi}", prøver AI Search`);
         const respons = await søkSlicerKatalog({
           tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
           søketerm: String(verdi), top: 5,
         });
         const vurdering = slicerVelgFraTreff(respons.treff, String(verdi));
         if (vurdering.type === 'unique') {
-          console.log(`[validator] AI Search match (basic): "${verdi}" → "${vurdering.treff}"`);
+          logger.debug(`[validator] AI Search match (basic): "${verdi}" → "${vurdering.treff}"`);
           return { ok: true, verdi: vurdering.treff };
         }
         if (vurdering.type === 'ambiguous') {
           const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
-          console.log(`[validator] tvetydig basic (${vurdering.alle.length} relevante etter filtrering)`);
+          logger.debug(`[validator] tvetydig basic (${vurdering.alle.length} relevante etter filtrering)`);
           return {
             ok:       false,
             kategori: 'ambiguous',
@@ -320,12 +321,12 @@ async function matchEnBasicVerdi(
             forslag: vurdering.alle.map((t) => t.verdi),
           };
         }
-        console.log(`[validator] AI Search ingen relevante treff for "${verdi}" (alle under terskel)`);
+        logger.debug(`[validator] AI Search ingen relevante treff for "${verdi}" (alle under terskel)`);
       } else {
-        console.log(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes`);
+        logger.debug(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes`);
       }
     } catch (err) {
-      console.warn(`[validator] AI Search feilet for "${verdi}", faller tilbake til lokal-only:`, err);
+      logger.warn(`[validator] AI Search feilet for "${verdi}", faller tilbake til lokal-only:`, err);
     }
   }
 
@@ -372,11 +373,11 @@ async function matchEnBarn(
   // 1. Lokal eksakt/prefiks under forelder
   const lokal = finnBesteMatch(barnVerdi, tilgjengeligeBarn);
   if (lokal.type === 'exact') {
-    console.log(`[validator] eksakt (barn): "${lokal.treff}" under "${forelder}"`);
+    logger.debug(`[validator] eksakt (barn): "${lokal.treff}" under "${forelder}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'prefix') {
-    console.log(`[validator] prefiks (barn): "${barnVerdi}" → "${lokal.treff}" under "${forelder}"`);
+    logger.debug(`[validator] prefiks (barn): "${barnVerdi}" → "${lokal.treff}" under "${forelder}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'ambiguous') {
@@ -395,7 +396,7 @@ async function matchEnBarn(
     try {
       const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
       if (status.indeksert) {
-        console.log(`[validator] ingen lokal match for barn "${barnVerdi}" under "${forelder}", prøver AI Search`);
+        logger.debug(`[validator] ingen lokal match for barn "${barnVerdi}" under "${forelder}", prøver AI Search`);
         const respons = await søkSlicerKatalog({
           tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
           søketerm: String(barnVerdi),
@@ -404,12 +405,12 @@ async function matchEnBarn(
         });
         const vurdering = slicerVelgFraTreff(respons.treff, String(barnVerdi));
         if (vurdering.type === 'unique') {
-          console.log(`[validator] AI Search match (barn): "${barnVerdi}" → "${vurdering.treff}" under "${forelder}"`);
+          logger.debug(`[validator] AI Search match (barn): "${barnVerdi}" → "${vurdering.treff}" under "${forelder}"`);
           return { ok: true, verdi: vurdering.treff };
         }
         if (vurdering.type === 'ambiguous') {
           const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
-          console.log(`[validator] tvetydig barn (${vurdering.alle.length} relevante etter filtrering)`);
+          logger.debug(`[validator] tvetydig barn (${vurdering.alle.length} relevante etter filtrering)`);
           return {
             ok:       false,
             kategori: 'ambiguous',
@@ -417,10 +418,10 @@ async function matchEnBarn(
             forslag: vurdering.alle.map((t) => t.verdi),
           };
         }
-        console.log(`[validator] AI Search ingen relevante treff for "${barnVerdi}" under "${forelder}" (alle under terskel)`);
+        logger.debug(`[validator] AI Search ingen relevante treff for "${barnVerdi}" under "${forelder}" (alle under terskel)`);
       }
     } catch (err) {
-      console.warn(`[validator] AI Search feilet for barn "${barnVerdi}", faller tilbake:`, err);
+      logger.warn(`[validator] AI Search feilet for barn "${barnVerdi}", faller tilbake:`, err);
     }
   }
 
@@ -453,11 +454,11 @@ async function matchEnTopp(
   // 1. Lokal eksakt/prefiks mot ekspanderte topp-noder
   const lokal = finnBesteMatch(toppVerdi, info.toppNivåVerdier);
   if (lokal.type === 'exact') {
-    console.log(`[validator] eksakt (topp): "${lokal.treff}" i "${info.tittel}"`);
+    logger.debug(`[validator] eksakt (topp): "${lokal.treff}" i "${info.tittel}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'prefix') {
-    console.log(`[validator] prefiks (topp): "${toppVerdi}" → "${lokal.treff}" i "${info.tittel}"`);
+    logger.debug(`[validator] prefiks (topp): "${toppVerdi}" → "${lokal.treff}" i "${info.tittel}"`);
     return { ok: true, verdi: lokal.treff };
   }
   if (lokal.type === 'ambiguous') {
@@ -476,7 +477,7 @@ async function matchEnTopp(
     try {
       const status = await slicerErIndeksert(tenant, rapportId, info.tittel);
       if (status.indeksert) {
-        console.log(`[validator] ingen lokal match for topp "${toppVerdi}", prøver AI Search`);
+        logger.debug(`[validator] ingen lokal match for topp "${toppVerdi}", prøver AI Search`);
         const respons = await søkSlicerKatalog({
           tenant, rapport_id: rapportId, slicer_tittel: info.tittel,
           søketerm: String(toppVerdi),
@@ -485,12 +486,12 @@ async function matchEnTopp(
         });
         const vurdering = slicerVelgFraTreff(respons.treff, String(toppVerdi));
         if (vurdering.type === 'unique') {
-          console.log(`[validator] AI Search match (topp): "${toppVerdi}" → "${vurdering.treff}"`);
+          logger.debug(`[validator] AI Search match (topp): "${toppVerdi}" → "${vurdering.treff}"`);
           return { ok: true, verdi: vurdering.treff };
         }
         if (vurdering.type === 'ambiguous') {
           const liste = vurdering.alle.map((t) => `  - ${t.verdi} (score ${t.score.toFixed(2)})`).join('\n');
-          console.log(`[validator] tvetydig topp (${vurdering.alle.length} relevante etter filtrering)`);
+          logger.debug(`[validator] tvetydig topp (${vurdering.alle.length} relevante etter filtrering)`);
           return {
             ok:       false,
             kategori: 'ambiguous',
@@ -498,12 +499,12 @@ async function matchEnTopp(
             forslag: vurdering.alle.map((t) => t.verdi),
           };
         }
-        console.log(`[validator] AI Search ingen relevante topp-treff for "${toppVerdi}" (alle under terskel)`);
+        logger.debug(`[validator] AI Search ingen relevante topp-treff for "${toppVerdi}" (alle under terskel)`);
       } else {
-        console.log(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes for topp`);
+        logger.debug(`[validator] sliceren "${info.tittel}" er ikke indeksert — kun lokal-match brukes for topp`);
       }
     } catch (err) {
-      console.warn(`[validator] AI Search feilet for topp "${toppVerdi}", faller tilbake til lokal-only:`, err);
+      logger.warn(`[validator] AI Search feilet for topp "${toppVerdi}", faller tilbake til lokal-only:`, err);
     }
   }
 
@@ -871,7 +872,7 @@ const createReportTool: OpenAI.Chat.ChatCompletionTool = {
   },
 };
 
-console.log('[OpenAI] tools registrert:', tools.map((t) => ('function' in t ? t.function.name : 'ukjent')));
+logger.debug('[OpenAI] tools registrert:', tools.map((t) => ('function' in t ? t.function.name : 'ukjent')));
 
 function historyToMessages(history: OpenAI.Chat.ChatCompletionMessageParam[]): ChatMessage[] {
   return history.map((h) => {
@@ -931,7 +932,7 @@ export async function kjørBlokkerende(
   const temperatur = opts.temperatur ?? 0.3;
   const maksTokens = opts.maksTokens ?? 2000;
 
-  console.log(`[OpenAI] Blokkerende kall: modell=${modell}, temp=${temperatur}, maxTokens=${maksTokens}`);
+  logger.debug(`[OpenAI] Blokkerende kall: modell=${modell}, temp=${temperatur}, maxTokens=${maksTokens}`);
   const start = Date.now();
 
   const respons = await client.chat.completions.create({
@@ -951,7 +952,7 @@ export async function kjørBlokkerende(
   const completionTokens = respons.usage?.completion_tokens ?? 0;
   const totaltTokens     = respons.usage?.total_tokens ?? 0;
 
-  console.log(`[OpenAI] Ferdig: ${promptTokens}+${completionTokens}=${totaltTokens} tokens, ${latens}ms`);
+  logger.debug(`[OpenAI] Ferdig: ${promptTokens}+${completionTokens}=${totaltTokens} tokens, ${latens}ms`);
 
   return { tekst, promptTokens, completionTokens, totaltTokens, modell };
 }
@@ -1069,20 +1070,20 @@ export async function chat(
         args = {};
       }
 
-      console.log('[OpenAI] tool call:', tc.name, tc.args);
+      logger.debug('[OpenAI] tool call:', tc.name, tc.args);
 
       try {
         if (tc.name === 'search_portal_reports') {
           const sokeord = (args['sokeord'] as string | undefined) ?? '';
-          console.log('[search_portal_reports] sokeord:', JSON.stringify(sokeord));
-          console.log('[search_portal_reports] context:', JSON.stringify(context));
+          logger.debug('[search_portal_reports] sokeord:', JSON.stringify(sokeord));
+          logger.debug('[search_portal_reports] context:', JSON.stringify(context));
 
           const entraObjectId = context?.entraObjectId;
           const isAdmin       = context?.isAdmin ?? false;
 
           // Split søkeord på mellomrom — hvert ord må matche minst én kolonne (AND)
           const ord = sokeord.split(/\s+/).map(o => o.trim()).filter(o => o.length > 1);
-          console.log('[search_portal_reports] ord:', JSON.stringify(ord));
+          logger.debug('[search_portal_reports] ord:', JSON.stringify(ord));
 
           type RapportResult = { id: string; navn: string; område: string | null; beskrivelse: string | null; nøkkelord: string | null; workspace_navn: string };
           let rapporter: RapportResult[];
@@ -1193,10 +1194,7 @@ export async function chat(
             workspace_navn: r.workspace_navn,
           }));
 
-          console.log('[search_portal_reports] funnet:', rapporterMedNr.length);
-          console.log('[search_portal_reports] sender til AI:', JSON.stringify(
-            rapporterMedNr.map(r => ({ nr: r.nr, id: r.id, navn: r.navn, workspace: r.workspace_navn })), null, 2
-          ));
+          logger.debug('[search_portal_reports] funnet:', rapporterMedNr.length);
           result = { rapporter: rapporterMedNr };
         } else if (tc.name === 'query_database') {
           const rawSQL   = args['sql'] as string;
@@ -1217,17 +1215,17 @@ export async function chat(
             const ikketillatt = viewsISql.filter(v =>
               !context.tillatteViewNavn!.some(t => t.toLowerCase() === v)
             );
-            console.log('[tilgang] SQL views (uten schema):', viewsISql);
+            logger.debug('[tilgang] SQL views (uten schema):', viewsISql);
             if (ikketillatt.length > 0) {
-              console.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
+              logger.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
               result = { error: 'Du har ikke tilgang til denne datakilden.' };
             }
           }
 
           if (!result) {
-            console.log('[OpenAI] query_database:', sqlQuery);
+            logger.debug('[OpenAI] query_database:', sqlQuery);
             const isAzureSql = /ai_gold\./i.test(sqlQuery);
-            console.log('[OpenAI] ruter til:', isAzureSql ? 'Azure SQL' : 'Fabric');
+            logger.debug('[OpenAI] ruter til:', isAzureSql ? 'Azure SQL' : 'Fabric');
             if (isAzureSql) {
               const rows = await queryAzureSQL(sqlQuery, 200);
               onChunk({ type: 'query_result', data: rows, sql: sqlQuery });
@@ -1281,7 +1279,7 @@ export async function chat(
             } | null = null;
             const info = context?.slicere?.find((s) => s.tittel === config.tittel);
 
-            console.log(
+            logger.debug(
               `[validator] start — tittel="${config.tittel}" type=${config.type} ` +
               `tenant=${context?.tenant ?? '(mangler)'} rapportId=${context?.rapportId ?? '(mangler)'} ` +
               `info=${info ? `found(${info.type})` : '(mangler)'} ` +
@@ -1306,7 +1304,7 @@ export async function chat(
                   config = { ...config, verdier: validering.verdier };
                 }
               } else {
-                console.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte basic, slicer er ${info?.type ?? 'ukjent'}`);
+                logger.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte basic, slicer er ${info?.type ?? 'ukjent'}`);
                 valideringsfeil = {
                   kategori: 'invalid_input',
                   error: `Slicer "${config.tittel}" er av type ${info?.type ?? 'ukjent'}, men du sendte type=basic. Send riktig type.`,
@@ -1327,7 +1325,7 @@ export async function chat(
                   config = { ...config, nivåer: validering.nivåer };
                 }
               } else {
-                console.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte hierarchy, slicer er ${info?.type ?? 'ukjent'}`);
+                logger.warn(`[backend] type-mismatch for "${config.tittel}": AI sendte hierarchy, slicer er ${info?.type ?? 'ukjent'}`);
                 valideringsfeil = {
                   kategori: 'invalid_input',
                   error: `Slicer "${config.tittel}" er av type ${info?.type ?? 'ukjent'}, men du sendte type=hierarchy. Send riktig type.`,
@@ -1336,14 +1334,14 @@ export async function chat(
             }
 
             if (valideringsfeil) {
-              console.log(`[validator] returnerer status=${valideringsfeil.kategori} til AI (ingen SSE emittes): ${valideringsfeil.error.slice(0, 200)}`);
+              logger.debug(`[validator] returnerer status=${valideringsfeil.kategori} til AI (ingen SSE emittes): ${valideringsfeil.error.slice(0, 200)}`);
               result = {
                 status:  valideringsfeil.kategori,
                 melding: valideringsfeil.error,
                 ...(valideringsfeil.forslag ? { forslag: valideringsfeil.forslag } : {}),
               };
             } else {
-              console.log('[backend] sending slicer SSE event:', JSON.stringify(config));
+              logger.debug('[backend] sending slicer SSE event:', JSON.stringify(config));
               onChunk({ type: 'slicer', config });
 
               // Bygg melding som tydelig viser korrigeringer (hvis noen)
@@ -1389,7 +1387,7 @@ export async function chat(
           } else {
             const info = context?.slicere?.find((s) => s.tittel === tittel);
             const datoSlicere = (context?.slicere ?? []).filter((s) => s.erDato);
-            console.log(
+            logger.debug(
               `[set_date_filter] tittel="${tittel}" fra=${fra} til=${til} ` +
               `info=${info ? `found(erDato=${info.erDato})` : '(mangler)'} ` +
               `dato_slicere=[${datoSlicere.map((s) => s.tittel).join(', ')}]`,
@@ -1429,7 +1427,7 @@ export async function chat(
                 fraIso: fraUtcIso,
                 tilIso: tilUtcIso,
               };
-              console.log('[set_date_filter] sending date_filter SSE:', JSON.stringify(dateFilterConfig));
+              logger.debug('[set_date_filter] sending date_filter SSE:', JSON.stringify(dateFilterConfig));
               onChunk({ type: 'date_filter', config: dateFilterConfig });
               result = {
                 status:  'success',
@@ -1447,7 +1445,7 @@ export async function chat(
             const byPbiId = await prisma.rapport.findFirst({ where: { pbiReportId: rapportId } });
             portalId = byPbiId?.id ?? rapportId;
           }
-          console.log(`[OpenAI] open_report: rapportId=${rapportId} → portalId=${portalId}`);
+          logger.debug(`[OpenAI] open_report: rapportId=${rapportId} → portalId=${portalId}`);
           onChunk({ type: 'open_report', rapportId: portalId, rapportNavn });
           result = { success: true, message: `Åpner rapport: ${rapportNavn}` };
         } else if (tc.name === 'create_report') {
@@ -1467,7 +1465,7 @@ export async function chat(
               const kpiViewFull   = kpiViewMatch?.[1] ?? null;
               const kpiSchema     = kpiViewFull?.split('.')[0] ?? 'ai_gold';
               const kpiViewNavn   = kpiViewFull?.split('.')[1] ?? null;
-              console.log('[create_report] kpi_referanser:', kpiReferanser, '| view:', kpiViewFull);
+              logger.debug('[create_report] kpi_referanser:', kpiReferanser, '| view:', kpiViewFull);
 
               if (!kpiViewNavn) {
                 result = { error: 'kpi_referanser krever at sql-parameteren inneholder en gyldig FROM ai_gold.<view>-klausul.' };
@@ -1485,7 +1483,7 @@ export async function chat(
                   WHERE v.schema_name = '${kpiSchema.replace(/'/g, "''")}' AND v.view_name = '${kpiViewNavn.replace(/'/g, "''")}'
                     AND k.navn IN (${navnListe}) AND k.er_aktiv = 1
                 `);
-                console.log('[create_report] KPI-rader funnet:', kpiRader.length, 'av', kpiReferanser.length, 'forespurte');
+                logger.debug('[create_report] KPI-rader funnet:', kpiRader.length, 'av', kpiReferanser.length, 'forespurte');
 
                 const funnet    = new Set(kpiRader.map(r => String(r['navn'])));
                 const manglende = kpiReferanser.filter(n => !funnet.has(n));
@@ -1503,11 +1501,11 @@ export async function chat(
                 const fromPos = sqlQuery.search(/\bFROM\b/i);
                 if (fromPos > 0) {
                   sqlQuery = `${sqlQuery.slice(0, fromPos).trimEnd()}, ${kpiCols} ${sqlQuery.slice(fromPos)}`;
-                  console.log('[create_report] SQL etter KPI-injeksjon:', sqlQuery.slice(0, 200));
+                  logger.debug('[create_report] SQL etter KPI-injeksjon:', sqlQuery.slice(0, 200));
                 }
               } catch (kpiLookupErr) {
                 const msg = kpiLookupErr instanceof Error ? kpiLookupErr.message : String(kpiLookupErr);
-                console.error('[create_report] KPI-oppslag feilet:', msg);
+                logger.error('[create_report] KPI-oppslag feilet:', msg);
                 result = { error: `Kunne ikke hente KPI-SQL fra databasen: ${msg}` };
                 onChunk({ type: 'tool_call', tool: tc.name, result });
                 history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
@@ -1516,16 +1514,16 @@ export async function chat(
             }
             // ── Slutt KPI-injeksjon ───────────────────────────────────────
 
-            console.log('[OpenAI] create_report SQL:', sqlQuery);
+            logger.debug('[OpenAI] create_report SQL:', sqlQuery);
 
             // Pre-validering: sjekk yAkse mot SQL-aliaser FØR DB-kall
             const yAkseInput = args['yAkse'] as string | undefined;
             if (yAkseInput) {
               const aliasMatches = [...sqlQuery.matchAll(/\bAS\s+\[?([a-zA-ZæøåÆØÅ0-9_]+)\]?/gi)];
               const sqlAliaser   = aliasMatches.map(m => m[1]);
-              console.log('[OpenAI] create_report SQL-aliaser:', sqlAliaser);
+              logger.debug('[OpenAI] create_report SQL-aliaser:', sqlAliaser);
               if (sqlAliaser.length > 0 && !sqlAliaser.some(a => a.toLowerCase() === yAkseInput.toLowerCase())) {
-                console.warn(`[OpenAI] create_report yAkse "${yAkseInput}" matcher ikke SQL-aliaser: ${sqlAliaser.join(', ')}`);
+                logger.warn(`[OpenAI] create_report yAkse "${yAkseInput}" matcher ikke SQL-aliaser: ${sqlAliaser.join(', ')}`);
                 result = {
                   error: `yAkse "${yAkseInput}" finnes ikke som alias i SQL. ` +
                     `Tilgjengelige aliaser: ${sqlAliaser.join(', ')}. ` +
@@ -1540,9 +1538,9 @@ export async function chat(
             let data: Record<string, unknown>[] = [];
             try {
               data = await queryAzureSQL(sqlQuery, 500);
-              console.log('[OpenAI] create_report rader:', data.length);
+              logger.debug('[OpenAI] create_report rader:', data.length);
             } catch (sqlErr) {
-              console.error('[OpenAI] create_report SQL-feil:', sqlErr);
+              logger.error('[OpenAI] create_report SQL-feil:', sqlErr);
               result = { error: `SQL-feil: ${(sqlErr as Error).message}` };
               onChunk({ type: 'tool_call', tool: tc.name, result });
               history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
@@ -1596,7 +1594,7 @@ export async function chat(
                     kolonne_type: (r['kolonne_type'] as string) ?? 'dimensjon',
                   }))
                   .filter(k => Boolean(k.kolonne_navn));
-                console.log('[OpenAI] create_report alle view-kolonner:', alleViewKolonner.length);
+                logger.debug('[OpenAI] create_report alle view-kolonner:', alleViewKolonner.length);
 
                 // Hent KPI-er og legg til som virtuelle kolonner med sql_uttrykk
                 // KPI-er finnes ikke i INFORMATION_SCHEMA — de er forhåndsdefinerte beregninger
@@ -1619,13 +1617,13 @@ export async function chat(
                         format:       k['format'] ? String(k['format']) : undefined,
                       }));
                     alleViewKolonner = [...alleViewKolonner, ...kpiKolonner];
-                    console.log('[OpenAI] create_report KPI-er lastet:', kpiKolonner.length);
+                    logger.debug('[OpenAI] create_report KPI-er lastet:', kpiKolonner.length);
                   }
                 } catch (kpiErr) {
-                  console.warn('[OpenAI] create_report KPI-henting feilet:', (kpiErr as Error).message);
+                  logger.warn('[OpenAI] create_report KPI-henting feilet:', (kpiErr as Error).message);
                 }
               } catch (isErr) {
-                console.warn('[OpenAI] create_report kolonner-feil:', (isErr as Error).message);
+                logger.warn('[OpenAI] create_report kolonner-feil:', (isErr as Error).message);
               }
             }
 
@@ -1663,7 +1661,7 @@ export async function chat(
                 prosjektFilter = `WHERE [${safKol}] LIKE '%${prosjektNavn.replace(/'/g, "''")}%'`;
               }
             }
-            console.log('[OpenAI] create_report prosjektfilter:', prosjektFilter ?? 'ingen');
+            logger.debug('[OpenAI] create_report prosjektfilter:', prosjektFilter ?? 'ingen');
 
             // Valider yAkse mot faktiske kolonner i SQL-resultatet
             const yAkseArg = args['yAkse'] as string | undefined;
@@ -1673,7 +1671,7 @@ export async function chat(
                 k => k.toLowerCase() === yAkseArg.toLowerCase(),
               );
               if (!yAkseFinnes) {
-                console.warn(`[OpenAI] create_report yAkse "${yAkseArg}" finnes ikke i SQL-resultatet. Faktiske kolonner: ${faktiskeKolonner.join(', ')}`);
+                logger.warn(`[OpenAI] create_report yAkse "${yAkseArg}" finnes ikke i SQL-resultatet. Faktiske kolonner: ${faktiskeKolonner.join(', ')}`);
                 result = {
                   error: `Kolonnen "${yAkseArg}" finnes ikke i SQL-resultatet. ` +
                     `Faktiske kolonner er: ${faktiskeKolonner.join(', ')}. ` +
@@ -1704,7 +1702,7 @@ export async function chat(
               prosjektKolonneType,
               prosjektFilter,
             };
-            console.log('[OpenAI] create_report forslag klar, rader:', data.length);
+            logger.debug('[OpenAI] create_report forslag klar, rader:', data.length);
             onChunk({ type: 'rapport_forslag', forslag });
 
             // Etter rapporten er bygd: detekter aggregat-uttrykk i SELECT-listen
@@ -1716,11 +1714,11 @@ export async function chat(
                 const viewName    = viewNavn.split('.')[1] ?? viewNavn;
                 const kandidater  = await detekterKpiKandidater(sqlQuery, schemaName, viewName);
                 if (kandidater.length > 0) {
-                  console.log('[OpenAI] kpi-kandidater detektert:', kandidater.length, kandidater.map(k => k.teknisk_navn));
+                  logger.debug('[OpenAI] kpi-kandidater detektert:', kandidater.length, kandidater.map(k => k.teknisk_navn));
                   onChunk({ type: 'kpi_forslag', forslag: kandidater, viewNavn });
                 }
               } catch (kpiDetErr) {
-                console.warn('[OpenAI] kpi-deteksjon feilet:', (kpiDetErr as Error).message);
+                logger.warn('[OpenAI] kpi-deteksjon feilet:', (kpiDetErr as Error).message);
               }
             }
 
@@ -1817,7 +1815,7 @@ export async function chat(
         }
       } catch (err) {
         const e = err as { message?: string; status?: number; code?: string; type?: string };
-        console.error('[OpenAI] Feil:', {
+        logger.error('[OpenAI] Feil:', {
           message: e.message,
           status:  e.status,
           code:    e.code,

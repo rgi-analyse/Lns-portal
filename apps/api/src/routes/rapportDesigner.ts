@@ -3,6 +3,7 @@ import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import type { PrismaClient } from '../generated/prisma/client';
 import { queryAzureSQL, executeAzureSQL } from '../services/azureSqlService';
+import { logger } from '../lib/logger';
 
 function safeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9\-]/g, '');
@@ -74,7 +75,7 @@ async function hentEllerOpprettMittWorkspace(
     `UPDATE bruker SET mittWorkspaceId = '${safeId(workspace.id)}' WHERE id = '${safeId(brukerId)}'`,
   );
 
-  console.log('[Designer] opprettet personlig workspace:', workspace.navn);
+  logger.debug('[Designer] opprettet personlig workspace:', workspace.navn);
   return workspace.id;
 }
 
@@ -124,7 +125,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
             const isNum = config.prosjektKolonneType !== 'string';
             config.prosjektFilter   = `WHERE [${kontekstKolonne}] = ${isNum ? kontekstVerdi : `'${kontekstVerdi}'`}`;
             config.laastFilter      = { kolonne: kontekstKolonne, verdi: kontekstVerdi };
-            console.log('[Designer] kontekst fra workspace:', { kontekstKolonne, kontekstVerdi, kontekstType });
+            logger.debug('[Designer] kontekst fra workspace:', { kontekstKolonne, kontekstVerdi, kontekstType });
           } else {
             // Fallback: trekk ut tall fra workspace-navn (bakoverkompatibilitet)
             // Kun sett prosjektNr hvis prosjektKolonne allerede er satt i config —
@@ -138,11 +139,11 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
               const isNum = config.prosjektKolonneType !== 'string';
               config.prosjektFilter = `WHERE [${config.prosjektKolonne}] = ${isNum ? prosjektNrFromDb : `'${prosjektNrFromDb}'`}`;
               config.laastFilter = { kolonne: config.prosjektKolonne, verdi: prosjektNrFromDb };
-              console.log('[Designer] prosjektNr fra workspace-navn (fallback):', prosjektNrFromDb);
+              logger.debug('[Designer] prosjektNr fra workspace-navn (fallback):', prosjektNrFromDb);
             }
           }
         } catch (err) {
-          console.error('[Designer] kunne ikke hente kontekst fra fraRapportId:', err);
+          logger.error('[Designer] kunne ikke hente kontekst fra fraRapportId:', err);
         }
       }
 
@@ -174,7 +175,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         data: { workspaceId: wsId, rapportId: rapport.id, rekkefølge: 0 },
       });
 
-      console.log('[Designer] rapport lagret:', tittel, '→ workspace:', wsId);
+      logger.debug('[Designer] rapport lagret:', tittel, '→ workspace:', wsId);
       return reply.send({ success: true, rapportId: rapport.id, workspaceId: wsId });
     },
   );
@@ -221,7 +222,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         `UPDATE Rapport SET designerConfig = '${configJson}' WHERE id = '${id}'`,
       );
 
-      console.log('[Designer] rapport oppdatert:', id, '→', tittel.trim());
+      logger.debug('[Designer] rapport oppdatert:', id, '→', tittel.trim());
       return reply.send({ success: true, rapportId: id });
     },
   );
@@ -252,7 +253,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       }
 
       await db.rapport.update({ where: { id }, data: { navn: navn.trim() } });
-      console.log('[Designer] rapport omdøpt:', id, '→', navn.trim());
+      logger.debug('[Designer] rapport omdøpt:', id, '→', navn.trim());
       return reply.send({ success: true, navn: navn.trim() });
     },
   );
@@ -285,7 +286,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       }
 
       await db.rapport.update({ where: { id }, data: { erAktiv: false } });
-      console.log('[Designer] rapport slettet (soft):', id);
+      logger.debug('[Designer] rapport slettet (soft):', id);
       return reply.status(204).send();
     },
   );
@@ -306,7 +307,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
       // Behold norske bokstaver (æøå) — kun fjern tegn som er farlige i SQL-kontekst.
       // Alle metadata-spørringer bruker @view-parameter, så ingen injeksjonsrisiko.
       const view   = (dotIdx !== -1 ? viewNavn.slice(dotIdx + 1) : viewNavn).replace(/['";\x00-\x1f]/g, '');
-      console.log('[view-kolonner] schema:', schema, '| view:', view, '| original:', viewNavn);
+      logger.debug('[view-kolonner] schema:', schema, '| view:', view, '| original:', viewNavn);
       if (!schema || !view) return reply.status(400).send({ error: 'Ugyldig viewNavn.' });
 
       // Hent KPI-er for et view uavhengig av kolonne-kilde. KPI-er lever i
@@ -340,9 +341,9 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
               format:       k['format'] ? String(k['format']) : undefined,
             });
           }
-          console.log('[view-kolonner] KPI-er lastet:', kpi.length);
+          logger.debug('[view-kolonner] KPI-er lastet:', kpi.length);
         } catch (kpiErr) {
-          console.warn('[view-kolonner] KPI-henting feilet:', kpiErr);
+          logger.warn('[view-kolonner] KPI-henting feilet:', kpiErr);
         }
         return kpi;
       };
@@ -354,7 +355,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
            WHERE view_name = @view`,
           { view },
         );
-        console.log('[view-kolonner] ai_metadata_views treff for view:', viewDiag.length, viewDiag);
+        logger.debug('[view-kolonner] ai_metadata_views treff for view:', viewDiag.length, viewDiag);
 
         const metaRows = await queryAzureSQL(
           `SELECT k.kolonne_navn, k.datatype, k.kolonne_type, k.sort_order
@@ -366,7 +367,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
            ORDER BY k.sort_order, k.kolonne_navn`,
           { schema, view },
         );
-        console.log('[view-kolonner] metadata-treff (med er_aktiv=1):', metaRows.length);
+        logger.debug('[view-kolonner] metadata-treff (med er_aktiv=1):', metaRows.length);
 
         if (metaRows.length === 0 && viewDiag.length > 0) {
           const metaAlle = await queryAzureSQL(
@@ -378,9 +379,9 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
              ORDER BY k.sort_order, k.kolonne_navn`,
             { schema, view },
           );
-          console.log('[view-kolonner] metadata-treff (uten er_aktiv-filter):', metaAlle.length, metaAlle);
+          logger.debug('[view-kolonner] metadata-treff (uten er_aktiv-filter):', metaAlle.length, metaAlle);
           if (metaAlle.length > 0) {
-            console.warn('[view-kolonner] er_aktiv er ikke 1 for dette viewet — bruk likevel metadata');
+            logger.warn('[view-kolonner] er_aktiv er ikke 1 for dette viewet — bruk likevel metadata');
             const kpiKolonner = await lastKpiKolonner();
             return reply.send({ kolonner: [...metaAlle, ...kpiKolonner], kilde: 'metadata' });
           }
@@ -391,7 +392,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
           return reply.send({ kolonner: [...metaRows, ...kpiKolonner], kilde: 'metadata' });
         }
 
-        console.warn('[view-kolonner] ingen metadata funnet — fallback til INFORMATION_SCHEMA');
+        logger.warn('[view-kolonner] ingen metadata funnet — fallback til INFORMATION_SCHEMA');
 
         // Diagnose: vis hvilke view-navn som faktisk finnes med lignende navn
         const diagnose = await queryAzureSQL(
@@ -401,7 +402,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
              AND TABLE_NAME LIKE @likePat`,
           { schema, likePat: `${view.substring(0, Math.min(10, view.length))}%` },
         );
-        console.log('[view-kolonner] INFORMATION_SCHEMA diagnose (like-søk):', JSON.stringify(diagnose));
+        logger.debug('[view-kolonner] INFORMATION_SCHEMA diagnose (like-søk):', JSON.stringify(diagnose));
 
         const rows = await queryAzureSQL(
           `SELECT
@@ -423,7 +424,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
            ORDER BY ORDINAL_POSITION`,
           { schema, view },
         );
-        console.log('[view-kolonner] INFORMATION_SCHEMA kolonner:', rows.length);
+        logger.debug('[view-kolonner] INFORMATION_SCHEMA kolonner:', rows.length);
 
         if (rows.length > 0) {
           const kpiKolonner = await lastKpiKolonner();
@@ -432,7 +433,7 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
 
         // Fallback: hent kolonner direkte fra viewet via SELECT TOP 1
         // Nyttig når TABLE_NAME i INFORMATION_SCHEMA har annen encoding enn view-navnet vi fikk
-        console.warn('[view-kolonner] INFORMATION_SCHEMA ga 0 treff — prøver direkte SELECT TOP 1');
+        logger.warn('[view-kolonner] INFORMATION_SCHEMA ga 0 treff — prøver direkte SELECT TOP 1');
         try {
           const safeSchema = schema.replace(/[^a-zA-Z0-9_]/g, '');
           const safeView   = view.replace(/\]/g, '');  // bare fjern ] for bracket-escaping
@@ -446,20 +447,20 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
               datatype:     'varchar',
               sort_order:   0,
             }));
-            console.log('[view-kolonner] fallback direkte SELECT kolonner:', kolonner.length);
+            logger.debug('[view-kolonner] fallback direkte SELECT kolonner:', kolonner.length);
             const kpiKolonner = await lastKpiKolonner();
             return reply.send({ kolonner: [...kolonner, ...kpiKolonner], kilde: 'direkte_select' });
           }
-          console.warn('[view-kolonner] direkte SELECT ga 0 rader — view er tomt eller ikke tilgjengelig');
+          logger.warn('[view-kolonner] direkte SELECT ga 0 rader — view er tomt eller ikke tilgjengelig');
           const kpiKolonner = await lastKpiKolonner();
           return reply.send({ kolonner: kpiKolonner, kilde: 'direkte_select' });
         } catch (fallbackErr) {
-          console.error('[view-kolonner] direkte SELECT feilet:', fallbackErr);
+          logger.error('[view-kolonner] direkte SELECT feilet:', fallbackErr);
           const kpiKolonner = await lastKpiKolonner();
           return reply.send({ kolonner: kpiKolonner, kilde: 'information_schema' });
         }
       } catch (err) {
-        console.error('[view-kolonner] feil:', err);
+        logger.error('[view-kolonner] feil:', err);
         return reply.status(500).send({ error: 'Kunne ikke hente kolonner.' });
       }
     },
@@ -471,10 +472,10 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       const { viewNavn, kolonne, prosjektFilter, kaskadefiltere, limit: limitStr, offset: offsetStr, søk } = request.query;
 
-      console.log('[kolonneverdier] viewNavn:', viewNavn, '| kolonne:', kolonne);
+      logger.debug('[kolonneverdier] viewNavn:', viewNavn, '| kolonne:', kolonne);
 
       if (!viewNavn?.startsWith('ai_gold.')) {
-        console.error('[kolonneverdier] ugyldig viewNavn:', viewNavn);
+        logger.error('[kolonneverdier] ugyldig viewNavn:', viewNavn);
         return reply.status(400).send({ error: 'Kun ai_gold views tillatt.' });
       }
 
@@ -543,17 +544,17 @@ export async function rapportDesignerRoutes(fastify: FastifyInstance) {
         OFFSET ${offset} ROWS
         FETCH NEXT ${limit} ROWS ONLY
       `.replace(/\s+/g, ' ').trim();
-      console.log('[kolonneverdier] SQL:', sql);
+      logger.debug('[kolonneverdier] SQL:', sql);
 
       try {
         const rows = await queryAzureSQL(sql);
         const verdier = rows
           .map(r => (r as { verdi: unknown }).verdi)
           .filter(v => v !== null && v !== undefined && String(v) !== '');
-        console.log('[kolonneverdier] returnerer', verdier.length, 'verdier (offset:', offset, ')');
+        logger.debug('[kolonneverdier] returnerer', verdier.length, 'verdier (offset:', offset, ')');
         return reply.send({ verdier });
       } catch (err) {
-        console.error('[kolonneverdier] SQL feil:', err);
+        logger.error('[kolonneverdier] SQL feil:', err);
         return reply.status(500).send({ error: 'Kunne ikke hente kolonneverdier.' });
       }
     },

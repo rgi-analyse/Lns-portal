@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
 import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
 import { loggHendelse } from '@/lib/loggHendelse';
 import { useLisens } from '@/components/LisensProvider';
@@ -133,7 +134,7 @@ export default function WorkspacePage() {
         );
       }
     } catch (err) {
-      console.error('[Workspace] navnendring feilet:', err);
+      logger.error('[Workspace] navnendring feilet:', err);
     } finally {
       avbrytRedigering();
     }
@@ -156,7 +157,7 @@ export default function WorkspacePage() {
         setRapporter((prev) => prev.filter((r) => r.id !== rapportId));
       }
     } catch (err) {
-      console.error('[Workspace] sletting feilet:', err);
+      logger.error('[Workspace] sletting feilet:', err);
     }
   };
 

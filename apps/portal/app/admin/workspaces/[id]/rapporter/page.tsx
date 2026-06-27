@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -84,39 +85,37 @@ export default function WorkspaceRapporterPage() {
     // Vent til auth er avgjort før fetch — ellers er authHeaders tom før MSAL-init -> 401.
     if (!authAvklart) return;
     if (!isAuthenticated) { setLoading(false); return; }
-    console.log('[RapporterPage] API URL:', process.env.NEXT_PUBLIC_API_URL);
+    logger.debug('[RapporterPage] API URL:', process.env.NEXT_PUBLIC_API_URL);
     setLoading(true);
     try {
       const wsUrl = `/api/workspaces/${id}`;
-      console.log('[RapporterPage] Henter workspace:', wsUrl);
+      logger.debug('[RapporterPage] Henter workspace:', wsUrl);
       const wsRes = await apiFetch(wsUrl, { headers: metaHeaders });
-      console.log('[RapporterPage] Workspace response status:', wsRes.status);
+      logger.debug('[RapporterPage] Workspace response status:', wsRes.status);
       if (!wsRes.ok) {
         const body = await wsRes.text();
-        console.error('[RapporterPage] Feil fra API (workspace):', body);
+        logger.error('[RapporterPage] Feil fra API (workspace):', body);
         throw new Error(`HTTP ${wsRes.status}`);
       }
       const ws = await wsRes.json() as Workspace;
 
       const rapUrl = `/api/workspaces/${id}/rapporter`;
-      console.log('[RapporterPage] Henter rapporter:', rapUrl);
+      logger.debug('[RapporterPage] Henter rapporter:', rapUrl);
       const rapRes = await apiFetch(rapUrl, { headers: metaHeaders });
-      console.log('[RapporterPage] Rapporter response status:', rapRes.status);
+      logger.debug('[RapporterPage] Rapporter response status:', rapRes.status);
       if (!rapRes.ok) {
         const body = await rapRes.text();
-        console.error('[RapporterPage] Feil fra API (rapporter):', body);
+        logger.error('[RapporterPage] Feil fra API (rapporter):', body);
         throw new Error(`HTTP ${rapRes.status}`);
       }
       const rListRaw = await rapRes.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rList: Rapport[] = (Array.isArray(rListRaw) ? rListRaw : []).map((r: any) => r.rapport ?? r);
-      console.log('[RapporterPage] rListRaw:', rListRaw);
-      console.log('[RapporterPage] rList etter mapping:', rList);
       setWorkspace(ws);
       setRapporter(rList);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Ukjent feil';
-      console.error('[RapporterPage] feil ved henting av data:', msg);
+      logger.error('[RapporterPage] feil ved henting av data:', msg);
       toast({ title: 'Kunne ikke laste data', description: msg, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -223,17 +222,17 @@ export default function WorkspaceRapporterPage() {
 
   const leggTilAiKobling = async () => {
     if (!aiKoblingRapport || !nyViewId) return;
-    console.log('[AiKobling] POST rapport:', aiKoblingRapport.id, 'view:', nyViewId, 'prioritet:', nyPrioritet);
+    logger.debug('[AiKobling] POST rapport:', aiKoblingRapport.id, 'view:', nyViewId, 'prioritet:', nyPrioritet);
     try {
       const res = await apiFetch(`/api/admin/metadata/rapport/${aiKoblingRapport.id}/views`, {
         method: 'POST',
         headers: metaJsonHeaders,
         body: JSON.stringify({ viewId: nyViewId, prioritet: nyPrioritet }),
       });
-      console.log('[AiKobling] POST svar:', res.status, res.statusText);
+      logger.debug('[AiKobling] POST svar:', res.status, res.statusText);
       if (!res.ok) {
         const txt = await res.text();
-        console.error('[AiKobling] POST feilet:', txt);
+        logger.error('[AiKobling] POST feilet:', txt);
         toast({ title: `Kunne ikke lagre kobling (${res.status})`, variant: 'destructive' });
         return;
       }
@@ -241,24 +240,24 @@ export default function WorkspaceRapporterPage() {
       // Re-hent fra DB for å vise korrekt lagret state
       await åpneAiKobling(aiKoblingRapport);
     } catch (err) {
-      console.error('[AiKobling] POST exception:', err);
+      logger.error('[AiKobling] POST exception:', err);
       toast({ title: 'Nettverksfeil ved lagring av kobling', variant: 'destructive' });
     }
   };
 
   const fjernAiKobling = async (viewId: string) => {
     if (!aiKoblingRapport) return;
-    console.log('[AiKobling] DELETE rapport:', aiKoblingRapport.id, 'view:', viewId);
+    logger.debug('[AiKobling] DELETE rapport:', aiKoblingRapport.id, 'view:', viewId);
     try {
       const res = await apiFetch(`/api/admin/metadata/rapport/${aiKoblingRapport.id}/views/${viewId}`, { method: 'DELETE', headers: metaHeaders });
-      console.log('[AiKobling] DELETE svar:', res.status);
+      logger.debug('[AiKobling] DELETE svar:', res.status);
       if (!res.ok) {
         toast({ title: `Kunne ikke fjerne kobling (${res.status})`, variant: 'destructive' });
         return;
       }
       setKobletViews(prev => prev.filter(v => v.view_id !== viewId));
     } catch (err) {
-      console.error('[AiKobling] DELETE exception:', err);
+      logger.error('[AiKobling] DELETE exception:', err);
       toast({ title: 'Nettverksfeil ved fjerning av kobling', variant: 'destructive' });
     }
   };

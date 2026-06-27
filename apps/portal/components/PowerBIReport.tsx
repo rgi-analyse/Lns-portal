@@ -9,6 +9,7 @@ import type {
   SlicerConfig, SlicerInfo, SlicerMapping, SlicerState,
 } from '@/lib/slicerOps';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import {
   FileText, Presentation, Table,
   Maximize, RefreshCw, RotateCcw,
@@ -141,7 +142,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       values: filterConfig.values,
     };
     report.updateFilters(models.FiltersOperations.Replace, [filter]).catch((err) =>
-      console.warn('[PowerBIReport] filter feil:', err),
+      logger.warn('[PowerBIReport] filter feil:', err),
     );
     // Dato-range-filter (advanced): GreaterThanOrEqual fraIso, LessThan tilIso.
     // Applieres på sliceren via visual.setSlicerState siden dette er et slicer-
@@ -158,7 +159,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       try {
         const visualName = slicerMappingRef.current[tittel];
         if (!visualName) {
-          console.warn(`[PBI] date-filter: slicer "${tittel}" mangler i mapping`);
+          logger.warn(`[PBI] date-filter: slicer "${tittel}" mangler i mapping`);
           return;
         }
         const r = reportRef.current;
@@ -169,7 +170,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         const visuals = await aktiv.getVisuals();
         const visual  = visuals.find((v) => v.name === visualName);
         if (!visual) {
-          console.warn(`[PBI] date-filter: visual "${visualName}" ikke funnet`);
+          logger.warn(`[PBI] date-filter: visual "${visualName}" ikke funnet`);
           return;
         }
         const filter = {
@@ -182,12 +183,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             { operator: 'LessThan',           value: tilIso },
           ],
         };
-        console.log('[PBI] applierer date-filter:', JSON.stringify(filter));
+        logger.debug('[PBI] applierer date-filter:', JSON.stringify(filter));
         await visual.setSlicerState({ filters: [filter] as unknown as models.ISlicerFilter[] });
         const state = await slicerOps.getActiveState(r, slicerMappingRef.current, slicereRef.current);
         onActiveStateChangeRef.current?.(state);
       } catch (err) {
-        console.warn('[PBI] date-filter feilet:', err);
+        logger.warn('[PBI] date-filter feilet:', err);
       }
     })();
   }, [dateFilterConfig]);
@@ -201,11 +202,11 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       for (const config of slicerQueue) {
         if (avbrutt) return;
         try {
-          console.log('[PBI] slicer-kø prosesserer:', config);
+          logger.debug('[PBI] slicer-kø prosesserer:', config);
           await slicerOps.apply(r, slicerMappingRef.current, slicereRef.current, config);
-          console.log('[PBI] slicer prosessert:', config.tittel);
+          logger.debug('[PBI] slicer prosessert:', config.tittel);
         } catch (err) {
-          console.error('[PBI] slicer feilet:', config.tittel, err);
+          logger.error('[PBI] slicer feilet:', config.tittel, err);
         }
       }
       if (!avbrutt && reportRef.current) {
@@ -219,7 +220,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
   useEffect(() => {
     if (!clearSlicerTitle || !reportRef.current) return;
-    console.log('[PBI] clearSlicerTitle endret, nullstiller slicer:', clearSlicerTitle);
+    logger.debug('[PBI] clearSlicerTitle endret, nullstiller slicer:', clearSlicerTitle);
     const r = reportRef.current;
     slicerOps.clear(r, slicerMappingRef.current, clearSlicerTitle)
       .then(async () => {
@@ -227,7 +228,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         const state = await slicerOps.getActiveState(reportRef.current, slicerMappingRef.current, slicereRef.current);
         onActiveStateChangeRef.current?.(state);
       })
-      .catch((err) => console.warn('[PBI] clearSlicer feilet:', err));
+      .catch((err) => logger.warn('[PBI] clearSlicer feilet:', err));
   }, [clearSlicerTitle]);
 
   async function exportVisualData(visualTitle: string): Promise<string> {
@@ -287,17 +288,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
     try {
       const pages = await synligeSider();
-      console.log(`[PBI] Synlige sider: ${pages.length}`);
+      logger.debug(`[PBI] Synlige sider: ${pages.length}`);
 
       for (const page of pages) {
         const visuals = await page.getVisuals();
-        console.log(`[PBI] Side "${page.displayName}": ${visuals.length} visuals`);
+        logger.debug(`[PBI] Side "${page.displayName}": ${visuals.length} visuals`);
 
         for (const visual of visuals) {
           const compositeKey = `${page.name}::${visual.name}`;
           if (filter && !filter.has(compositeKey)) continue;
           if (!erEksporterbar(visual.type)) {
-            console.log(`[PBI] ⏭ skippet: "${visual.title || visual.name}" (${visual.type})`);
+            logger.debug(`[PBI] ⏭ skippet: "${visual.title || visual.name}" (${visual.type})`);
             continue;
           }
 
@@ -306,7 +307,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             const exported = await visual.exportData(models.ExportDataType.Summarized, 10000);
             const lines = exported.data?.split('\n') ?? [];
             const rowCount = lines.length - 1;
-            console.log(`[PBI] ✅ "${label}" (summarized): ${rowCount} rader`);
+            logger.debug(`[PBI] ✅ "${label}" (summarized): ${rowCount} rader`);
             if (rowCount > 0) result[label] = exported.data;
           } catch {
             // Prøv Underlying hvis Summarized feiler
@@ -314,18 +315,18 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               const exported = await visual.exportData(models.ExportDataType.Underlying, 10000);
               const lines = exported.data?.split('\n') ?? [];
               const rowCount = lines.length - 1;
-              console.log(`[PBI] ✅ "${label}" (underlying): ${rowCount} rader`);
+              logger.debug(`[PBI] ✅ "${label}" (underlying): ${rowCount} rader`);
               if (rowCount > 0) result[label] = exported.data;
             } catch (e2) {
-              console.warn(`[PBI] ⚠️ "${label}" (${visual.type}) ikke eksporterbar: ${(e2 as Error).message}`);
+              logger.warn(`[PBI] ⚠️ "${label}" (${visual.type}) ikke eksporterbar: ${(e2 as Error).message}`);
             }
           }
         }
       }
 
-      console.log(`[PBI] Total data: ${Object.keys(result).length} visuals`);
+      logger.debug(`[PBI] Total data: ${Object.keys(result).length} visuals`);
     } catch (e) {
-      console.error('[PBI] getAllVisualsData feil:', (e as Error).message);
+      logger.error('[PBI] getAllVisualsData feil:', (e as Error).message);
     }
 
     return result;
@@ -338,7 +339,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       const pages = await synligeSider();
       for (const page of pages) {
         const visuals = await page.getVisuals();
-        console.log('[PBI] Kandidater for eksport:', visuals.map((v) => `${v.title || v.name} (${v.type})`));
+        logger.debug('[PBI] Kandidater for eksport:', visuals.map((v) => `${v.title || v.name} (${v.type})`));
         for (const visual of visuals) {
           if (!erEksporterbar(visual.type)) continue;
           if (!visual.title?.trim()) continue; // hopp over visuals uten tittel
@@ -352,7 +353,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         }
       }
     } catch (e) {
-      console.error('[PBI] hentExcelKandidater feil:', (e as Error).message);
+      logger.error('[PBI] hentExcelKandidater feil:', (e as Error).message);
     }
     return kandidater;
   };
@@ -363,12 +364,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       const { slicere, mapping } = await slicerOps.loadAll(r);
       slicereRef.current = slicere;
       slicerMappingRef.current = mapping;
-      console.log('[PBI] slicere lastet:', slicere.length, '— titler:', Object.keys(mapping));
+      logger.debug('[PBI] slicere lastet:', slicere.length, '— titler:', Object.keys(mapping));
       onSlicereLoaded?.(slicere);
       const state = await slicerOps.getActiveState(r, mapping, slicere);
       onActiveStateChangeRef.current?.(state);
     } catch (err) {
-      console.error('[PBI] refreshSlicere feilet:', err);
+      logger.error('[PBI] refreshSlicere feilet:', err);
     }
   };
 
@@ -389,7 +390,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
               keepalive: true,
             });
           })
-          .catch(err => console.warn('[PBI] unmount save feil:', err));
+          .catch(err => logger.warn('[PBI] unmount save feil:', err));
       }
     };
   }, [innstillingerKey]);
@@ -399,14 +400,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     fetchedRef.current = true;
 
     const fetchToken = async () => {
-      console.log('[PBI] fetchToken props:', { pbiReportId, pbiDatasetId, pbiWorkspaceId });
       const body =
         pbiReportId && pbiDatasetId && pbiWorkspaceId
           ? { pbiReportId, pbiDatasetId, pbiWorkspaceId }
           : rapportId
           ? { rapportId }
           : {};
-      console.log('[PBI] fetchToken body som sendes:', JSON.stringify(body));
       try {
         const response = await apiFetch(
           '/api/embed-token',
@@ -445,7 +444,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       });
       toast({ title: 'Visning lagret!', variant: 'success' });
     } catch (err) {
-      console.error('[PowerBIReport] Bookmark feil:', err);
+      logger.error('[PowerBIReport] Bookmark feil:', err);
       toast({ title: 'Kunne ikke lagre visning', variant: 'destructive' });
     }
   };
@@ -461,27 +460,24 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
   };
 
   const autoSaveBookmark = async () => {
-    console.log('[PBI] autoSaveBookmark kjører');
-    console.log('[PBI] report instans:', reportRef.current);
-    console.log('[PBI] account:', accountRef.current);
-    console.log('[PBI] pbiReportId:', pbiReportId);
+    logger.debug('[PBI] autoSaveBookmark kjører');
 
     if (!reportRef.current) {
-      console.log('[PBI] autoSave avbrutt - report er null');
+      logger.debug('[PBI] autoSave avbrutt - report er null');
       return;
     }
     if (!accountRef.current) {
-      console.log('[PBI] autoSave avbrutt - account er null');
+      logger.debug('[PBI] autoSave avbrutt - account er null');
       return;
     }
     if (!innstillingerKey) {
-      console.log('[PBI] autoSave avbrutt - innstillingerKey er null');
+      logger.debug('[PBI] autoSave avbrutt - innstillingerKey er null');
       return;
     }
 
     try {
       const bookmark = await reportRef.current.bookmarksManager.capture();
-      console.log('[PBI] bookmark captured:', bookmark?.name);
+      logger.debug('[PBI] bookmark captured:', bookmark?.name);
 
       const response = await apiFetch(`/api/innstillinger/${innstillingerKey}`, {
         method: 'POST',
@@ -492,12 +488,12 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
           verdi: JSON.stringify(bookmark),
         }),
       });
-      console.log('[PBI] autoSave response status:', response.status);
+      logger.debug('[PBI] autoSave response status:', response.status);
 
       setAutoSaveStatus('saved');
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
     } catch (err) {
-      console.error('[PBI] autoSave feil:', err);
+      logger.error('[PBI] autoSave feil:', err);
     }
   };
 
@@ -506,13 +502,13 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     slicerStateTimer.current = setTimeout(async () => {
       if (!reportRef.current) return;
       const state = await slicerOps.getActiveState(reportRef.current, slicerMappingRef.current, slicereRef.current);
-      console.log('[PBI] slicer state oppdatert (bruker-interaksjon):', JSON.stringify(state));
+      logger.debug('[PBI] slicer state oppdatert (bruker-interaksjon):', JSON.stringify(state));
       onActiveStateChangeRef.current?.(state);
     }, 500);
   };
 
   const triggerAutoSave = () => {
-    console.log('[PBI] triggerAutoSave kalt, starter 1sek timer');
+    logger.debug('[PBI] triggerAutoSave kalt, starter 1sek timer');
     setAutoSaveStatus('pending');
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => { autoSaveBookmark(); }, 1000);
@@ -542,7 +538,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error(`${format} eksport feil:`, err);
+      logger.error(`${format} eksport feil:`, err);
     } finally {
       setExporting((prev) => ({ ...prev, [format]: false }));
     }
@@ -672,7 +668,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('[PBI] Excel-eksport feil:', err);
+      logger.error('[PBI] Excel-eksport feil:', err);
       toast({ title: 'Excel-eksport feilet', variant: 'destructive' });
     } finally {
       setEksporterer(false);
@@ -727,7 +723,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
       if (!respons.ok) {
         const err = await respons.json().catch(() => ({}));
-        console.error('[Refresh] trigger feilet:', err);
+        logger.error('[Refresh] trigger feilet:', err);
         setRefreshStatus('feilet');
         planleggIdleReset(8000);
         return;
@@ -735,7 +731,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
 
       const { refreshId } = await respons.json() as { refreshId?: string };
       if (!refreshId) {
-        console.warn('[Refresh] PBI returnerte ingen refreshId — kan ikke polle status');
+        logger.warn('[Refresh] PBI returnerte ingen refreshId — kan ikke polle status');
         setRefreshStatus('feilet');
         planleggIdleReset(8000);
         return;
@@ -755,7 +751,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             `&refreshId=${encodeURIComponent(refreshId)}`,
           );
           if (!statusRes.ok) {
-            console.warn('[Refresh] status-poll svarte', statusRes.status);
+            logger.warn('[Refresh] status-poll svarte', statusRes.status);
             return; // forbigående feil — fortsett polling
           }
           const { status, error } = await statusRes.json() as { status: string; error: string | null };
@@ -767,7 +763,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             // bruker beholder filtre, slicer-state, scroll-posisjon.
             if (reportRef.current) {
               try { await reportRef.current.refresh(); }
-              catch (e) { console.warn('[Refresh] report.refresh() feilet:', e); }
+              catch (e) { logger.warn('[Refresh] report.refresh() feilet:', e); }
             }
             // Oppdater "Sist oppdatert"-info i verktøylinja
             apiFetch(`/api/pbi/refresh-info?datasetId=${pbiDatasetId}&workspaceId=${pbiWorkspaceId}`)
@@ -777,13 +773,13 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
             planleggIdleReset(5000);
           } else if (status === 'Failed' || status === 'Disabled') {
             stopRefreshTimers();
-            console.error('[Refresh] PBI rapporterte', status, error);
+            logger.error('[Refresh] PBI rapporterte', status, error);
             setRefreshStatus('feilet');
             planleggIdleReset(8000);
           }
           // Alle andre statuser ('Unknown', 'InProgress'): la pollingen fortsette
         } catch (e) {
-          console.warn('[Refresh] poll-feil:', e);
+          logger.warn('[Refresh] poll-feil:', e);
         }
       };
       refreshTimersRef.current.poll = setInterval(sjekkStatus, 4000);
@@ -797,7 +793,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
         }
       }, 300_000);
     } catch (e) {
-      console.error('[Refresh] nettverksfeil:', e);
+      logger.error('[Refresh] nettverksfeil:', e);
       stopRefreshTimers();
       setRefreshStatus('feilet');
       planleggIdleReset(8000);
@@ -836,9 +832,9 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
     try {
       await report.setZoom(zoom);
       setZoomLevel(zoom);
-      console.log('[PBI] tilpass-zoom satt til:', zoom, `(container: ${w}×${h})`);
+      logger.debug('[PBI] tilpass-zoom satt til:', zoom, `(container: ${w}×${h})`);
     } catch (err) {
-      console.warn('[PBI] tilpass-zoom feil:', err);
+      logger.warn('[PBI] tilpass-zoom feil:', err);
     }
   };
 
@@ -1138,8 +1134,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
           },
         }}
         eventHandlers={new Map([
-          ['loaded', (event, embeddedReport) => {
-            console.log('[PBI] loaded event', event);
+          ['loaded', (_event, embeddedReport) => {
             const r = embeddedReport as Report;
             setReport(r);
             onRegisterGetVisualData?.(getAllVisualsData);
@@ -1153,10 +1148,10 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                   const zoom = Math.min(h / 720, w / 1280, 1.0);
                   await r.setZoom(zoom);
                   setZoomLevel(zoom);
-                  console.log('[PBI] auto-zoom satt til:', zoom, `(container: ${w}×${h})`);
+                  logger.debug('[PBI] auto-zoom satt til:', zoom, `(container: ${w}×${h})`);
                 }
               } catch (err) {
-                console.warn('[PBI] auto-zoom feil:', err);
+                logger.warn('[PBI] auto-zoom feil:', err);
               }
             }, 500);
 
@@ -1166,7 +1161,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                 const pages = await r.getPages();
                 const aktiv = pages.find((p) => p.isActive);
                 if (aktiv?.displayName) {
-                  console.log('[PBI] aktiv side (innlasting):', aktiv.displayName);
+                  logger.debug('[PBI] aktiv side (innlasting):', aktiv.displayName);
                   onAktivSideChange?.(aktiv.displayName);
                 }
               } catch { /* ignorer */ }
@@ -1179,17 +1174,17 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                 const tablesRes = await apiFetch(tablesUrl.replace(API, ''));
                 if (tablesRes.ok) {
                   const { tables } = await tablesRes.json() as { tables: string[] };
-                  console.log('[PBI] Tilgjengelige tabeller:', tables);
+                  logger.debug('[PBI] Tilgjengelige tabeller:', tables);
                   onTablesLoaded?.(tables);
                 }
               } catch (e) {
-                console.warn('[PBI] Kunne ikke hente tabeller:', e);
+                logger.warn('[PBI] Kunne ikke hente tabeller:', e);
               }
             }, 2000);
             if (pbiReportId && entraObjectId) {
               (async () => {
                 try {
-                  console.log('[PBI] henter innstillinger, nøkkel:', innstillingerKey);
+                  logger.debug('[PBI] henter innstillinger, nøkkel:', innstillingerKey);
                   // Prøv workspace-spesifikk nøkkel først, fall tilbake til kun pbiReportId
                   const keysToTry = innstillingerKey && innstillingerKey !== pbiReportId
                     ? [innstillingerKey, pbiReportId]
@@ -1204,7 +1199,7 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                     if (res.ok) {
                       innstilling = await res.json() as { verdi?: string } | null;
                       if (innstilling?.verdi) {
-                        console.log('[PBI] bokmerke funnet med nøkkel:', key);
+                        logger.debug('[PBI] bokmerke funnet med nøkkel:', key);
                         break;
                       }
                     }
@@ -1215,27 +1210,27 @@ export default function PowerBIReport({ rapportId, portalWorkspaceId, pbiReportI
                     await r.bookmarksManager.applyState(bookmark.state);
                   }
                 } catch (e) {
-                  console.warn('[PowerBIReport] Kunne ikke gjenopprette bokmerke:', e);
+                  logger.warn('[PowerBIReport] Kunne ikke gjenopprette bokmerke:', e);
                 }
               })();
             }
           }],
-          ['dataSelected',    (event) => { console.log('[PBI] dataSelected event', event); triggerAutoSave(); triggerSlicerStateUpdate(); }],
-          ['filtersApplied',  (event) => { console.log('[PBI] filtersApplied event', event); triggerAutoSave(); triggerSlicerStateUpdate(); }],
+          ['dataSelected',    () => { triggerAutoSave(); triggerSlicerStateUpdate(); }],
+          ['filtersApplied',  () => { triggerAutoSave(); triggerSlicerStateUpdate(); }],
           ['pageChanged',     (event) => {
             const side = (event as unknown as { detail?: { newPage?: { displayName?: string } } }).detail?.newPage?.displayName ?? '';
-            console.log('[PBI] aktiv side:', side);
+            logger.debug('[PBI] aktiv side:', side);
             onAktivSideChange?.(side);
             triggerAutoSave();
             // Re-mapp slicere på den nye siden — slicer-titler kan referere til andre visual.name
             if (reportRef.current) {
               refreshSlicere(reportRef.current).catch((err) =>
-                console.warn('[PBI] refreshSlicere ved pageChanged feilet:', err),
+                logger.warn('[PBI] refreshSlicere ved pageChanged feilet:', err),
               );
             }
           }],
-          ['bookmarkApplied', (event) => { console.log('[PBI] bookmarkApplied event', event); triggerAutoSave(); }],
-          ['visualClicked',   (event) => { console.log('[PBI] visualClicked event', event); triggerAutoSave(); }],
+          ['bookmarkApplied', () => { triggerAutoSave(); }],
+          ['visualClicked',   () => { triggerAutoSave(); }],
         ])}
         cssClassName="h-full w-full"
       />

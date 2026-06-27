@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { apiFetch } from '@/lib/apiClient';
@@ -141,7 +142,6 @@ export default function MetadataAdminPage() {
     try {
       const res = await apiFetch('/api/admin/metadata/views', { headers: authHeaders });
       const data: unknown = await res.json();
-      console.log('[Metadata] API respons:', data);
       setViews(Array.isArray(data) ? data.map((v: MetadataView) => ({ ...v, kpi: v.kpi ?? [] })) : []);
     } catch {
       setStatusMsg('Feil ved henting av views');
@@ -249,7 +249,7 @@ export default function MetadataAdminPage() {
       });
       if (!res.ok) {
         const txt = await res.text();
-        console.error('[Metadata] feil ved legging til view:', txt);
+        logger.error('[Metadata] feil ved legging til view:', txt);
         setStatusMsg(`Feil ved opprettelse av ${view_name}: ${res.status}`);
         return;
       }
@@ -264,7 +264,7 @@ export default function MetadataAdminPage() {
       setStatusMsg(`${visningsnavn} lagt til og synkronisert`);
       await hentViews();
     } catch (err) {
-      console.error('[Metadata] exception ved legging til view:', err);
+      logger.error('[Metadata] exception ved legging til view:', err);
       setStatusMsg(`Nettverksfeil ved opprettelse av ${view_name}`);
     } finally {
       setAddingView(null);

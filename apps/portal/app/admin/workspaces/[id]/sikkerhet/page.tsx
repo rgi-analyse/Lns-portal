@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/toast';
 import TilgangStyring from '@/components/TilgangStyring';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { logger } from '@/lib/logger';
 
 interface Workspace {
   id: string;
@@ -30,16 +31,16 @@ export default function SikkerhetPage() {
     const load = async () => {
       try {
         const r = await apiFetch(`/api/workspaces/${id}`, { headers: authHeaders });
-        console.log('[SikkerhetPage] Response status:', r.status);
+        logger.debug('[SikkerhetPage] Response status:', r.status);
         if (!r.ok) {
           const body = await r.text();
-          console.error('[SikkerhetPage] Feil fra API:', body);
+          logger.error('[SikkerhetPage] Feil fra API:', body);
           throw new Error(`HTTP ${r.status}`);
         }
         setWorkspace(await r.json() as Workspace);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Ukjent feil';
-        console.error('[SikkerhetPage] feil ved henting av workspace:', msg);
+        logger.error('[SikkerhetPage] feil ved henting av workspace:', msg);
         setError(msg);
         toast({ title: 'Workspace ikke funnet', variant: 'destructive' });
       } finally {
