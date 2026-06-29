@@ -4,6 +4,7 @@ import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { verifiserGrupper } from '../services/graphService';
+import { feilRespons } from '../lib/feilRespons';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -238,10 +239,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         });
         return reply.send(merged);
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        logger.error('[workspaces] GET /api/workspaces:', error);
-        fastify.log.error(error);
-        return reply.status(500).send({ error: 'Kunne ikke hente workspaces.', detail });
+        return feilRespons(reply, 500, 'Kunne ikke hente workspaces.', error);
       }
     },
   );

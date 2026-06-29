@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { logger } from '../lib/logger';
 import { getAzureToken } from './embedToken';
+import { feilRespons } from '../lib/feilRespons';
 
 type ExportFormat = 'PDF' | 'PPTX';
 type ExportStatus = 'NotStarted' | 'Running' | 'Succeeded' | 'Failed';
@@ -116,11 +117,7 @@ export async function exportReportRoutes(fastify: FastifyInstance) {
         .header('Content-Disposition', `attachment; filename="rapport.${EXTENSIONS[format]}"`)
         .send(buffer);
     } catch (error) {
-      logger.error('Eksport feil:', error);
-      fastify.log.error(error);
-      return reply.status(500).send({
-        error: error instanceof Error ? error.message : 'Ukjent feil under eksport.',
-      });
+      return feilRespons(reply, 500, 'Kunne ikke eksportere rapporten.', error);
     }
   });
 }

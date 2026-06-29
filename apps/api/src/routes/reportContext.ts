@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { feilRespons } from '../lib/feilRespons';
 import * as mssql from 'mssql';
 import { getAzureToken } from '../lib/azureToken';
 import { logger } from '../lib/logger';
@@ -77,8 +78,7 @@ export async function reportContextRoutes(fastify: FastifyInstance) {
         logger.debug('[ReportContext] Hentet:', context.ReportName);
         return reply.send(context);
       } catch (err) {
-        logger.error('[ReportContext] Feil:', err instanceof Error ? err.message : err);
-        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil' });
+        return feilRespons(reply, 500, 'Kunne ikke hente rapport-kontekst.', err);
       }
     },
   );

@@ -8,6 +8,7 @@ import {
 } from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
+import { loggFeil } from '../lib/feilRespons';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { erAdmin } from '../middleware/auth';
@@ -1172,7 +1173,8 @@ Tilgjengelige visualiseringstyper:
         try {
           await chat(messages, ingenRapportPrompt, writeOgCapture, chatContext);
         } catch (err) {
-          write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
+          const feil = loggFeil('Det oppstod en feil under svaret.', err, request);
+          write({ type: 'error', message: `${feil.error} (ref: ${feil.korrelasjonId})` });
         } finally {
           loggTiming('global');
           reply.raw.end();
@@ -1647,8 +1649,8 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       try {
         await chat(messages, rapportKontekst, writeOgCapture, chatContext);
       } catch (err) {
-        logger.error('[chat] feil:', err);
-        write({ type: 'error', message: err instanceof Error ? err.message : 'Ukjent feil' });
+        const feil = loggFeil('Det oppstod en feil under svaret.', err, request);
+        write({ type: 'error', message: `${feil.error} (ref: ${feil.korrelasjonId})` });
       } finally {
         loggTiming('rapport');
         reply.raw.end();

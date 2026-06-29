@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { executeQuery } from '../services/fabricService';
+import { feilRespons } from '../lib/feilRespons';
 
 export async function debugSchemasRoutes(fastify: FastifyInstance) {
   fastify.get('/api/debug/schemas', async (_request, reply) => {
@@ -10,7 +11,7 @@ export async function debugSchemasRoutes(fastify: FastifyInstance) {
       `, 200);
       return reply.send(result);
     } catch (err) {
-      return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil' });
+      return feilRespons(reply, 500, 'Kunne ikke hente skjema-info.', err);
     }
   });
 }

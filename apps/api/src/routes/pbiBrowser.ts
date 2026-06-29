@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getAzureToken } from './embedToken';
+import { feilRespons } from '../lib/feilRespons';
 
 interface PbiGroup {
   id: string;
@@ -45,9 +46,7 @@ export async function pbiBrowserRoutes(fastify: FastifyInstance) {
 
       if (!response.ok) {
         const body = await response.text();
-        return reply
-          .status(502)
-          .send({ error: `Power BI feilet med HTTP ${response.status}`, detail: body });
+        return feilRespons(reply, 502, 'Kunne ikke hente Power BI-arbeidsområder.', new Error(`PBI ${response.status}: ${body}`));
       }
 
       const data       = await response.json() as PbiGroupsResponse;
@@ -60,10 +59,7 @@ export async function pbiBrowserRoutes(fastify: FastifyInstance) {
 
       return reply.send(workspaces);
     } catch (error) {
-      fastify.log.error(error);
-      return reply
-        .status(500)
-        .send({ error: error instanceof Error ? error.message : 'Kunne ikke hente PBI workspaces.' });
+      return feilRespons(reply, 500, 'Kunne ikke hente Power BI-arbeidsområder.', error);
     }
   });
 
@@ -82,9 +78,7 @@ export async function pbiBrowserRoutes(fastify: FastifyInstance) {
 
         if (!response.ok) {
           const body = await response.text();
-          return reply
-            .status(502)
-            .send({ error: `Power BI feilet med HTTP ${response.status}`, detail: body });
+          return feilRespons(reply, 502, 'Kunne ikke hente Power BI-rapporter.', new Error(`PBI ${response.status}: ${body}`));
         }
 
         const data     = await response.json() as PbiReportsResponse;
@@ -98,10 +92,7 @@ export async function pbiBrowserRoutes(fastify: FastifyInstance) {
 
         return reply.send(rapporter);
       } catch (error) {
-        fastify.log.error(error);
-        return reply
-          .status(500)
-          .send({ error: error instanceof Error ? error.message : 'Kunne ikke hente PBI rapporter.' });
+        return feilRespons(reply, 500, 'Kunne ikke hente Power BI-rapporter.', error);
       }
     },
   );

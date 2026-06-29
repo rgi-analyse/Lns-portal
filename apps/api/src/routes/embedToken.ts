@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
+import { feilRespons } from '../lib/feilRespons';
 export { getAzureToken };
 
 interface PbiReport {
@@ -166,25 +167,10 @@ export async function embedTokenRoutes(fastify: FastifyInstance) {
         tokenId: tokenData.tokenId,
       };
     } catch (error) {
-      logger.error('Embed token feil:', error);
-
       if (error instanceof ApiError) {
-        fastify.log.error(
-          { source: error.source, status: error.status, body: error.body },
-          error.message
-        );
-        return reply.status(502).send({
-          error: error.message,
-          source: error.source,
-          status: error.status,
-          detail: error.body,
-        });
+        return feilRespons(reply, 502, 'Kunne ikke hente embed-token.', error);
       }
-
-      fastify.log.error(error);
-      return reply.status(500).send({
-        error: error instanceof Error ? error.message : 'Ukjent feil ved henting av embed token.',
-      });
+      return feilRespons(reply, 500, 'Kunne ikke hente embed-token.', error);
     }
   });
 }

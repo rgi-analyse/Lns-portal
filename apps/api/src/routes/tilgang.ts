@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { searchGroups, searchUsers } from '../services/graphService';
+import { feilRespons } from '../lib/feilRespons';
 
 function isNotFound(error: unknown): boolean {
   return (
@@ -30,10 +31,7 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
         const groups = await searchGroups(q);
         return reply.send(groups);
       } catch (error) {
-        fastify.log.error(error);
-        return reply
-          .status(502)
-          .send({ error: error instanceof Error ? error.message : 'Gruppe-søk feilet.' });
+        return feilRespons(reply, 502, 'Gruppe-søk feilet.', error);
       }
     },
   );
@@ -48,10 +46,7 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
         const users = await searchUsers(q);
         return reply.send(users);
       } catch (error) {
-        fastify.log.error(error);
-        return reply
-          .status(502)
-          .send({ error: error instanceof Error ? error.message : 'Bruker-søk feilet.' });
+        return feilRespons(reply, 502, 'Bruker-søk feilet.', error);
       }
     },
   );

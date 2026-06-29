@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { logger } from '../lib/logger';
 import { getAzureToken } from './embedToken';
+import { feilRespons } from '../lib/feilRespons';
 
 interface RefreshEntry {
   id?: string;
@@ -86,11 +87,9 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
           return reply.status(202).send({ ok: true, refreshId });
         }
         const body = await res.text().catch(() => '');
-        fastify.log.error(`[pbiRefresh] PBI svarte ${res.status}: ${body}`);
-        return reply.status(res.status).send({ error: `PBI svarte ${res.status}`, detail: body });
+        return feilRespons(reply, res.status, 'Kunne ikke starte oppdatering.', new Error(`PBI svarte ${res.status}: ${body}`));
       } catch (err) {
-        fastify.log.error(err);
-        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
+        return feilRespons(reply, 500, 'Kunne ikke starte oppdatering.', err);
       }
     },
   );
@@ -137,8 +136,7 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
         );
         if (!histRes.ok) {
           const body = await histRes.text().catch(() => '');
-          fastify.log.error(`[pbiRefresh] status-history svarte ${histRes.status}: ${body}`);
-          return reply.status(histRes.status).send({ error: `PBI svarte ${histRes.status}`, detail: body });
+          return feilRespons(reply, histRes.status, 'Kunne ikke hente oppdateringshistorikk.', new Error(`PBI svarte ${histRes.status}: ${body}`));
         }
         const data  = await histRes.json() as RefreshHistoryResponse;
         const entry = data.value?.find((r) => (r.requestId ?? r.id) === refreshId);
@@ -154,8 +152,7 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
           error:     entry.serviceExceptionJson ?? null,
         });
       } catch (err) {
-        fastify.log.error(err);
-        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
+        return feilRespons(reply, 500, 'Kunne ikke hente oppdateringsstatus.', err);
       }
     },
   );
@@ -211,8 +208,7 @@ export async function pbiRefreshRoutes(fastify: FastifyInstance) {
           },
         });
       } catch (err) {
-        fastify.log.error(err);
-        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil.' });
+        return feilRespons(reply, 500, 'Kunne ikke hente oppdateringsplan.', err);
       }
     },
   );

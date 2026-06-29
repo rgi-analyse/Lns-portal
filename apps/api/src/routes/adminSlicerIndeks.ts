@@ -14,6 +14,7 @@ import { indekserSlicer } from '../services/slicerIndekseringService';
 import { hentSchedulerStatus } from '../services/slicerIndekseringScheduler';
 import { slettAlleForSlicer } from '../services/slicerKatalogService';
 import { prisma } from '../lib/prisma';
+import { feilRespons } from '../lib/feilRespons';
 
 interface OpprettBody {
   rapport_id:        string;
@@ -377,8 +378,7 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
           indeks_ms:        r.indekserings_ms,
         });
       } catch (err) {
-        const melding = err instanceof Error ? err.message : 'Ukjent feil under indeksering.';
-        return reply.status(500).send({ error: melding });
+        return feilRespons(reply, 500, 'Kunne ikke indeksere slicer.', err);
       }
     },
   );
@@ -487,10 +487,7 @@ export async function adminSlicerIndeksRoutes(fastify: FastifyInstance) {
           });
           return reply.send({ tabell, kolonner });
         } catch (err) {
-          return reply.status(400).send({
-            error:  `Kunne ikke lese tabellen "${tabell}".`,
-            detail: err instanceof Error ? err.message : String(err),
-          });
+          return feilRespons(reply, 400, `Kunne ikke lese tabellen "${tabell}".`, err);
         }
       }
 
@@ -523,17 +520,13 @@ SELECTCOLUMNS(
           logger.debug(`[admin-tabeller] kilde=rest_api antall=${tabeller.length}`);
           return reply.send({ tabeller, kilde: 'rest_api' as const });
         } catch (restErr) {
-          const restDetail = restErr instanceof Error ? restErr.message : String(restErr);
-          const restStack  = restErr instanceof Error ? restErr.stack : undefined;
-          logger.error('[admin-tabeller] REST feilet:', restErr);
-          logger.error('[admin-tabeller] REST detail:', restDetail);
-          if (restStack) logger.error('[admin-tabeller] REST stack:', restStack);
-          return reply.status(400).send({
-            error:
-              'Kan ikke liste tabeller automatisk — både INFO.TABLES og PBI REST feilet. ' +
+          return feilRespons(
+            reply,
+            400,
+            'Kan ikke liste tabeller automatisk — både INFO.TABLES og PBI REST feilet. ' +
               'Oppgi tabellnavn via ?tabell=<navn> for å hente kolonner.',
-            detail: { info_tables: infoDetail.slice(0, 500), rest_api: restDetail.slice(0, 500) },
-          });
+            restErr,
+          );
         }
       }
     },

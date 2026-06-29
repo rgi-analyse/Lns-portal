@@ -3,6 +3,7 @@ import { logger } from '../lib/logger';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 import { queryAzureSQL } from '../services/azureSqlService';
+import { feilRespons } from '../lib/feilRespons';
 
 export async function pbiCreateRoutes(fastify: FastifyInstance) {
   // POST /api/pbi/create-token — henter embed-token for å opprette ny rapport i nettleseren
@@ -57,8 +58,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         logger.debug('[pbiCreateToken] token hentet, utløper:', tokenData.expiration);
         return reply.send({ token: tokenData.token, expiration: tokenData.expiration });
       } catch (error) {
-        fastify.log.error(error);
-        return reply.status(500).send({ error: 'Kunne ikke hente create-token.', detail: error instanceof Error ? error.message : String(error) });
+        return feilRespons(reply, 500, 'Kunne ikke hente Power BI-token.', error);
       }
     },
   );
@@ -97,8 +97,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         logger.debug('[pbiRegister] Ny rapport registrert i DB:', rapport.id, rapport.navn);
         return reply.status(201).send({ id: rapport.id, navn: rapport.navn });
       } catch (error) {
-        fastify.log.error(error);
-        return reply.status(500).send({ error: 'Kunne ikke registrere rapport.', detail: error instanceof Error ? error.message : String(error) });
+        return feilRespons(reply, 500, 'Kunne ikke registrere rapporten.', error);
       }
     },
   );
@@ -157,12 +156,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
 
         return reply.status(204).send();
       } catch (error) {
-        logger.error('[pbiSlett] Feil:', error);
-        fastify.log.error(error);
-        return reply.status(500).send({
-          error: 'Kunne ikke slette rapport.',
-          detail: error instanceof Error ? error.message : String(error),
-        });
+        return feilRespons(reply, 500, 'Kunne ikke slette rapporten.', error);
       }
     },
   );
@@ -190,7 +184,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         const rows = await queryAzureSQL(sql, 500);
         return reply.send({ rows });
       } catch (error) {
-        return reply.status(500).send({ error: 'SQL-feil.', detail: error instanceof Error ? error.message : String(error) });
+        return feilRespons(reply, 500, 'Kunne ikke kjøre spørringen.', error);
       }
     },
   );
@@ -237,7 +231,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
         `);
         return reply.send({ kolonner: rows.map(r => r['COLUMN_NAME'] as string) });
       } catch (error) {
-        return reply.status(500).send({ error: 'Feil ved henting av kolonner.', detail: error instanceof Error ? error.message : String(error) });
+        return feilRespons(reply, 500, 'Kunne ikke hente kolonner.', error);
       }
     },
   );
