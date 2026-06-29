@@ -3,6 +3,7 @@ import { logger } from '../lib/logger';
 import { queryAzureSQL } from '../services/azureSqlService';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { validerKpiUttrykk } from '../services/kpiValidator';
+import { feilRespons } from '../lib/feilRespons';
 
 const esc = (s: string): string => s.replace(/'/g, "''");
 
@@ -103,9 +104,7 @@ export async function kpiRoutes(fastify: FastifyInstance) {
         logger.debug('[kpi.lagre] opprettet KPI:', navn, 'for', schema + '.' + view, 'av', bruker.email);
         return reply.status(201).send({ success: true, kpi: rader[0] });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.error('[kpi.lagre] INSERT feilet:', msg);
-        return reply.status(500).send({ error: `KPI-insert feilet: ${msg}` });
+        return feilRespons(reply, 500, 'Kunne ikke lagre KPI.', err);
       }
     },
   );

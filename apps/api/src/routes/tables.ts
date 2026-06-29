@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { logger } from '../lib/logger';
 import { getTableSchema } from '../services/fabricService';
+import { feilRespons } from '../lib/feilRespons';
 
 const schemaCache: Record<string, string[]> = {};
 
@@ -23,7 +24,7 @@ export async function tablesRoutes(fastify: FastifyInstance) {
         logger.debug('[Tables] Hentet og cachet tabeller for:', cacheKey, '— antall:', tableNames.length);
         return reply.send({ tables: tableNames });
       } catch (err) {
-        return reply.status(500).send({ error: err instanceof Error ? err.message : 'Ukjent feil' });
+        return feilRespons(reply, 500, 'Kunne ikke hente tabellen.', err);
       }
     },
   );

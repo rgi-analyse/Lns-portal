@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { queryAzureSQL, executeAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
+import { feilRespons } from '../lib/feilRespons';
 
 interface TtsInnstillinger {
   stemmNavn?: string;
@@ -95,8 +96,7 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
         `);
         return reply.status(201).send({ ok: true });
       } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({ error: 'Kunne ikke lagre favoritt.', detail });
+        return feilRespons(reply, 500, 'Kunne ikke lagre favoritt.', err);
       }
     },
   );
@@ -117,8 +117,7 @@ export async function megInnstillingerRoutes(fastify: FastifyInstance) {
         );
         return reply.status(204).send();
       } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({ error: 'Kunne ikke fjerne favoritt.', detail });
+        return feilRespons(reply, 500, 'Kunne ikke fjerne favoritt.', err);
       }
     },
   );

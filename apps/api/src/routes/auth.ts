@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { hashPassword, verifyPassword, validatePasswordStrength } from '../services/passwordService';
 import crypto from 'crypto';
+import { feilRespons } from '../lib/feilRespons';
 
 interface LoginCheckBody  { email: string }
 interface LoginLokalBody  { email: string; passord: string }
@@ -47,9 +48,7 @@ export async function authRoutes(fastify: FastifyInstance) {
         if (!bruker) return reply.send({ finnes: false });
         return reply.send({ finnes: true, erEntra: bruker.erEntraBruker });
       } catch (err) {
-        fastify.log.error({ err }, "[login-check] FEIL");
-        const msg = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({ error: msg });
+        return feilRespons(reply, 500, 'Kunne ikke sjekke innlogging.', err);
       }
     },
   );
@@ -79,9 +78,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           where: { email: { equals: email }, erEntraBruker: false, erAktiv: true },
         });
       } catch (err) {
-        fastify.log.error({ err }, "[login-lokal] findFirst FEIL");
-        const msg = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({ error: msg });
+        return feilRespons(reply, 500, 'Kunne ikke logge inn.', err);
       }
       if (!bruker || !bruker.passordHash) {
         return reply.status(401).send({ error: 'Feil e-post eller passord.' });
@@ -224,9 +221,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           },
         });
       } catch (err) {
-        fastify.log.error({ err }, '[Admin] feil ved opprettelse av lokal bruker');
-        const msg = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({ error: msg });
+        return feilRespons(reply, 500, 'Kunne ikke opprette brukeren.', err);
       }
       return reply.status(201).send(bruker);
     },

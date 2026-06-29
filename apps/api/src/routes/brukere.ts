@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { getGraphToken } from '../services/graphService';
 import { requireBruker, requireAdmin, resolveBruker, type AuthRequest } from '../middleware/auth';
+import { feilRespons } from '../lib/feilRespons';
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 const GYLDIGE_ROLLER = ['tenantadmin', 'admin', 'redaktør', 'bruker'] as const;
@@ -61,9 +62,7 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
         }
         return reply.send(brukere);
       } catch (error) {
-        fastify.log.error({ error }, '[brukere] FEIL');
-        const msg = error instanceof Error ? error.message : String(error);
-        return reply.status(500).send({ error: msg });
+        return feilRespons(reply, 500, 'Kunne ikke fullføre forespørselen.', error);
       }
     },
   );
