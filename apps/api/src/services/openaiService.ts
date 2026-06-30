@@ -571,7 +571,7 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
         properties: {
           sql: {
             type: 'string',
-            description: 'SQL SELECT-spørring mot datavarehus, f.eks. SELECT SUM(AntallBolter) FROM ai_gold.vw_Fact_Bolting_BeverBas WHERE år = 2026 AND ukenr = 10. Bruk IKKE for rapportsøk — bruk search_portal_reports i stedet.',
+            description: 'SQL SELECT-spørring mot datavarehus, f.eks. SELECT SUM([Verdi]) FROM ai_gold.vw_Fact_Eksempel WHERE år = 2026 AND ukenr = 10. Bruk kun view-navn fra "TILGJENGELIGE DATAKILDER" i systemprompten. Bruk IKKE for rapportsøk — bruk search_portal_reports i stedet.',
           },
         },
         required: ['sql'],
@@ -775,7 +775,7 @@ const opprettKpiTool: OpenAI.Chat.ChatCompletionTool = {
       properties: {
         view_navn: {
           type: 'string',
-          description: 'Fullt view-navn inkl. schema, f.eks. ai_gold.vw_Fact_Regnskapstransksjoner',
+          description: 'Fullt view-navn inkl. schema, f.eks. ai_gold.vw_Fact_Eksempel. Bruk kun view-navn fra "TILGJENGELIGE DATAKILDER" i systemprompten.',
         },
         navn: {
           type: 'string',
