@@ -36,7 +36,7 @@ export async function healthRoutes(fastify: FastifyInstance) {
       health.status = 'degraded';
       health.checks.database.status = 'error';
       health.checks.database.error =
-        err instanceof Error ? err.message : 'Unknown error';
+        err instanceof Error ? err.message : 'Ukjent feil';
     }
 
     return reply.status(health.status === 'ok' ? 200 : 503).send(health);

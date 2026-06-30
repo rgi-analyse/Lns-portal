@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { erIkkeFunnet, erDuplikat } from '../lib/prismaFeil';
 import { requireBruker, requireAdmin } from '../middleware/auth';
 import { extractSlug } from '../middleware/tenant';
 
@@ -94,7 +95,7 @@ export async function temaRoutes(fastify: FastifyInstance) {
         });
         return reply.status(201).send(tema);
       } catch (err: unknown) {
-        if ((err as { code?: string })?.code === 'P2002') {
+        if (erDuplikat(err)) {
           return reply.status(409).send({ error: 'Tenanten har allerede et tema.' });
         }
         fastify.log.error(err);
@@ -127,7 +128,7 @@ export async function temaRoutes(fastify: FastifyInstance) {
         });
         return reply.send(tema);
       } catch (err: unknown) {
-        if ((err as { code?: string })?.code === 'P2025') {
+        if (erIkkeFunnet(err)) {
           return reply.status(404).send({ error: 'Tema ikke funnet.' });
         }
         fastify.log.error(err);
@@ -156,7 +157,7 @@ export async function temaRoutes(fastify: FastifyInstance) {
         await prisma.organisasjonTema.delete({ where: { id: request.params.id } });
         return reply.status(204).send();
       } catch (err: unknown) {
-        if ((err as { code?: string })?.code === 'P2025') {
+        if (erIkkeFunnet(err)) {
           return reply.status(404).send({ error: 'Tema ikke funnet.' });
         }
         return reply.status(500).send({ error: 'Kunne ikke slette tema.' });

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { erIkkeFunnet } from '../lib/prismaFeil';
 import { getGraphToken } from '../services/graphService';
 import { requireBruker, requireAdmin, resolveBruker, type AuthRequest } from '../middleware/auth';
 import { feilRespons } from '../lib/feilRespons';
@@ -186,12 +187,7 @@ export async function brukerAdminRoutes(fastify: FastifyInstance) {
         });
         return reply.send(bruker);
       } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          (error as { code: string }).code === 'P2025'
-        ) {
+        if (erIkkeFunnet(error)) {
           return reply.status(404).send({ error: 'Bruker ikke funnet.' });
         }
         fastify.log.error(error);
