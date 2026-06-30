@@ -1057,7 +1057,7 @@ Tilgjengelige visualiseringstyper:
         if (entraObjectId && String(sisteBrukermelding).trim()) {
           await prisma.chatHistorikk.create({
             data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdGlobal, tenantSlug, rapportId: chatRapportIdGlobal },
-          }).catch(() => {});
+          }).catch(err => logger.warn('[Chat] kunne ikke lagre brukermelding (global):', err));
         }
 
         reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -1133,7 +1133,7 @@ Tilgjengelige visualiseringstyper:
             },
           }).then(() => {
             sikreTittelGenerert(innloggetBruker.id, øktIdGlobal, tenantSlug);
-          }).catch(() => {});
+          }).catch(err => logger.warn('[Chat] kunne ikke lagre assistentmelding (global):', err));
         }
         return;
       }
@@ -1540,7 +1540,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
       if (entraObjectId && String(sisteBrukermelding).trim()) {
         await prisma.chatHistorikk.create({  // rapport-stream brukermelding
           data: { userId: innloggetBruker.id, rolle: 'user', innhold: String(sisteBrukermelding).slice(0, 4000), øktId: øktIdRapport, tenantSlug, rapportId: chatRapportIdRapport },
-        }).catch(() => {});
+        }).catch(err => logger.warn('[Chat] kunne ikke lagre brukermelding (rapport):', err));
       }
 
       reply.raw.setHeader('Content-Type', 'text/event-stream');
@@ -1616,7 +1616,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
           },
         }).then(() => {
           sikreTittelGenerert(innloggetBruker.id, øktIdRapport, tenantSlug);
-        }).catch(() => {});
+        }).catch(err => logger.warn('[Chat] kunne ikke lagre assistentmelding (rapport):', err));
       }
     },
   );
