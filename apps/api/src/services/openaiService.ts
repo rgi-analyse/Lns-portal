@@ -3,6 +3,7 @@ import { executeQuery } from './fabricService';
 import { queryAzureSQL } from './azureSqlService';
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
+import { validerSqlMotTilgang, INGEN_TILGANG, type Datatilgang } from './datatilgang';
 import {
   søk as søkSlicerKatalog,
   erIndeksert as slicerErIndeksert,
@@ -178,8 +179,8 @@ export interface ChatContext {
   kildePbiReportId?: string;
   prosjektNr?: string | null;
   prosjektNavn?: string | null;
-  /** Tillatte view-navn (lowercase) for denne brukeren — undefined = ingen begrensning */
-  tillatteViewNavn?: string[];
+  /** Brukerens AI-datatilgang (fail-closed). Undefined → behandles som INGEN_TILGANG. */
+  datatilgang?: Datatilgang;
   /** Slicer-info fra aktiv side — brukes til å validere/korrigere AI sin slicer-payload */
   slicere?: SlicerInfo[];
   /** Tenant-slug og portal-rapport-id — brukes til AI Search-fallback i validator */
@@ -1200,26 +1201,12 @@ export async function chat(
           const rawSQL   = args['sql'] as string;
           const sqlQuery = sanitizeSQL(rawSQL);
 
-          // Tilgangskontroll: avvis SQL som refererer views utenfor brukerens workspace-tilgang
-          if (context?.tillatteViewNavn && context.tillatteViewNavn.length > 0) {
-            const sqlLower = sqlQuery.toLowerCase();
-            // Norsk-safe regex: \w stopper ved æøå — bruk eksplisitt tegnklasse
-            const norskBokstav = '[a-zA-ZæøåÆØÅ0-9_]';
-            const sqlViewRegex = new RegExp(`(${norskBokstav}+\\.${norskBokstav}+)`, 'gi');
-            // Strip schema-prefix (f.eks. ai_gold.vw_Fact_X → vw_fact_x) før sammenligning.
-            // workspace-lista inneholder kun view-navn uten schema.
-            const viewsISql = (sqlLower.match(sqlViewRegex) ?? []).map(v => {
-              const deler = v.toLowerCase().split('.');
-              return deler[deler.length - 1];
-            }).filter(v => v.startsWith('vw_'));
-            const ikketillatt = viewsISql.filter(v =>
-              !context.tillatteViewNavn!.some(t => t.toLowerCase() === v)
-            );
-            logger.debug('[tilgang] SQL views (uten schema):', viewsISql);
-            if (ikketillatt.length > 0) {
-              logger.warn('[tilgang] SQL refererer ikke-tillatte views:', ikketillatt);
-              result = { error: 'Du har ikke tilgang til denne datakilden.' };
-            }
+          // Tilgangskontroll (fail-closed): valider mot brukerens datatilgang.
+          // Manglende kontekst → INGEN_TILGANG (nektet), aldri allow-all.
+          const validering = validerSqlMotTilgang(sqlQuery, context?.datatilgang ?? INGEN_TILGANG);
+          if (!validering.ok) {
+            logger.warn('[tilgang] query_database avvist:', validering.grunn, validering.avvisteViews);
+            result = { error: 'Du har ikke tilgang til denne datakilden.' };
           }
 
           if (!result) {
@@ -1535,13 +1522,23 @@ export async function chat(
               }
             }
 
+            // Tilgangskontroll (fail-closed): valider endelig SQL (etter KPI-injeksjon)
+            const crValidering = validerSqlMotTilgang(sqlQuery, context?.datatilgang ?? INGEN_TILGANG);
+            if (!crValidering.ok) {
+              logger.warn('[tilgang] create_report avvist:', crValidering.grunn, crValidering.avvisteViews);
+              result = { error: 'Du har ikke tilgang til denne datakilden.' };
+              onChunk({ type: 'tool_call', tool: tc.name, result });
+              history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
+              continue;
+            }
+
             let data: Record<string, unknown>[] = [];
             try {
               data = await queryAzureSQL(sqlQuery, 500);
               logger.debug('[OpenAI] create_report rader:', data.length);
             } catch (sqlErr) {
               logger.error('[OpenAI] create_report SQL-feil:', sqlErr);
-              result = { error: `SQL-feil: ${(sqlErr as Error).message}` };
+              result = { error: 'Kunne ikke kjøre spørringen for rapporten.' };
               onChunk({ type: 'tool_call', tool: tc.name, result });
               history.push({ role: 'tool', content: JSON.stringify(result), tool_call_id: tc.id });
               continue;

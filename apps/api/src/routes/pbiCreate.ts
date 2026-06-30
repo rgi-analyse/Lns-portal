@@ -4,6 +4,8 @@ import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { getAzureToken } from '../lib/azureToken';
 import { queryAzureSQL } from '../services/azureSqlService';
 import { feilRespons } from '../lib/feilRespons';
+import { requireBruker, erAdmin, type AuthRequest } from '../middleware/auth';
+import { hentDatatilgang, validerSqlMotTilgang } from '../services/datatilgang';
 
 export async function pbiCreateRoutes(fastify: FastifyInstance) {
   // POST /api/pbi/create-token — henter embed-token for å opprette ny rapport i nettleseren
@@ -165,6 +167,7 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
   fastify.post<{ Body: { sql: string } }>(
     '/api/pbi/query-sql',
     {
+      preHandler: [resolveTenant, requireBruker],
       schema: {
         body: {
           type: 'object',
@@ -175,10 +178,21 @@ export async function pbiCreateRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { sql } = request.body;
-      // Tillat kun SELECT mot ai_gold-views
-      if (!/^\s*SELECT\b/i.test(sql) || !/\bai_gold\.\w/i.test(sql)) {
-        return reply.status(400).send({ error: 'Kun SELECT-spørringer mot ai_gold-views er tillatt.' });
+      const { sql }   = request.body;
+      const bruker    = (request as AuthRequest).bruker;
+      const tenantReq = request as TenantRequest;
+
+      // Tilgangskontroll (fail-closed): kun SELECT mot views brukeren har AI-tilgang til.
+      const tilgang = await hentDatatilgang({
+        erAdminTilgang: erAdmin(bruker?.rolle),
+        entraObjectId:  bruker?.entraObjectId,
+        tenantPrisma:   tenantReq.tenantPrisma,
+        dbUrl:          tenantReq.tenantDatabaseUrl,
+      });
+      const validering = validerSqlMotTilgang(sql, tilgang);
+      if (!validering.ok) {
+        logger.warn('[query-sql] avvist:', validering.grunn, validering.avvisteViews);
+        return reply.status(403).send({ error: 'Du har ikke tilgang til denne datakilden.' });
       }
       try {
         const rows = await queryAzureSQL(sql, 500);

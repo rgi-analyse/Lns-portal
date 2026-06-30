@@ -9,6 +9,7 @@ import {
 import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { loggFeil } from '../lib/feilRespons';
+import { hentDatatilgang, type Datatilgang } from '../services/datatilgang';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 import { erAdmin } from '../middleware/auth';
@@ -316,25 +317,21 @@ function rankViews(
 }
 
 async function buildDynamicViewsSection(
-  viewIds?: string[] | null,
+  datatilgang: Datatilgang,
   område?: string | null,
   brukerSpørsmål?: string,
-  kobletViewIds?: string[] | null,
-  tillatteViewIds?: string[] | null,
   profilViews?: string[],
 ): Promise<string> {
-  // Filtrer views: rapport-kobling → workspace-tilgang → område → alle
+  // Tilgangsfilter (fail-closed): admin → område/alle; begrenset → kun tillatte view-id-er.
   let viewsFilter: string;
-  if (viewIds && viewIds.length > 0) {
-    const idList = viewIds.map(id => `'${escStr(id)}'`).join(', ');
-    viewsFilter = `WHERE v.er_aktiv = 1 AND v.id IN (${idList})`;
-  } else if (tillatteViewIds && tillatteViewIds.length > 0) {
-    const idList = tillatteViewIds.map(id => `'${escStr(id)}'`).join(', ');
-    viewsFilter = `WHERE v.er_aktiv = 1 AND v.id IN (${idList})`;
-  } else if (område) {
-    viewsFilter = `WHERE v.er_aktiv = 1 AND (v.område = '${escStr(område)}' OR v.område IS NULL)`;
+  if (datatilgang.mode === 'admin') {
+    viewsFilter = område
+      ? `WHERE v.er_aktiv = 1 AND (v.område = '${escStr(område)}' OR v.område IS NULL)`
+      : `WHERE v.er_aktiv = 1`;
   } else {
-    viewsFilter = `WHERE v.er_aktiv = 1`;
+    // tillatteViewIds garantert ikke-tom her (buildSystemPrompt håndterer tom = egen melding)
+    const idList = datatilgang.tillatteViewIds.map(id => `'${escStr(id)}'`).join(', ');
+    viewsFilter = `WHERE v.er_aktiv = 1 AND v.id IN (${idList})`;
   }
   logger.debug('[buildSystemPrompt] viewsFilter:', viewsFilter);
 
@@ -397,18 +394,9 @@ async function buildDynamicViewsSection(
   if (brukerSpørsmål && alleViews.length > 4) {
     const rangerteViews = rankViews(alleViews, kolonner as Record<string, unknown>[], regler as Record<string, unknown>[], brukerSpørsmål, profilViews);
 
-    // Rapport-koblede views prioriteres alltid
-    const koblede = kobletViewIds
-      ? rangerteViews.filter(v => kobletViewIds.includes(v['id'] as string))
-      : [];
-    const andreRangerte = rangerteViews
-      .filter(v => !kobletViewIds?.includes(v['id'] as string))
-      .slice(0, 3);
-
-    viewsForPrompt = [...koblede, ...andreRangerte];
-    utelatte = alleViews
-      .filter(v => !viewsForPrompt.includes(v))
-      .map(v => v['visningsnavn'] as string);
+    // Vis de mest relevante i detalj; resten (fortsatt tilgangsstyrt) listes som navn.
+    viewsForPrompt = rangerteViews.slice(0, 4);
+    utelatte = rangerteViews.slice(4).map(v => v['visningsnavn'] as string);
 
     logger.debug('[buildSystemPrompt] sender til AI:', viewsForPrompt.map(v => v['view_name']).join(', '));
     logger.debug('[buildSystemPrompt] utelatte views:', utelatte.join(', '));
@@ -481,69 +469,47 @@ async function buildDynamicViewsSection(
 }
 
 async function buildSystemPrompt(
+  datatilgang: Datatilgang,
   rapportId?: string | null,
   område?: string | null,
   brukerSpørsmål?: string,
-  tillatteViewIds?: string[] | null,
   profilViews?: string[],
-  dbUrl?: string | null,
 ): Promise<string> {
-  logger.debug('[buildSystemPrompt] rapportId:', rapportId);
-  logger.debug('[buildSystemPrompt] tillatteViewIds:', tillatteViewIds);
+  const iDag = new Date().toLocaleDateString('nb-NO', {
+    timeZone: 'Europe/Oslo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const byggPrompt = (seksjon: string): string => `Dagens dato: ${iDag}.
 
-  // Prøv rapport-spesifikk kobling først. ai_rapport_view_kobling er per-tenant
-  // (rapport_id er tenant-lokal) — spørres mot tenant-DB via dbUrl.
-  let kobletViewIds: string[] | null = null;
-  if (rapportId && dbUrl) {
-    try {
-      const kobling = await queryAzureSQLForTenant(dbUrl, `
-        SELECT view_id FROM ai_rapport_view_kobling
-        WHERE rapport_id = '${escStr(rapportId)}'
-        ORDER BY prioritet
-      `);
-      if (kobling.length > 0) {
-        kobletViewIds = kobling.map(r => r['view_id'] as string);
-        logger.debug(`[Chat] bruker ${kobletViewIds.length} koblede views for rapport ${rapportId}`);
-      }
-    } catch {
-      // Tom kobling-tabell / feil — fallback til område-filter
-    }
+Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.
+
+## TILGJENGELIGE DATAKILDER
+${seksjon}
+
+---
+${BASIS_REGLER}`;
+
+  // Fail-closed: begrenset uten tillatte views = AI ikke aktivert (normal opt-in-tilstand,
+  // ikke en feil). Ulik melding for rapport- vs forside-kontekst.
+  if (datatilgang.mode === 'begrenset' && datatilgang.tillatteViewIds.length === 0) {
+    const melding = rapportId
+      ? 'AI-funksjonalitet er ikke aktivert for denne rapporten ennå. Be en administrator om å koble views til rapporten. Du kan ikke kjøre dataspørringer her ennå.'
+      : 'Du har ingen rapporter med aktivert AI-funksjonalitet ennå. Be en administrator om å aktivere AI for en rapport du har tilgang til.';
+    logger.debug(`[buildSystemPrompt] tom allow-list — AI ikke aktivert (rapportId=${rapportId ?? 'ingen'})`);
+    return byggPrompt(`*${melding}*`);
   }
 
-  logger.debug('[buildSystemPrompt] kobletViewIds:', kobletViewIds);
-
-  // Når brukerSpørsmål er satt bruker vi dynamisk ranking — hopp over cache
-  const cacheKey = brukerSpørsmål ? null : (kobletViewIds ? `rapport:${rapportId}` : (område ?? 'all'));
+  // Cache kun for admin (begrenset er bruker-/rapport-spesifikk — skal ikke deles på tvers).
+  const cacheKey = (!brukerSpørsmål && datatilgang.mode === 'admin') ? (område ?? 'all') : null;
   if (cacheKey) {
     const cached = promptCacheMap.get(cacheKey);
     if (cached && Date.now() < cached.expires) return cached.prompt;
   }
 
   try {
-    const viewsSection = await buildDynamicViewsSection(
-      kobletViewIds,
-      kobletViewIds ? null : område,
-      brukerSpørsmål,
-      kobletViewIds,
-      kobletViewIds ? null : tillatteViewIds,
-      profilViews,
-    );
-    const iDag = new Date().toLocaleDateString('nb-NO', {
-      timeZone: 'Europe/Oslo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    });
-    const prompt = `Dagens dato: ${iDag}.
-
-Du er en dataassistent som hjelper brukere med å hente og analysere data fra virksomhetens databaser.
-
-## TILGJENGELIGE DATAKILDER
-${viewsSection}
-
----
-${BASIS_REGLER}`;
+    const viewsSection = await buildDynamicViewsSection(datatilgang, område, brukerSpørsmål, profilViews);
+    const prompt = byggPrompt(viewsSection);
     logger.debug('[buildSystemPrompt] prompt lengde:', prompt.length);
-    if (cacheKey) {
-      promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
-    }
+    if (cacheKey) promptCacheMap.set(cacheKey, { prompt, expires: Date.now() + 2 * 60 * 1000 });
     return prompt;
   } catch (err) {
     logger.warn('[Chat] Bruker fallback til hardkodet prompt:', err instanceof Error ? err.message : err);
@@ -823,60 +789,10 @@ export async function chatRoutes(fastify: FastifyInstance) {
       }
 
       // ai_rapport_view_kobling er per-tenant — hentes via tenant-DB (dbUrl).
+      // Datatilgang resolves fail-closed per branch under (forside = union av brukerens
+      // rapporter; rapport-kontekst = den rapportens koblede views).
       const dbUrl = (request as TenantRequest).tenantDatabaseUrl;
-
-      // Hent views brukeren har tilgang til via workspace-kjede:
-      // Bruker → Workspace-tilgang → Rapport → ai_rapport_view_kobling → View
-      // Admin-shortcut: tillatteViewIds = null = ingen restriksjon (konsistent med UI-tilgang)
-      let tillatteViewIds: string[] | null = null;
-      if (entraObjectId && !chatContext.isAdmin) {
-        try {
-          const db = (request as TenantRequest).tenantPrisma;
-          const grupper: string[] = request.body.grupper ?? [];
-          const identities = [entraObjectId, ...grupper].filter(Boolean);
-          const orFilter: Record<string, unknown>[] = [];
-          if (identities.length > 0) {
-            orFilter.push({ tilgang: { some: { entraId: { in: identities } } } });
-          }
-          orFilter.push({ opprettetAv: entraObjectId });
-          const wsRapporter = await db.workspace.findMany({
-            where: { OR: orFilter },
-            select: { rapporter: { where: { rapport: { erAktiv: true } }, select: { rapportId: true } } },
-          });
-          const rapportIds = wsRapporter.flatMap(w => w.rapporter.map(r => r.rapportId));
-          if (rapportIds.length > 0) {
-            const koblinger = await queryAzureSQLForTenant(dbUrl ?? '', `
-              SELECT DISTINCT view_id FROM ai_rapport_view_kobling
-              WHERE rapport_id IN (${rapportIds.map(id => `'${escStr(id)}'`).join(',')})
-            `);
-            if (koblinger.length > 0) {
-              tillatteViewIds = koblinger.map(r => r['view_id'] as string);
-              logger.debug('[Chat] tilgjengelige views via workspace:', tillatteViewIds.length);
-            } else {
-              logger.warn('[Chat] ingen view-koblinger funnet for brukerens rapporter — viser alle views');
-            }
-          }
-        } catch (err) {
-          logger.warn('[Chat] workspace-view tilgang feil — fortsetter uten begrensning:', err instanceof Error ? err.message : err);
-        }
-      } else if (chatContext.isAdmin) {
-        logger.debug('[Chat] admin-bruker — ingen view-tilgangsbegrensning');
-      }
-
-      // Hent view-navn for tilgangskontroll i query_database (brukes i openaiService)
-      if (tillatteViewIds && tillatteViewIds.length > 0) {
-        try {
-          const viewNavnRows = await queryAzureSQL(`
-            SELECT view_name FROM ai_metadata_views
-            WHERE id IN (${tillatteViewIds.map(id => `'${escStr(id)}'`).join(',')}) AND er_aktiv = 1
-          `);
-          const tillatteViewNavn = viewNavnRows.map(r => String(r['view_name'] ?? '').toLowerCase()).filter(Boolean);
-          chatContext = { ...chatContext, tillatteViewNavn };
-          logger.debug('[tilgang] workspace-views:', tillatteViewNavn);
-        } catch (err) {
-          logger.warn('[Chat] view-navn fetch feil:', err instanceof Error ? err.message : err);
-        }
-      }
+      const grupper: string[] = request.body.grupper ?? [];
 
       t1 = Date.now(); // T1: tilgang-sjekk (bruker-rolle + workspace-view-kjede) ferdig
 
@@ -979,7 +895,14 @@ export async function chatRoutes(fastify: FastifyInstance) {
         logger.debug('[Chat] prosjektNr:', 'ingen (forside)');
         logger.debug('[Chat] kontekst:', 'global');
         const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-        const basisPrompt = await buildSystemPrompt(null, null, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
+        const datatilgang = await hentDatatilgang({
+          erAdminTilgang: chatContext.isAdmin ?? false,
+          entraObjectId, grupper,
+          tenantPrisma: (request as TenantRequest).tenantPrisma,
+          dbUrl,
+        });
+        chatContext = { ...chatContext, datatilgang };
+        const basisPrompt = await buildSystemPrompt(datatilgang, null, null, sisteBrukermelding as string, profilViews);
         logger.debug('[systemPrompt] lengde:', basisPrompt.length);
         // FIX 4: token-estimat (ingen-rapport branch)
         logger.debug('[Chat] ingen-rapport prompt lengde (tegn):', basisPrompt.length);
@@ -1275,7 +1198,14 @@ Tilgjengelige visualiseringstyper:
 
       // Bygg system prompt — prøv rapport-kobling, fallback til område, fallback til alle
       const sisteBrukermelding = [...(request.body.messages ?? [])].reverse().find(m => m.role === 'user')?.content ?? '';
-      const basisPrompt = await buildSystemPrompt(rapportId, rapportOmråde, sisteBrukermelding as string, tillatteViewIds, profilViews, dbUrl);
+      const datatilgang = await hentDatatilgang({
+        erAdminTilgang: chatContext.isAdmin ?? false,
+        entraObjectId, grupper,
+        tenantPrisma: (request as TenantRequest).tenantPrisma,
+        dbUrl,
+      }, { rapportId });
+      chatContext = { ...chatContext, datatilgang };
+      const basisPrompt = await buildSystemPrompt(datatilgang, rapportId, rapportOmråde, sisteBrukermelding as string, profilViews);
       logger.debug('[systemPrompt] lengde:', basisPrompt.length);
 
       // Formater PBI visual-data (CSV fra exportData) til lesbar tekst for AI-kontekst
