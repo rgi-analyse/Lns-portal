@@ -64,22 +64,25 @@ export async function hentDatatilgang(
   if (!dbUrl) return INGEN_TILGANG;
 
   try {
-    // 1. Rapport-id(er) i scope
+    // 1. Brukerens tilgjengelige rapporter = workspaces brukeren har TILGANG til
+    //    (Tilgang-tabellen). IKKE opprettetAv — eierskap er ikke en tilgangsgrant.
+    //    Samme mønster som search_portal_reports.
+    const identities = [input.entraObjectId, ...(input.grupper ?? [])].filter(Boolean) as string[];
+    if (identities.length === 0) return INGEN_TILGANG;
+
+    const wsRapporter = await input.tenantPrisma.workspace.findMany({
+      where: { tilgang: { some: { entraId: { in: identities } } } },
+      select: { rapporter: { where: { rapport: { erAktiv: true } }, select: { rapportId: true } } },
+    }) as WsRapportRad[];
+    const tilgjengelige = new Set(wsRapporter.flatMap(w => w.rapporter.map(r => r.rapportId)));
+
     let rapportIds: string[];
     if (opts?.rapportId) {
-      rapportIds = [opts.rapportId];
+      // Rapport-kontekst: kun hvis brukeren faktisk har tilgang til rapporten.
+      // Verifiser mot tilgjengelige-settet — stol aldri på rapportId fra request (id-spoofing).
+      rapportIds = tilgjengelige.has(opts.rapportId) ? [opts.rapportId] : [];
     } else {
-      const identities = [input.entraObjectId, ...(input.grupper ?? [])].filter(Boolean) as string[];
-      const orFilter: Record<string, unknown>[] = [];
-      if (identities.length > 0) orFilter.push({ tilgang: { some: { entraId: { in: identities } } } });
-      if (input.entraObjectId) orFilter.push({ opprettetAv: input.entraObjectId });
-      if (orFilter.length === 0) return INGEN_TILGANG;
-
-      const wsRapporter = await input.tenantPrisma.workspace.findMany({
-        where: { OR: orFilter },
-        select: { rapporter: { where: { rapport: { erAktiv: true } }, select: { rapportId: true } } },
-      }) as WsRapportRad[];
-      rapportIds = wsRapporter.flatMap(w => w.rapporter.map(r => r.rapportId));
+      rapportIds = [...tilgjengelige];
     }
     if (rapportIds.length === 0) return INGEN_TILGANG;
 

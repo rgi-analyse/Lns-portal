@@ -5,7 +5,7 @@
  * Dekker testkravene fra sikkerhetsscenariet: robust view-uttrekk
  * (schema-qualified, CTE, ikke-vw_), SELECT-only, fail-closed.
  */
-import { validerSqlMotTilgang, type Datatilgang } from '../services/datatilgang';
+import { validerSqlMotTilgang, hentDatatilgang, type Datatilgang } from '../services/datatilgang';
 
 const begrenset: Datatilgang = {
   mode: 'begrenset',
@@ -94,5 +94,56 @@ sjekk('admin SELECT hvilket som helst view',
 sjekk('admin DELETE fortsatt blokkert',
   validerSqlMotTilgang('DELETE FROM ai_gold.vw_Fact_Bolting', admin).ok, false);
 
-console.log(feil === 0 ? '\nALLE TESTER OK' : `\n${feil} TEST(ER) FEILET`);
-process.exit(feil === 0 ? 0 : 1);
+// ── hentDatatilgang (mocket Prisma) ─────────────────────────────────────────
+async function kjørHentDatatilgangTester(): Promise<void> {
+  // A. opprettetAv gir IKKE tilgang: bruker uten Tilgang-rad → tom allow-list,
+  //    og spørringen skal bruke Tilgang-relasjonen (ikke opprettetAv/OR).
+  let captured: any = null;
+  const prismaUtenTilgang = {
+    workspace: { findMany: async (args: any) => { captured = args; return []; } },
+  };
+  const rA = await hentDatatilgang({
+    erAdminTilgang: false, entraObjectId: 'u-creator', tenantPrisma: prismaUtenTilgang, dbUrl: 'dummy',
+  });
+  sjekk('opprettetAv gir IKKE tilgang (tom allow-list)',
+    rA.mode === 'begrenset' && rA.tillatteViewIds.length === 0, true);
+  const w = captured?.where ?? {};
+  sjekk('spørring bruker kun Tilgang (ingen opprettetAv/OR)',
+    !!w.tilgang && w.OR === undefined && w.opprettetAv === undefined, true);
+
+  // B. Spoofet/ukjent rapportId → tom (verifiseres mot tilgjengelige rapporter).
+  const prismaMedRapport = {
+    workspace: { findMany: async () => [{ rapporter: [{ rapportId: 'rapp-A' }] }] },
+  };
+  const rB = await hentDatatilgang(
+    { erAdminTilgang: false, entraObjectId: 'u1', tenantPrisma: prismaMedRapport, dbUrl: 'dummy' },
+    { rapportId: 'rapp-SPOOF' });
+  sjekk('spoofet rapportId → tom allow-list',
+    rB.mode === 'begrenset' && rB.tillatteViewIds.length === 0, true);
+
+  // C. Admin → mode:'admin' (ingen DB-oppslag).
+  const rC = await hentDatatilgang({
+    erAdminTilgang: true, entraObjectId: 'u1',
+    tenantPrisma: { workspace: { findMany: async () => [] } }, dbUrl: 'dummy',
+  });
+  sjekk('admin → mode:admin', rC.mode === 'admin', true);
+
+  // D. Ingen identitet → tom (fail-closed).
+  const rD = await hentDatatilgang({
+    erAdminTilgang: false,
+    tenantPrisma: { workspace: { findMany: async () => [] } }, dbUrl: 'dummy',
+  });
+  sjekk('ingen identitet → tom', rD.mode === 'begrenset' && rD.tillatteViewIds.length === 0, true);
+
+  // E. Tom dbUrl → tom (fail-closed).
+  const rE = await hentDatatilgang({
+    erAdminTilgang: false, entraObjectId: 'u1',
+    tenantPrisma: { workspace: { findMany: async () => [{ rapporter: [{ rapportId: 'x' }] }] } }, dbUrl: '',
+  });
+  sjekk('tom dbUrl → tom', rE.mode === 'begrenset' && rE.tillatteViewIds.length === 0, true);
+}
+
+kjørHentDatatilgangTester().then(() => {
+  console.log(feil === 0 ? '\nALLE TESTER OK' : `\n${feil} TEST(ER) FEILET`);
+  process.exit(feil === 0 ? 0 : 1);
+});
