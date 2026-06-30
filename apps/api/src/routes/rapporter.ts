@@ -4,15 +4,7 @@ import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middle
 import { requireBruker, requireAdmin, resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { verifiserGrupper } from '../services/graphService';
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: string }).code === 'P2025'
-  );
-}
+import { erIkkeFunnet } from '../lib/prismaFeil';
 
 interface CreateRapportBody {
   navn: string;
@@ -172,7 +164,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         });
         return reply.send(rapport);
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke oppdatere rapport.' });
       }
@@ -189,7 +181,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         await db.rapport.delete({ where: { id: request.params.id } });
         return reply.status(204).send();
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke slette rapport.' });
       }
@@ -278,7 +270,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         });
         return reply.status(204).send();
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Rapport ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke deaktivere rapport.' });
       }
@@ -469,7 +461,7 @@ export async function rapportRoutes(fastify: FastifyInstance) {
         });
         return reply.status(204).send();
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Kobling ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Kobling ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke fjerne kobling.' });
       }

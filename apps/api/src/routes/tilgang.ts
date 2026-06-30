@@ -2,15 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { resolveTenant, type TenantRequest } from '../middleware/tenant';
 import { searchGroups, searchUsers } from '../services/graphService';
 import { feilRespons } from '../lib/feilRespons';
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: string }).code === 'P2025'
-  );
-}
+import { erIkkeFunnet } from '../lib/prismaFeil';
 
 interface CreateTilgangBody {
   type: string;
@@ -138,7 +130,7 @@ export async function tilgangRoutes(fastify: FastifyInstance) {
         });
         return reply.status(204).send();
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Tilgang ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Tilgang ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke fjerne tilgang.' });
       }

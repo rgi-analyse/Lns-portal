@@ -5,15 +5,7 @@ import { resolveBruker, erAdmin } from '../middleware/auth';
 import { queryAzureSQL, queryAzureSQLForTenant } from '../services/azureSqlService';
 import { verifiserGrupper } from '../services/graphService';
 import { feilRespons } from '../lib/feilRespons';
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code: string }).code === 'P2025'
-  );
-}
+import { erIkkeFunnet } from '../lib/prismaFeil';
 
 interface CreateWorkspaceBody {
   navn:            string;
@@ -292,7 +284,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         );
         return reply.send({ oppdatert: rekkefolge.length });
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke oppdatere rekkefølgen.' });
       }
@@ -496,7 +488,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         });
         return reply.send(workspace);
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke oppdatere workspace.' });
       }
@@ -516,7 +508,7 @@ export async function workspaceRoutes(fastify: FastifyInstance) {
         await db.workspace.delete({ where: { id: request.params.id } });
         return reply.status(204).send();
       } catch (error) {
-        if (isNotFound(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
+        if (erIkkeFunnet(error)) return reply.status(404).send({ error: 'Workspace ikke funnet.' });
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke slette workspace.' });
       }

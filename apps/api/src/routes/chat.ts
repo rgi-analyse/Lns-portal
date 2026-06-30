@@ -1632,7 +1632,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
-      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      if (!entraObjectId) return reply.status(401).send({ error: 'Ikke autentisert' });
       const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const query = request.query as Record<string, string | undefined>;
@@ -1702,7 +1702,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
-      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      if (!entraObjectId) return reply.status(401).send({ error: 'Ikke autentisert' });
       const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
@@ -1743,7 +1743,7 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
-      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      if (!entraObjectId) return reply.status(401).send({ error: 'Ikke autentisert' });
       const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
@@ -1762,12 +1762,12 @@ Prosjektfilteret er obligatorisk i SQL og skal IKKE vises som brukerfilter i rap
     { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
       const entraObjectId = (request.headers['x-entra-object-id'] as string | undefined)?.trim();
-      if (!entraObjectId) return reply.code(401).send({ error: 'Ikke autentisert' });
+      if (!entraObjectId) return reply.status(401).send({ error: 'Ikke autentisert' });
       const innloggetBruker = (request as AuthRequest).bruker;
       const tenantSlug = (request.headers['x-tenant-id'] as string | undefined) ?? 'lns';
       const { øktId } = request.params as { øktId: string };
       const { tittel } = request.body as { tittel?: string };
-      if (!tittel) return reply.code(400).send({ error: 'tittel påkrevd' });
+      if (!tittel) return reply.status(400).send({ error: 'tittel påkrevd' });
 
       await prisma.$executeRawUnsafe(
         `UPDATE [ChatHistorikk] SET [tittel] = @P1 WHERE [userId] = @P2 AND [øktId] = @P3 AND [tenantSlug] = @P4`,

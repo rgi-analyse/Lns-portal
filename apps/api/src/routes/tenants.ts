@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
 import { requireBruker, requireTenantAdmin } from '../middleware/auth';
+import { erIkkeFunnet, erDuplikat } from '../lib/prismaFeil';
 
 interface CreateTenantBody {
   slug: string;
@@ -62,6 +63,9 @@ export async function tenantRoutes(fastify: FastifyInstance) {
           erAktiv: tenant.erAktiv, opprettet: tenant.opprettet,
         });
       } catch (error) {
+        if (erDuplikat(error)) {
+          return reply.status(409).send({ error: 'En tenant med denne slug-en finnes allerede.' });
+        }
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke opprette tenant.' });
       }
@@ -87,6 +91,9 @@ export async function tenantRoutes(fastify: FastifyInstance) {
           id: tenant.id, slug: tenant.slug, navn: tenant.navn, erAktiv: tenant.erAktiv,
         });
       } catch (error) {
+        if (erIkkeFunnet(error)) {
+          return reply.status(404).send({ error: 'Tenant ikke funnet.' });
+        }
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke oppdatere tenant.' });
       }
@@ -105,6 +112,9 @@ export async function tenantRoutes(fastify: FastifyInstance) {
         });
         return reply.status(204).send();
       } catch (error) {
+        if (erIkkeFunnet(error)) {
+          return reply.status(404).send({ error: 'Tenant ikke funnet.' });
+        }
         fastify.log.error(error);
         return reply.status(500).send({ error: 'Kunne ikke deaktivere tenant.' });
       }

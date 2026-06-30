@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma';
+import { erIkkeFunnet } from '../lib/prismaFeil';
 import { requireBruker, type AuthRequest } from '../middleware/auth';
 
 const STANDARD_SVAR = {
@@ -128,7 +129,7 @@ export async function lisensRoutes(fastify: FastifyInstance) {
         const { databaseUrl: _db, ...safe } = tenant;
         return reply.send({ ...safe, erUtløpt: erUtløpt(tenant.lisensUtløper) });
       } catch (err: unknown) {
-        if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2025') {
+        if (erIkkeFunnet(err)) {
           return reply.status(404).send({ error: 'Tenant ikke funnet.' });
         }
         fastify.log.error(err);
