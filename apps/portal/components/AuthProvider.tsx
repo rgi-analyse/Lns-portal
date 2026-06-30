@@ -5,6 +5,7 @@ import { MsalProvider, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { msalConfig, loginRequest } from '@/lib/authConfig';
 import { SessionGuard } from '@/lib/sessionGuard';
+import { logger } from '@/lib/logger';
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
@@ -24,7 +25,7 @@ function InnloggingsRegistrerer() {
         'x-tenant-id': 'lns',
         'x-entra-object-id': entraId,
       },
-    }).catch(() => {});
+    }).catch(err => logger.warn('[Auth] kunne ikke registrere innlogging:', err));
   }, [isAuthenticated, accounts]);
 
   return null;
@@ -37,7 +38,7 @@ function SessionGuardSetup() {
     const guard = new SessionGuard(instance as PublicClientApplication, loginRequest.scopes as string[]);
 
     // Sjekk ved oppstart — fanger "første gang på dagen"-tilstanden
-    guard.sjekkVedOppstart().catch(() => {});
+    guard.sjekkVedOppstart().catch(err => logger.warn('[Auth] sesjonssjekk ved oppstart feilet:', err));
 
     // Start kontinuerlig overvåkning (inaktivitet + tab-fokus)
     guard.start();
