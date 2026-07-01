@@ -35,8 +35,14 @@ function getKustoClient(): KustoClient {
 
 // Kusto-identifier (tabell/kolonne): kun bokstaver/tall/underscore, maks 100 tegn.
 const IDENT_RE = /^[A-Za-z0-9_]+$/;
+
+/** True hvis strengen er en trygg KQL-identifier. Gjenbrukes av admin-ruten for input-validering. */
+export function erGyldigKqlIdent(verdi: string): boolean {
+  return !!verdi && verdi.length <= 100 && IDENT_RE.test(verdi);
+}
+
 function validerIdent(verdi: string, felt: string): string {
-  if (!verdi || verdi.length > 100 || !IDENT_RE.test(verdi)) {
+  if (!erGyldigKqlIdent(verdi)) {
     throw new Error(`Ugyldig KQL-identifier for ${felt}: "${verdi}"`);
   }
   return verdi;

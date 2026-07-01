@@ -11,6 +11,9 @@ logger.warn('[Startup] PBI_TENANT_ID satt:', !!process.env.PBI_TENANT_ID);
 logger.warn('[Startup] PBI_CLIENT_ID satt:', !!process.env.PBI_CLIENT_ID);
 logger.warn('[Startup] PBI_CLIENT_SECRET satt:', !!process.env.PBI_CLIENT_SECRET);
 logger.warn('[Startup] AZURE_OPENAI_KEY satt:', !!process.env.AZURE_OPENAI_KEY);
+// KUSTO_* er valgfrie (kun sensor-modulen) — vises for synlighet, ikke i påkrevde-lista.
+logger.warn('[Startup] KUSTO_CLUSTER_URI satt:', !!process.env.KUSTO_CLUSTER_URI);
+logger.warn('[Startup] KUSTO_DATABASE satt:', !!process.env.KUSTO_DATABASE);
 
 const påkrevde = ['DATABASE_URL', 'PBI_TENANT_ID', 'PBI_CLIENT_ID', 'PBI_CLIENT_SECRET'];
 const mangler = påkrevde.filter(v => !process.env[v]);
@@ -54,6 +57,7 @@ import { lisensRoutes } from './routes/lisens';
 import { analyseRoutes } from './routes/analyse';
 import { slicerKatalogRoutes } from './routes/slicerKatalog';
 import { adminSlicerIndeksRoutes } from './routes/adminSlicerIndeks';
+import { sensorRoutes } from './routes/sensor';
 import { startScheduler } from './services/slicerIndekseringScheduler';
 import { startAnalyseWorker } from './workers/analyseWorker';
 
@@ -135,6 +139,7 @@ async function start() {
   await server.register(analyseRoutes);
   await server.register(slicerKatalogRoutes);
   await server.register(adminSlicerIndeksRoutes);
+  await server.register(sensorRoutes);
 
   // Start scheduler etter at alt annet er klart, men før server.listen returnerer.
   // Skal ikke blokkere oppstart — funksjonen er fail-soft.
