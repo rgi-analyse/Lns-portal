@@ -485,11 +485,13 @@ export default function WorkspacePage() {
                   {dashbord.map((d) => {
                     const n = antallGrafer(d.konfig);
                     return (
-                      <div
+                      <a
                         key={d.id}
+                        href={`/dashboard/sensorer/${d.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="sensor-dash-rad"
-                        onClick={() => router.push(`/dashboard/sensorer/${d.id}`)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)', cursor: 'pointer' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)', cursor: 'pointer', textDecoration: 'none' }}
                       >
                         <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <Activity className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
@@ -506,7 +508,7 @@ export default function WorkspacePage() {
                             {n} graf{n !== 1 ? 'er' : ''}
                           </div>
                         </div>
-                      </div>
+                      </a>
                     );
                   })}
                 </div>
