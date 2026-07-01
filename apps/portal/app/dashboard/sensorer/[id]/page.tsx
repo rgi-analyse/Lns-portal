@@ -1,22 +1,30 @@
 'use client';
 
 /**
- * Sensor-kontrollrom (Steg 4a — minimal hent + tegn).
- * Fullskjerm-overlay (dekker sidebar/topbar via fixed inset-0), henter siste
- * 30 min (ingen siden-param) og tegner én statisk uPlot-linje. Polling/tema/
- * tidssone kommer i Steg 4b.
+ * Sensor-kontrollrom (Steg 4b — live).
+ * Fullskjerm via createPortal til document.body (dekker topbar/sidebar/chat
+ * garantert, uansett stacking-context). Live-polling med delta-fetch, sliding
+ * window, tema (gull på navy) og Europe/Oslo-tid.
+ *
+ * tidsvindu/intervall er hardkodet her nå — hentes fra SensorDashbord-konfig
+ * i Steg 5 (dashbord-CRUD). Intervallet klampes 2–60 s i useSensorPolling.
  */
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
-import type uPlot from 'uplot';
+import { useSensorPolling } from '@/hooks/useSensorPolling';
 
 const SensorGraf = dynamic(() => import('@/components/sensor/SensorGraf'), { ssr: false });
 
-interface Punkt { ts: string; value: number | null }
+const TIDSVINDU_MIN = 30;   // TODO Steg 5: fra SensorDashbord.tidsvinduMinutter
+const INTERVALL_SEK = 10;   // TODO Steg 5: fra SensorDashbord.oppdateringsIntervallSek
+
 interface SensorMeta { id: string; navn: string; enhet?: string | null }
+
+const datoFmt = new Intl.DateTimeFormat('nb-NO', { timeZone: 'Europe/Oslo', day: '2-digit', month: '2-digit', year: '2-digit' });
 
 export default function SensorKontrollrom() {
   const params = useParams();
@@ -24,59 +32,53 @@ export default function SensorKontrollrom() {
   const { authHeaders, grupper, authAvklart, isAuthenticated } = usePortalAuth();
 
   const [meta, setMeta] = useState<SensorMeta | null>(null);
-  const [data, setData] = useState<uPlot.AlignedData | null>(null);
-  const [feil, setFeil] = useState<string | null>(null);
-  const [laster, setLaster] = useState(true);
+  const [montert, setMontert] = useState(false);
+  useEffect(() => setMontert(true), []);
 
+  const aktiv = authAvklart && isAuthenticated && !!id;
+
+  // Sensor-meta (navn/enhet) — engangs.
   useEffect(() => {
-    if (!authAvklart) return;
-    if (!isAuthenticated || !id) { setLaster(false); return; }
-
+    if (!aktiv) return;
     let avbrutt = false;
-    (async () => {
-      setLaster(true); setFeil(null);
-      try {
-        const gq = grupper.length ? `?grupper=${encodeURIComponent(grupper.join(','))}` : '';
-        const [listeRes, dataRes] = await Promise.all([
-          apiFetch(`/api/sensor${gq}`, { headers: authHeaders }),
-          apiFetch(`/api/sensor/${id}/data${gq}`, { headers: authHeaders }),
-        ]);
-        if (!dataRes.ok) {
-          const kropp = await dataRes.json().catch(() => ({})) as { error?: string };
-          throw new Error(kropp.error ?? `HTTP ${dataRes.status}`);
-        }
-        const liste = listeRes.ok ? (await listeRes.json() as SensorMeta[]) : [];
-        const { punkter } = await dataRes.json() as { punkter: Punkt[] };
-        if (avbrutt) return;
-        setMeta(liste.find(s => s.id.toLowerCase() === id.toLowerCase()) ?? null);
-        setData([
-          punkter.map(p => Date.parse(p.ts) / 1000),
-          punkter.map(p => p.value),
-        ]);
-      } catch (e) {
-        if (!avbrutt) setFeil(e instanceof Error ? e.message : 'Ukjent feil');
-      } finally {
-        if (!avbrutt) setLaster(false);
-      }
-    })();
+    const gq = grupper.length ? `?grupper=${encodeURIComponent(grupper.join(','))}` : '';
+    apiFetch(`/api/sensor${gq}`, { headers: authHeaders })
+      .then(r => (r.ok ? (r.json() as Promise<SensorMeta[]>) : []))
+      .then(liste => { if (!avbrutt) setMeta(liste.find(s => s.id.toLowerCase() === id.toLowerCase()) ?? null); })
+      .catch(() => {});
     return () => { avbrutt = true; };
-  }, [id, authAvklart, isAuthenticated, authHeaders, grupper]);
+  }, [aktiv, id, authHeaders, grupper]);
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'var(--background)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
-      <h1 style={{ margin: 0, color: 'var(--text-secondary, #cbd5e1)', fontSize: 18, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-        {meta?.navn ?? 'Sensor'} — siste 30 min{meta?.enhet ? ` (${meta.enhet})` : ''}
-      </h1>
+  const { data, feil, laster } = useSensorPolling({
+    sensorId: id, intervallSek: INTERVALL_SEK, tidsvinduMin: TIDSVINDU_MIN, authHeaders, grupper, aktiv,
+  });
+
+  const tomtVindu = !!data && data[0].length === 0;
+
+  const innhold = (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'var(--background)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
+        <h1 style={{ margin: 0, color: 'var(--primary, #F5A623)', fontSize: 18, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          {meta?.navn ?? 'Sensor'}{meta?.enhet ? ` (${meta.enhet})` : ''}
+        </h1>
+        <span style={{ color: 'var(--text-secondary, #94a3b8)', fontSize: 13 }}>
+          {datoFmt.format(new Date())} · siste {TIDSVINDU_MIN} min · oppdaterer hvert {INTERVALL_SEK}s · Europe/Oslo
+        </span>
+      </div>
 
       {authAvklart && !isAuthenticated && <p style={{ color: '#cbd5e1' }}>Du må være innlogget.</p>}
-      {laster && <p style={{ color: '#cbd5e1' }}>Laster sensor-data …</p>}
+      {laster && !data && <p style={{ color: '#cbd5e1' }}>Laster sensor-data …</p>}
       {feil && <p style={{ color: '#f87171' }}>Kunne ikke hente sensor-data: {feil}</p>}
+      {tomtVindu && !feil && <p style={{ color: '#cbd5e1' }}>Ingen data i tidsvinduet ennå.</p>}
 
-      {data && !feil && (
-        <div style={{ flex: 1, minHeight: 0, background: '#fff', borderRadius: 8, padding: 12 }}>
+      {data && !tomtVindu && (
+        <div style={{ flex: 1, minHeight: 0, background: 'var(--navy, #1B2A4A)', borderRadius: 10, padding: 12, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))' }}>
           <SensorGraf data={data} navn={meta?.navn ?? 'Verdi'} enhet={meta?.enhet ?? undefined} />
         </div>
       )}
     </div>
   );
+
+  if (!montert) return null;
+  return createPortal(innhold, document.body);
 }
