@@ -86,7 +86,7 @@ export async function sensorDashbordRoutes(fastify: FastifyInstance) {
       try {
         const dashbord = await db.sensorDashbord.findMany({
           where: { workspaceId },
-          select: { id: true, navn: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, opprettet: true },
+          select: { id: true, navn: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, konfig: true, opprettet: true },
           orderBy: { navn: 'asc' },
         });
         return reply.send(dashbord);

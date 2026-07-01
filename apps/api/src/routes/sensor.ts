@@ -18,7 +18,9 @@ function hentGrupper(request: FastifyRequest): string[] {
 
 export async function sensorRoutes(fastify: FastifyInstance) {
   // ── GET /api/sensor — sensorer brukeren har tilgang til ────────────────────
-  fastify.get(
+  // Valgfritt ?workspaceId= filtrerer til sensorer koblet til det workspacet
+  // (brukes av dashbord-skjemaet for å vise kun relevante sensorer).
+  fastify.get<{ Querystring: { workspaceId?: string; grupper?: string } }>(
     '/api/sensor',
     { preHandler: [resolveTenant, requireBruker] },
     async (request, reply) => {
@@ -31,9 +33,12 @@ export async function sensorRoutes(fastify: FastifyInstance) {
         tenantPrisma: db,
       });
       try {
+        const wsFilter = request.query.workspaceId
+          ? { workspaces: { some: { workspaceId: request.query.workspaceId } } }
+          : {};
         const where = tilgang.mode === 'admin'
-          ? { erAktiv: true }
-          : { erAktiv: true, id: { in: [...tilgang.tillatteSensorIds] } };
+          ? { erAktiv: true, ...wsFilter }
+          : { erAktiv: true, id: { in: [...tilgang.tillatteSensorIds] }, ...wsFilter };
         const sensorer = await db.sensor.findMany({
           where,
           select: { id: true, navn: true, sensorId: true, enhet: true, beskrivelse: true },
