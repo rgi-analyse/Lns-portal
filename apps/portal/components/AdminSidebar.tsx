@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
+import { Activity, Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
@@ -14,6 +14,7 @@ const nav = [
   { href: '/admin/brukere',    label: 'Brukere',    icon: Users },
   { href: '/admin/metadata',   label: 'Metadata',   icon: Database },
   { href: '/admin/slicer-indeksering', label: 'Slicer-indeksering', icon: Layers },
+  { href: '/admin/sensor-dashbord', label: 'Sensor-dashbord', icon: Activity },
   { href: '/admin/tema',       label: 'Tema',       icon: Palette },
   { href: '/admin/tenants',    label: 'Tenants',    icon: Globe,       kreverRolle: 'tenantadmin' as const },
   { href: '/admin/lisens',     label: 'Lisens',     icon: CreditCard,  kreverRolle: 'tenantadmin' as const },

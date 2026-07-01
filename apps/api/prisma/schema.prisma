@@ -17,12 +17,49 @@ model Workspace {
   sortOrder        Int                @default(0)
   rapporter        WorkspaceRapport[]
   tilgang          Tilgang[]
+  sensorer         WorkspaceSensor[]
+  sensorDashbord   SensorDashbord[]
 
   // Kontekst-parameter: brukes som fast filter når bruker åpner rapport-designer fra dette workspacet
   kontekstType     String?            @db.NVarChar(50)
   kontekstKolonne  String?            @db.NVarChar(100)
   kontekstVerdi    String?            @db.NVarChar(200)
   kontekstLabel    String?            @db.NVarChar(200)
+}
+
+// ── Sensor / Eventhouse-modul (live KQL-data) ────────────────────────────────
+model Sensor {
+  id           String            @id @default(uuid())
+  navn         String            @db.NVarChar(200)
+  sensorId     String            @unique @db.NVarChar(100)   // SensorID-verdi i KQL (WHERE SensorID == ...)
+  kqlTabell    String            @db.NVarChar(100)           // KQL-tabellnavn (én tabell per sensor-type)
+  kqlVerdiFelt String            @db.NVarChar(100)           // verdi-kolonne i KQL (varierer per tabell, f.eks. fill_grade_percentage)
+  enhet        String?           @db.NVarChar(50)
+  beskrivelse  String?           @db.NVarChar(500)
+  erAktiv      Boolean           @default(true)
+  opprettet    DateTime          @default(now())
+  workspaces   WorkspaceSensor[]
+}
+
+model WorkspaceSensor {
+  workspaceId String
+  sensorId    String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sensor      Sensor    @relation(fields: [sensorId], references: [id], onDelete: NoAction)
+
+  @@id([workspaceId, sensorId])
+}
+
+model SensorDashbord {
+  id                       String    @id @default(uuid())
+  workspaceId              String
+  navn                     String    @db.NVarChar(200)
+  tidsvinduMinutter        Int       @default(30)
+  oppdateringsIntervallSek Int       @default(10)
+  konfig                   String    @db.NVarChar(Max)   // JSON: layout/grafer
+  opprettet                DateTime  @default(now())
+  oppdatert                DateTime  @updatedAt
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model Rapport {

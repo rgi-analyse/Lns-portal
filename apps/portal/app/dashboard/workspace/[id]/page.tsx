@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileBarChart2, BarChart2, Pencil } from 'lucide-react';
+import { ArrowLeft, FileBarChart2, BarChart2, Pencil, Activity } from 'lucide-react';
 import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
@@ -27,6 +27,9 @@ function formaterDato(dato: string | null | undefined): string {
     hour: '2-digit', minute: '2-digit',
   });
 }
+
+interface SensorDashbord { id: string; navn: string; konfig: string }
+function antallGrafer(konfig: string): number { try { return JSON.parse(konfig).grafer?.length ?? 0; } catch { return 0; } }
 
 interface WorkspaceDetail {
   id:               string;
@@ -56,6 +59,7 @@ export default function WorkspacePage() {
   const [workspace,        setWorkspace]        = useState<WorkspaceDetail | null>(null);
   const [brukerChatAktivert, setBrukerChatAktivert] = useState<boolean | null>(null);
   const [rapporter,        setRapporter]        = useState<Rapport[]>([]);
+  const [dashbord,         setDashbord]         = useState<SensorDashbord[]>([]);
   const [error,            setError]            = useState<string | null>(null);
   const [kanLageRapport,   setKanLageRapport]   = useState(false);
   const [visNyRapportModal, setVisNyRapportModal] = useState(false);
@@ -89,6 +93,13 @@ export default function WorkspacePage() {
         const rapporter = await rRes.json() as Rapport[];
         setRapporter(rapporter);
       }
+
+      // Sensor-dashbord for workspacet (backend er fail-closed på workspace-tilgang)
+      const dUrl = new URL(`${API}/api/sensor-dashbord`);
+      dUrl.searchParams.set('workspaceId', id);
+      if (grupper.length > 0) dUrl.searchParams.set('grupper', grupper.join(','));
+      const dRes = await apiFetch(dUrl.pathname + dUrl.search, { headers: authHeaders });
+      if (dRes.ok) setDashbord(await dRes.json() as SensorDashbord[]);
 
       // Hent rolle for å avgjøre om "Ny rapport"-knappen skal vises
       if (entraObjectId) {
@@ -179,6 +190,9 @@ export default function WorkspacePage() {
     <>
       <style>{`
         .rapport-rad:hover .rapport-actions { opacity: 1 !important; }
+        .sensor-dash-rad:hover { border-color: var(--glass-border-hover) !important; }
+        .sensor-live-dot { animation: sensorPuls 1.6s ease-in-out infinite; }
+        @keyframes sensorPuls { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.65); } }
       `}</style>
 
       <div className="p-8 overflow-y-auto h-full">
@@ -456,6 +470,49 @@ export default function WorkspacePage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* Sensor-dashbord — skjules hvis ingen */}
+            {dashbord.length > 0 && (
+              <>
+                <div className="flex items-center gap-3 mb-4 mt-10">
+                  <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    Sensor-dashbord
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: 'var(--glass-bg)' }} />
+                </div>
+                <div className="space-y-1.5" style={{ maxWidth: 680 }}>
+                  {dashbord.map((d) => {
+                    const n = antallGrafer(d.konfig);
+                    return (
+                      <a
+                        key={d.id}
+                        href={`/dashboard/sensorer/${d.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="sensor-dash-rad"
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)', cursor: 'pointer', textDecoration: 'none' }}
+                      >
+                        <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--glass-gold-bg)', border: '1px solid var(--glass-gold-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Activity className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.navn}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#22c55e', flexShrink: 0 }}>
+                              <span className="sensor-live-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e' }} />
+                              Live
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                            {n} graf{n !== 1 ? 'er' : ''}
+                          </div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </>
         )}
