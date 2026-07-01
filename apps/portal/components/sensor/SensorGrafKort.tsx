@@ -45,7 +45,7 @@ export default function SensorGrafKort(props: Props) {
   }
 
   return (
-    <div style={{ height: 280, flexShrink: 0, background: 'var(--navy-dark, #1B2A4A)', borderRadius: 10, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))', padding: 12, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div style={{ flex: 1, minHeight: 200, background: 'var(--navy-dark, #1B2A4A)', borderRadius: 10, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))', padding: 12, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 12 }}>
         <span style={{ color: 'var(--text-secondary, rgba(255,255,255,0.7))', fontSize: 14, fontWeight: 600 }}>{props.tittel}</span>
         {props.visSisteVerdi && siste != null && (

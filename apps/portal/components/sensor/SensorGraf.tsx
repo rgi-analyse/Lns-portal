@@ -65,11 +65,16 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
 
   useEffect(() => { plot.current?.setData(data); }, [data]);
 
+  // Auto-resize: re-tegn uPlot når containeren endrer størrelse (viewport ELLER
+  // flex-omfordeling når antall grafer endres). ResizeObserver fanger begge.
   useEffect(() => {
     const el = boks.current;
-    const onResize = () => { if (el && plot.current) plot.current.setSize({ width: el.clientWidth, height: el.clientHeight }); };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (plot.current) plot.current.setSize({ width: el.clientWidth, height: el.clientHeight });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   return <div ref={boks} style={{ width: '100%', height: '100%' }} />;
