@@ -14,15 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
-
-const FARGER = ['primary', 'accent', 'success', 'warning', 'danger'] as const;
-type Farge = typeof FARGER[number];
-export const FARGE_HEX: Record<Farge, string> = {
-  primary: '#ffbb00', accent: '#38bdf8', success: '#22c55e', warning: '#f59e0b', danger: '#ef4444',
-};
-const FARGE_NAVN: Record<Farge, string> = {
-  primary: 'Gull (primary)', accent: 'Blå (accent)', success: 'Grønn (success)', warning: 'Oransje (warning)', danger: 'Rød (danger)',
-};
+import { FARGER, FARGE_HEX, FARGE_NAVN, type Farge } from './farger';
 
 interface Workspace { id: string; navn: string }
 interface Sensor { id: string; navn: string; enhet?: string | null }
@@ -231,9 +223,8 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--glass-bg-hover)' }}>
           <Link href="/admin/sensor-dashbord"><Button type="button" variant="outline" size="sm">Avbryt</Button></Link>
           <div className="flex gap-2">
-            {!erNy && grafer[0]?.sensorId && (
-              // 5c: bytt til /dashboard/sensorer/${dashbordId}
-              <a href={`/dashboard/sensorer/${grafer[0].sensorId}`} target="_blank" rel="noopener noreferrer">
+            {!erNy && (
+              <a href={`/dashboard/sensorer/${dashbordId}`} target="_blank" rel="noopener noreferrer">
                 <Button type="button" variant="outline" size="sm"><ExternalLink className="w-4 h-4 mr-1" /> Preview</Button>
               </a>
             )}

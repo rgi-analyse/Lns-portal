@@ -86,7 +86,7 @@ export async function sensorDashbordRoutes(fastify: FastifyInstance) {
       try {
         const dashbord = await db.sensorDashbord.findMany({
           where: { workspaceId },
-          select: { id: true, navn: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, konfig: true, opprettet: true },
+          select: { id: true, navn: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, konfig: true, opprettet: true, oppdatert: true },
           orderBy: { navn: 'asc' },
         });
         return reply.send(dashbord);
@@ -107,7 +107,7 @@ export async function sensorDashbordRoutes(fastify: FastifyInstance) {
       try {
         dashbord = await db.sensorDashbord.findUnique({
           where: { id: request.params.id },
-          select: { id: true, navn: true, workspaceId: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, konfig: true, opprettet: true },
+          select: { id: true, navn: true, workspaceId: true, tidsvinduMinutter: true, oppdateringsIntervallSek: true, konfig: true, opprettet: true, oppdatert: true },
         });
       } catch (err) {
         return feilRespons(reply, 500, 'Kunne ikke hente dashbord.', err);

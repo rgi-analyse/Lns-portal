@@ -58,6 +58,7 @@ model SensorDashbord {
   oppdateringsIntervallSek Int       @default(10)
   konfig                   String    @db.NVarChar(Max)   // JSON: layout/grafer
   opprettet                DateTime  @default(now())
+  oppdatert                DateTime  @updatedAt
   workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 

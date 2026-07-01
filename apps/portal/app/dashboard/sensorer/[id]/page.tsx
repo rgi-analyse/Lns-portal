@@ -1,27 +1,26 @@
 'use client';
 
 /**
- * Sensor-kontrollrom (Steg 4b — live).
- * Fullskjerm: dashboard-layouten hopper over sidebar/topbar/chat for
- * /dashboard/sensorer/*-ruter, så en enkel fixed inset-0-container dekker
- * viewporten. Live-polling, tema (gull på navy), Europe/Oslo-tid.
- *
- * tidsvindu/intervall er hardkodet nå — hentes fra SensorDashbord-konfig i
- * Steg 5. Intervallet klampes 2–60 s i useSensorPolling.
+ * Sensor-kontrollrom (Steg 5c). [id] = SensorDashbord-ID.
+ * Henter dashbord-konfig og rendrer N grafer (vertikal stack), med tidsvindu +
+ * oppdaterings-intervall + per-graf farge/y-min-max fra konfig. Fullskjerm:
+ * dashboard-layouten hopper over sidebar/topbar for /dashboard/sensorer/*.
  */
 import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
-import { useSensorPolling } from '@/hooks/useSensorPolling';
+import SensorGrafKort from '@/components/sensor/SensorGrafKort';
+import type { Farge } from '@/components/sensor/farger';
 
-const SensorGraf = dynamic(() => import('@/components/sensor/SensorGraf'), { ssr: false });
-
-const TIDSVINDU_MIN = 30;   // TODO Steg 5: fra SensorDashbord.tidsvinduMinutter
-const INTERVALL_SEK = 10;   // TODO Steg 5: fra SensorDashbord.oppdateringsIntervallSek
-
-interface SensorMeta { id: string; navn: string; enhet?: string | null }
+interface GrafKonfig { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge }
+interface Dashbord {
+  navn: string;
+  tidsvinduMinutter: number;
+  oppdateringsIntervallSek: number;
+  konfig: { layout: string; grafer: GrafKonfig[]; visSensorNavn: boolean; visSisteVerdi: boolean } | null;
+}
+interface SensorMeta { id: string; enhet?: string | null }
 
 const datoFmt = new Intl.DateTimeFormat('nb-NO', { timeZone: 'Europe/Oslo', day: '2-digit', month: '2-digit', year: '2-digit' });
 
@@ -30,46 +29,80 @@ export default function SensorKontrollrom() {
   const id = String(params?.id ?? '');
   const { authHeaders, grupper, authAvklart, isAuthenticated } = usePortalAuth();
 
-  const [meta, setMeta] = useState<SensorMeta | null>(null);
+  const [dashbord, setDashbord] = useState<Dashbord | null>(null);
+  const [enhetMap, setEnhetMap] = useState<Record<string, string | undefined>>({});
+  const [feil, setFeil] = useState<string | null>(null);
+  const [laster, setLaster] = useState(true);
   const aktiv = authAvklart && isAuthenticated && !!id;
 
-  // Sensor-meta (navn/enhet) — engangs.
   useEffect(() => {
-    if (!aktiv) return;
+    if (!authAvklart) return;
+    if (!aktiv) { setLaster(false); return; }
     let avbrutt = false;
-    const gq = grupper.length ? `?grupper=${encodeURIComponent(grupper.join(','))}` : '';
-    apiFetch(`/api/sensor${gq}`, { headers: authHeaders })
-      .then(r => (r.ok ? (r.json() as Promise<SensorMeta[]>) : []))
-      .then(liste => { if (!avbrutt) setMeta(liste.find(s => s.id.toLowerCase() === id.toLowerCase()) ?? null); })
-      .catch(() => {});
+    (async () => {
+      setLaster(true); setFeil(null);
+      try {
+        const gq = grupper.length ? `?grupper=${encodeURIComponent(grupper.join(','))}` : '';
+        const dRes = await apiFetch(`/api/sensor-dashbord/${id}${gq}`, { headers: authHeaders });
+        if (!dRes.ok) {
+          const k = await dRes.json().catch(() => ({})) as { error?: string };
+          throw new Error(k.error ?? `HTTP ${dRes.status}`);
+        }
+        const d = await dRes.json() as Dashbord;
+        const sRes = await apiFetch(`/api/sensor${gq}`, { headers: authHeaders });
+        const sensorer: SensorMeta[] = sRes.ok ? await sRes.json() : [];
+        if (avbrutt) return;
+        setDashbord(d);
+        setEnhetMap(Object.fromEntries(sensorer.map(s => [s.id, s.enhet ?? undefined])));
+      } catch (e) {
+        if (!avbrutt) setFeil(e instanceof Error ? e.message : 'Ukjent feil');
+      } finally {
+        if (!avbrutt) setLaster(false);
+      }
+    })();
     return () => { avbrutt = true; };
-  }, [aktiv, id, authHeaders, grupper]);
+  }, [id, authAvklart, aktiv, authHeaders, grupper]);
 
-  const { data, feil, laster } = useSensorPolling({
-    sensorId: id, intervallSek: INTERVALL_SEK, tidsvinduMin: TIDSVINDU_MIN, authHeaders, grupper, aktiv,
-  });
-
-  const tomtVindu = !!data && data[0].length === 0;
+  const grafer = dashbord?.konfig?.grafer ?? [];
+  const visSisteVerdi = dashbord?.konfig?.visSisteVerdi ?? true;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--navy-darkest, #0a1628)', display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--navy-darkest, #0a1628)', display: 'flex', flexDirection: 'column', padding: 20, gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
         <h1 style={{ margin: 0, color: 'var(--gold, #ffbb00)', fontSize: 18, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          {meta?.navn ?? 'Sensor'}{meta?.enhet ? ` (${meta.enhet})` : ''}
+          {dashbord?.navn ?? 'Kontrollrom'}
         </h1>
-        <span style={{ color: 'var(--text-secondary, rgba(255,255,255,0.7))', fontSize: 13 }}>
-          {datoFmt.format(new Date())} · siste {TIDSVINDU_MIN} min · oppdaterer hvert {INTERVALL_SEK}s · Europe/Oslo
-        </span>
+        {dashbord && (
+          <span style={{ color: 'var(--text-secondary, rgba(255,255,255,0.7))', fontSize: 13 }}>
+            {datoFmt.format(new Date())} · siste {dashbord.tidsvinduMinutter} min · hvert {dashbord.oppdateringsIntervallSek}s · Europe/Oslo
+          </span>
+        )}
       </div>
 
       {authAvklart && !isAuthenticated && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Du må være innlogget.</p>}
-      {laster && !data && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Laster sensor-data …</p>}
-      {feil && <p style={{ color: '#f87171' }}>Kunne ikke hente sensor-data: {feil}</p>}
-      {tomtVindu && !feil && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Ingen data i tidsvinduet ennå.</p>}
+      {laster && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Laster dashbord …</p>}
+      {feil && <p style={{ color: '#f87171' }}>Kunne ikke hente dashbord: {feil}</p>}
+      {dashbord && grafer.length === 0 && !feil && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Dashbordet har ingen grafer.</p>}
 
-      {data && !tomtVindu && (
-        <div style={{ flex: 1, minHeight: 0, background: 'var(--navy-dark, #1B2A4A)', borderRadius: 10, padding: 12, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))' }}>
-          <SensorGraf data={data} navn={meta?.navn ?? 'Verdi'} enhet={meta?.enhet ?? undefined} />
+      {dashbord && grafer.length > 0 && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {grafer.map((g, i) => (
+            <SensorGrafKort
+              key={`${g.sensorId}-${i}`}
+              sensorId={g.sensorId}
+              tittel={g.tittel}
+              enhet={enhetMap[g.sensorId]}
+              farge={g.farge}
+              yMin={g.yMin}
+              yMax={g.yMax}
+              tidsvinduMin={dashbord.tidsvinduMinutter}
+              intervallSek={dashbord.oppdateringsIntervallSek}
+              visSisteVerdi={visSisteVerdi}
+              authHeaders={authHeaders}
+              grupper={grupper}
+              aktiv={aktiv}
+            />
+          ))}
         </div>
       )}
     </div>

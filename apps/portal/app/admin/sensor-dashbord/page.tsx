@@ -15,12 +15,11 @@ import { toast } from '@/components/ui/toast';
 interface Workspace { id: string; navn: string }
 interface DashbordRad {
   id: string; navn: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number;
-  konfig: string; opprettet: string; workspaceId: string; workspaceNavn: string;
+  konfig: string; opprettet: string; oppdatert: string; workspaceId: string; workspaceNavn: string;
 }
 
 const datoFmt = new Intl.DateTimeFormat('nb-NO', { timeZone: 'Europe/Oslo', day: '2-digit', month: '2-digit', year: '2-digit' });
 const antallGrafer = (konfig: string): number => { try { return JSON.parse(konfig).grafer?.length ?? 0; } catch { return 0; } };
-const førsteSensor = (konfig: string): string | null => { try { return JSON.parse(konfig).grafer?.[0]?.sensorId ?? null; } catch { return null; } };
 
 export default function SensorDashbordListe() {
   const { authHeaders } = usePortalAuth();
@@ -89,7 +88,7 @@ export default function SensorDashbordListe() {
         <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Navn', 'Workspace', 'Grafer', 'Tidsvindu', 'Intervall', 'Opprettet', ''].map((h, i) => (
+              {['Navn', 'Workspace', 'Grafer', 'Tidsvindu', 'Intervall', 'Sist endret', ''].map((h, i) => (
                 <th key={i} style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--glass-bg-hover)' }}>{h}</th>
               ))}
             </tr>
@@ -99,26 +98,23 @@ export default function SensorDashbordListe() {
               <tr><td colSpan={7} style={{ ...celle, textAlign: 'center', color: 'var(--text-muted)' }}>Laster …</td></tr>
             ) : synlige.length === 0 ? (
               <tr><td colSpan={7} style={{ ...celle, textAlign: 'center', color: 'var(--text-muted)' }}>Ingen dashbord ennå.</td></tr>
-            ) : synlige.map(r => {
-              const sid = førsteSensor(r.konfig);
-              return (
-                <tr key={r.id}>
-                  <td style={{ ...celle, color: 'var(--text-primary)', fontWeight: 600 }}>{r.navn}</td>
-                  <td style={celle}>{r.workspaceNavn}</td>
-                  <td style={celle}>{antallGrafer(r.konfig)}</td>
-                  <td style={celle}>{r.tidsvinduMinutter} min</td>
-                  <td style={celle}>{r.oppdateringsIntervallSek} s</td>
-                  <td style={celle}>{datoFmt.format(new Date(r.opprettet))}</td>
-                  <td style={{ ...celle, whiteSpace: 'nowrap' }}>
-                    <div className="flex items-center gap-2 justify-end">
-                      <Link href={`/admin/sensor-dashbord/${r.id}`} title="Rediger" style={{ color: 'var(--text-secondary)' }}><Pencil className="w-4 h-4" /></Link>
-                      {sid && <a href={`/dashboard/sensorer/${sid}`} target="_blank" rel="noopener noreferrer" title="Preview" style={{ color: 'var(--text-secondary)' }}><ExternalLink className="w-4 h-4" /></a>}
-                      <button type="button" onClick={() => slett(r)} disabled={sletter === r.id} title="Slett" style={{ color: 'rgba(252,165,165,0.95)' }}><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            ) : synlige.map(r => (
+              <tr key={r.id}>
+                <td style={{ ...celle, color: 'var(--text-primary)', fontWeight: 600 }}>{r.navn}</td>
+                <td style={celle}>{r.workspaceNavn}</td>
+                <td style={celle}>{antallGrafer(r.konfig)}</td>
+                <td style={celle}>{r.tidsvinduMinutter} min</td>
+                <td style={celle}>{r.oppdateringsIntervallSek} s</td>
+                <td style={celle}>{datoFmt.format(new Date(r.oppdatert))}</td>
+                <td style={{ ...celle, whiteSpace: 'nowrap' }}>
+                  <div className="flex items-center gap-2 justify-end">
+                    <Link href={`/admin/sensor-dashbord/${r.id}`} title="Rediger" style={{ color: 'var(--text-secondary)' }}><Pencil className="w-4 h-4" /></Link>
+                    <a href={`/dashboard/sensorer/${r.id}`} target="_blank" rel="noopener noreferrer" title="Preview" style={{ color: 'var(--text-secondary)' }}><ExternalLink className="w-4 h-4" /></a>
+                    <button type="button" onClick={() => slett(r)} disabled={sletter === r.id} title="Slett" style={{ color: 'rgba(252,165,165,0.95)' }}><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
