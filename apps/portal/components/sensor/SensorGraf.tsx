@@ -5,7 +5,10 @@
  * importeres via next/dynamic med ssr:false fra siden.
  *
  * Steg 4b — tema-integrert:
- * - Gull-linje (var(--primary)) på navy graf-flate (satt av containeren).
+ * - Gull-linje: var(--gold) (= tema.primaryColor, hex #ffbb00 for LNS). NB:
+ *   var(--primary) er en HSL-triplett (shadcn-stil), IKKE en gyldig canvas-farge.
+ * - Farger sendes som FUNKSJONER som resolver CSS-variabelen live ved hver
+ *   redraw → linjen følger tema-endringer (neste poll re-tegner med ny farge).
  * - Akse-tekst/rutenett fra var(--text-secondary). Canvas trenger konkrete
  *   farger → CSS-variabler resolves via getComputedStyle.
  * - X-akse i Europe/Oslo, norsk format (Intl 'nb-NO'). Norge har heltalls
@@ -38,9 +41,10 @@ export default function SensorGraf({ data, navn, enhet }: Props) {
   useEffect(() => {
     const el = boks.current;
     if (!el) return;
-    const gull = cssVar('--primary', '#F5A623');
-    const tekst = cssVar('--text-secondary', '#94a3b8');
-    const rutenett = 'rgba(148,163,184,0.15)';
+    // Live-resolvende farger (funksjon kalles ved hver redraw) → følger tema-endring.
+    const gull = () => cssVar('--gold', '#ffbb00');
+    const tekst = () => cssVar('--text-secondary', 'rgba(255,255,255,0.7)');
+    const rutenett = 'rgba(255,255,255,0.10)';
 
     const opts: uPlot.Options = {
       width: el.clientWidth || 800,

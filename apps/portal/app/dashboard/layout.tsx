@@ -14,6 +14,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // — ikke vis global widget der for å unngå dobbel chat-knapp
   const skjulGlobalWidget = pathname.startsWith('/dashboard/rapport/');
 
+  // Sensor-kontrollrom kjører fullskjerm — ingen sidebar/topbar/chat.
+  if (pathname.startsWith('/dashboard/sensorer/')) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
