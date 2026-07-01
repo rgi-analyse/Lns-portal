@@ -58,6 +58,7 @@ import { analyseRoutes } from './routes/analyse';
 import { slicerKatalogRoutes } from './routes/slicerKatalog';
 import { adminSlicerIndeksRoutes } from './routes/adminSlicerIndeks';
 import { sensorRoutes } from './routes/sensor';
+import { sensorDashbordRoutes } from './routes/sensorDashbord';
 import { startScheduler } from './services/slicerIndekseringScheduler';
 import { startAnalyseWorker } from './workers/analyseWorker';
 
@@ -140,6 +141,7 @@ async function start() {
   await server.register(slicerKatalogRoutes);
   await server.register(adminSlicerIndeksRoutes);
   await server.register(sensorRoutes);
+  await server.register(sensorDashbordRoutes);
 
   // Start scheduler etter at alt annet er klart, men før server.listen returnerer.
   // Skal ikke blokkere oppstart — funksjonen er fail-soft.

@@ -19,7 +19,10 @@ export const INGEN_SENSORTILGANG: SensorTilgang = { mode: 'begrenset', tillatteS
 
 // Løs strukturell type så en full PrismaClient (overloadet findMany) er tilordnbar.
 interface TenantPrismaLike {
-  workspace: { findMany: (args: any) => Promise<unknown> };
+  workspace: {
+    findMany: (args: any) => Promise<unknown>;
+    findFirst: (args: any) => Promise<unknown>;
+  };
 }
 type WsSensorRad = { sensorer: { sensorId: string }[] };
 
@@ -52,4 +55,24 @@ export async function hentSensorTilgang(input: SensorTilgangInput): Promise<Sens
 /** True hvis brukeren har tilgang til Sensor.id (UUID). Admin → alltid. */
 export function harTilgangTilSensor(tilgang: SensorTilgang, sensorPrismaId: string): boolean {
   return tilgang.mode === 'admin' || tilgang.tillatteSensorIds.has(sensorPrismaId);
+}
+
+/**
+ * Har brukeren tilgang til et workspace (via Tilgang)? Brukes av dashbord-rutene.
+ * Fail-closed: admin → true; feil/tomt → false.
+ */
+export async function harWorkspaceTilgang(input: SensorTilgangInput, workspaceId: string): Promise<boolean> {
+  if (input.erAdminTilgang) return true;
+  const identities = [input.entraObjectId, ...(input.grupper ?? [])].filter(Boolean) as string[];
+  if (identities.length === 0) return false;
+  try {
+    const ws = await input.tenantPrisma.workspace.findFirst({
+      where: { id: workspaceId, tilgang: { some: { entraId: { in: identities } } } },
+      select: { id: true },
+    }) as { id: string } | null;
+    return !!ws;
+  } catch (err) {
+    logger.warn('[sensorTilgang] harWorkspaceTilgang fail-closed:', err instanceof Error ? err.message : err);
+    return false;
+  }
 }
