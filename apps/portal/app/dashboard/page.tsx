@@ -59,7 +59,8 @@ function formaterDato(iso: string | null | undefined): string {
 export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, entraObjectId, displayName, authHeaders, grupper } = usePortalAuth();
-  const firstName = displayName.split(' ')[0];
+  const rawFirstName = displayName.split(' ')[0];
+  const firstName = rawFirstName ? rawFirstName.charAt(0).toUpperCase() + rawFirstName.slice(1).toLowerCase() : rawFirstName;
 
   const [aktivitet,        setAktivitet]        = useState<Aktivitet | null>(null);
   const [workspaces,       setWorkspaces]        = useState<Workspace[]>([]);
@@ -143,7 +144,7 @@ export default function DashboardPage() {
         {/* Velkomst */}
         <div className="mb-8">
           <h1
-            className="uppercase tracking-wide"
+            className="tracking-wide"
             style={{
               fontFamily: 'var(--font-segoe)',
               fontWeight: 600,
