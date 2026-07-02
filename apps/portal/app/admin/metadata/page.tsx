@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { Badge } from '@/components/ui/badge';

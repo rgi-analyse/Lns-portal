@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageCircle, Minus, X } from 'lucide-react';
+import { MessageCircle, Minus, X } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { harBetaTilgang } from '@/lib/featureFlags';
 import { useLisens } from '@/components/LisensProvider';

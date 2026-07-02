@@ -1,17 +1,22 @@
-import * as Icons from 'lucide-react';
-import type { LucideIcon, LucideProps } from 'lucide-react';
+import * as React from 'react';
+import * as Ikoner from '@/components/ikoner';
 
-interface Props extends LucideProps {
+interface Props extends React.SVGProps<SVGSVGElement> {
   navn?:     string | null;
-  fallback?: keyof typeof Icons;
+  fallback?: keyof typeof Ikoner;
+  size?:     number | string;
 }
 
-// Icons-namespacet inneholder også ikke-ikon-utilities (createLucideIcon, LucideIcon, …).
-// Vi caster til et lookup-map — AnalyseType.ikon er fri-form string fra DB, så ugyldige
-// verdier må falle tilbake til fallback-ikonet.
-const icons = Icons as unknown as Record<string, LucideIcon | undefined>;
+// Ikon-adapteret (D2 Gruppe 4) eksporterer Fluent-ikoner under Lucide-navn.
+// AnalyseType.ikon er fri-form (Lucide-navn lagret i DB), så ugyldige/ukjente
+// navn faller tilbake til fallback-ikonet. Ikon-navn som ikke finnes i adapteret
+// vises som fallback — utvid adapteret ved behov.
+const ikoner = Ikoner as unknown as Record<
+  string,
+  React.ComponentType<React.SVGProps<SVGSVGElement> & { size?: number | string }> | undefined
+>;
 
 export function AnalyseIkon({ navn, fallback = 'FileText', ...rest }: Props) {
-  const IconKomponent = (navn ? icons[navn] : undefined) ?? icons[fallback] ?? Icons.FileText;
+  const IconKomponent = (navn ? ikoner[navn] : undefined) ?? ikoner[fallback] ?? Ikoner.FileText;
   return <IconKomponent {...rest} />;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Clock, FileBarChart2, RefreshCw, Star } from 'lucide-react';
+import { Clock, FileBarChart2, RefreshCw, Star } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useLisens } from '@/components/LisensProvider';

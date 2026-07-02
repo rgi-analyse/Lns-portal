@@ -14,7 +14,7 @@ import {
   FileText, Presentation, Table,
   Maximize, RefreshCw, RotateCcw,
   ZoomIn, ZoomOut, Scan, Maximize2,
-} from 'lucide-react';
+} from '@/components/ikoner';
 import * as XLSX from 'xlsx';
 import { toast } from '@/components/ui/toast';
 import { apiFetch } from '@/lib/apiClient';

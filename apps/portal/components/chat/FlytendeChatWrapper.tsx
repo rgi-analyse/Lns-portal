@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Rnd } from 'react-rnd';
 import dynamic from 'next/dynamic';
-import { GripHorizontal, MessageCircle } from 'lucide-react';
+import { GripHorizontal, MessageCircle } from '@/components/ikoner';
 import type AIChatComponent from '@/components/AIChat';
 
 const AIChat = dynamic(() => import('@/components/AIChat'), { ssr: false });

@@ -6,7 +6,7 @@ import { useMsal } from '@azure/msal-react';
 import { loginRequest } from '@/lib/authConfig';
 import { setLocalSession } from '@/lib/localAuth';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from '@/components/ikoner';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
 

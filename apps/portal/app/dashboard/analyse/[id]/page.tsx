@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';

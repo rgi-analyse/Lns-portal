@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, User } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 

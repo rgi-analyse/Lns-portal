@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, ExternalLink } from '@/components/ikoner';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { Button } from '@/components/ui/button';

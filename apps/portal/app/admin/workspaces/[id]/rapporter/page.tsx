@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from 'lucide-react';
+import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';

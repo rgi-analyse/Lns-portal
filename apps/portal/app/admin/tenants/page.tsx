@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Building, Plus, Pencil, CheckCircle, XCircle } from 'lucide-react';
+import { Building, Plus, Pencil, CheckCircle, XCircle } from '@/components/ikoner';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';

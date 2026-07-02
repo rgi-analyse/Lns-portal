@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, FileBarChart2, Users, ArrowRight } from 'lucide-react';
+import { Building2, FileBarChart2, Users, ArrowRight } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 

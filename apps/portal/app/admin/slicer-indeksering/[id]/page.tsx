@@ -11,7 +11,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, ArrowLeft, Database, Loader2, Pencil, Play, Power, RefreshCw, Trash2,
-} from 'lucide-react';
+} from '@/components/ikoner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';

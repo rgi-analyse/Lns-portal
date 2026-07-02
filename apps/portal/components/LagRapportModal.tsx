@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/apiClient';
 import { logger } from '@/lib/logger';
-import { X } from 'lucide-react';
+import { X } from '@/components/ikoner';
 
 interface ViewInfo {
   id: string;

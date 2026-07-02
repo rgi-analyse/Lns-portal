@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileBarChart2, BarChart2, Pencil, Activity } from 'lucide-react';
+import { ArrowLeft, FileBarChart2, BarChart2, Pencil, Activity } from '@/components/ikoner';
 import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';

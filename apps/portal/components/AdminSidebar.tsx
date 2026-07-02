@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
+import { Activity, Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';

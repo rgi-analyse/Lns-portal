@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, LayoutDashboard, Building2, TrendingUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutDashboard, Building2, TrendingUp, PanelLeftClose, PanelLeftOpen } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Report } from 'powerbi-client';
-import { ArrowLeft, Save, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Loader2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';

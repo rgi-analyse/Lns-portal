@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
-import { User, Mail, Shield } from 'lucide-react';
+import { User, Mail, Shield } from '@/components/ikoner';
 
 export default function ProfilPage() {
   const { displayName, email, rolle: lokalRolle, entraObjectId, isAuthenticated } = usePortalAuth();

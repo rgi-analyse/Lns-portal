@@ -12,7 +12,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, Database, FileBarChart2, Layers, MoreVertical,
   Pencil, Play, Plus, RefreshCw, Trash2,
-} from 'lucide-react';
+} from '@/components/ikoner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';

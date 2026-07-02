@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settings } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Download, Mic, Square, Volume2, Settings } from '@/components/ikoner';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { startAzureSTT, stoppAzureSTT, azureTTS, stoppAzureTTS, AZURE_STEMMER, settEntraObjectId } from '../services/azureSpeech';
 import { apiFetch, apiHeaders } from '@/lib/apiClient';

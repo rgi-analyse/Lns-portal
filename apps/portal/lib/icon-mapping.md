@@ -83,3 +83,17 @@ D2: enten (a) en Lucide→Fluent-oppslagsmap for de tillatte analyse-ikonene, el
 Proof-of-concept-komponentene (`components/designv2/`) importerer per-ikon fra
 `@fluentui/react-icons` (tree-shaking) — se `Button.tsx`/`TabellRad.tsx` og
 `/admin/design-preview`.
+
+## Implementert i D2 · Gruppe 4 — sentral adapter
+Migreringen ble gjort via `components/ikoner.tsx`: en adapter som re-eksporterer
+Fluent-ikoner under Lucide-navnene appen brukte. Hver fil byttet kun import-sti
+(`lucide-react` → `@/components/ikoner`); JSX (`className`, `size`) er uendret.
+Adapteren oversetter Lucide-`size` → width/height/fontSize og forkaster
+`strokeWidth`. `lucide-react` er avinstallert.
+
+`AnalyseIkon.tsx` (data-drevet `ikon`-navn fra DB) slår nå opp mot adapter-
+namespacet med Fluent-fallback (`FileText`). Ikon-navn i DB som ikke finnes i
+adapteren vises som fallback — utvid adapteren ved behov.
+
+Standardvariant er `20Regular`; faktisk visningsstørrelse styres av className/size.
+Filled/aktiv-varianter kan innføres per bruksted senere.

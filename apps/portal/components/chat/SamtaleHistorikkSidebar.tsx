@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from '@/components/ikoner';
 import { apiFetch, apiHeaders } from '@/lib/apiClient';
 
 interface Samtale {

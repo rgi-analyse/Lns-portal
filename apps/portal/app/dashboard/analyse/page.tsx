@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, TrendingUp, Loader2 } from 'lucide-react';
+import { Plus, TrendingUp, Loader2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { AnalyseIkon } from '@/components/analyse/AnalyseIkon';
