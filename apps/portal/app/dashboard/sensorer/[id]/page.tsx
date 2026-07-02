@@ -67,8 +67,8 @@ export default function SensorKontrollrom() {
   const visSisteVerdi = dashbord?.konfig?.visSisteVerdi ?? true;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--navy-darkest, #0a1628)', display: 'flex', flexDirection: 'column', padding: 20, gap: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--navy-darkest, #0a1628)', display: 'flex', flexDirection: 'column', padding: 16, gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
         <h1 style={{ margin: 0, color: 'var(--gold, #ffbb00)', fontSize: 18, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           {dashbord?.navn ?? 'Kontrollrom'}
         </h1>
@@ -85,7 +85,7 @@ export default function SensorKontrollrom() {
       {dashbord && grafer.length === 0 && !feil && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Dashbordet har ingen grafer.</p>}
 
       {dashbord && grafer.length > 0 && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {grafer.map((g, i) => (
             <SensorGrafKort
               key={`${g.sensorId}-${i}`}

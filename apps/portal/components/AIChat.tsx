@@ -937,7 +937,7 @@ export default function AIChat({
       {/* Chat panel */}
       {(standaloneMode || open) && (
         <div
-          className={standaloneMode ? 'flex overflow-hidden flex-1 w-full' : 'rounded-2xl flex overflow-hidden'}
+          className={standaloneMode ? 'flex overflow-hidden flex-1 w-full' : 'rounded-large flex overflow-hidden'}
           style={{
             ...(standaloneMode ? {} : {
               width: visSidebar && effektivSidebarSynlig
@@ -974,7 +974,7 @@ export default function AIChat({
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, position: 'relative' }}>
           {/* Header */}
           {!hideHeader && <div
-            className="flex items-center justify-between px-4 py-3 shrink-0"
+            className="flex items-center justify-between px-3 py-2.5 shrink-0"
             style={{
               background: 'rgba(10,18,35,0.95)',
               borderBottom: '1px solid var(--glass-bg-hover)',
@@ -996,10 +996,10 @@ export default function AIChat({
                     border: effektivSidebarSynlig
                       ? '1px solid rgba(245,166,35,0.4)'
                       : '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: '6px',
+                    borderRadius: '4px',
                     color: effektivSidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
                     cursor: 'pointer',
-                    padding: '5px 9px',
+                    padding: '4px 8px',
                     fontSize: '12px',
                     fontWeight: 500,
                     transition: 'all 0.15s ease',
@@ -1116,8 +1116,8 @@ export default function AIChat({
                 right: 8,
                 background: 'rgba(12,20,38,0.98)',
                 border: '1px solid var(--glass-border)',
-                borderRadius: 10,
-                padding: 14,
+                borderRadius: 8,
+                padding: 12,
                 width: 240,
                 zIndex: 100,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
@@ -1323,7 +1323,7 @@ export default function AIChat({
               return (
                 <div key={i} className="flex justify-start" style={{ minWidth: 0 }}>
                   <div
-                    className="w-full max-w-[95%] rounded-xl p-3 text-sm"
+                    className="w-full max-w-[95%] rounded-large p-3 text-sm"
                     style={{
                       background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-border)',
@@ -1417,7 +1417,7 @@ export default function AIChat({
                     style={{
                       background: 'var(--glass-bg)',
                       border: '1px solid var(--glass-border)',
-                      borderRadius: 10,
+                      borderRadius: 8,
                       padding: '10px 12px',
                       fontSize: 12,
                       minWidth: 0,

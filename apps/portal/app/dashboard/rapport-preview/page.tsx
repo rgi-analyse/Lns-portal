@@ -170,7 +170,7 @@ export default function RapportPreviewPage() {
   if (tokenFeil) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="rounded-xl p-6 max-w-md" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)' }}>
+        <div className="rounded-large p-4 max-w-md" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)' }}>
           <p style={{ color: 'rgba(252,165,165,0.9)', fontSize: 14 }}>❌ {tokenFeil}</p>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function RapportPreviewPage() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Sub-banner */}
       <div
-        className="shrink-0 flex items-center gap-3 px-5 py-2.5"
+        className="shrink-0 flex items-center gap-3 px-4 py-2"
         style={{
           background: 'var(--gold-dim)',
           borderBottom: '1px solid var(--gold-dim)',
@@ -217,7 +217,7 @@ export default function RapportPreviewPage() {
               type="button"
               onClick={lagreRapport}
               disabled={lagrer || laster}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: 'var(--gold-dim)', border: '1px solid var(--gold-dim)', color: 'var(--gold)' }}
               onMouseEnter={(e) => { if (!lagrer && !laster) (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--gold-dim)'; }}
@@ -230,7 +230,7 @@ export default function RapportPreviewPage() {
               type="button"
               onClick={forkast}
               disabled={lagrer}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}
               onMouseEnter={(e) => { if (!lagrer) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)'; }}

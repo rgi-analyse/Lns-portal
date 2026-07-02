@@ -339,7 +339,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
           height: `min(${DEFAULT_HØYDE}px, calc(100vh - 48px))`,
           background: 'rgba(12,20,38,0.98)',
           border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
-          borderRadius: 14,
+          borderRadius: 8,
           boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
           display: 'flex',
           flexDirection: 'column',
@@ -408,7 +408,7 @@ export default function FlytendeChatWrapper(props: FlytendeChatWrapperProps) {
         style={{
           background: 'rgba(12,20,38,0.98)',
           border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
-          borderRadius: 14,
+          borderRadius: 8,
           boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
           display: 'flex',
           flexDirection: 'column',
