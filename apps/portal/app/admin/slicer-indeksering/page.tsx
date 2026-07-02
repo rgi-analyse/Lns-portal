@@ -12,7 +12,7 @@ import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, Database, FileBarChart2, Layers, MoreVertical,
   Pencil, Play, Plus, RefreshCw, Trash2,
-} from 'lucide-react';
+} from '@/components/ikoner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,8 +56,8 @@ function StatKort({ label, value, icon: Icon, iconBg, iconBorder, iconColor }: S
         <p
           className="truncate"
           style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 800,
+            fontFamily: 'var(--font-segoe)',
+            fontWeight: 600,
             fontSize: 24,
             color: 'var(--text-primary)',
             lineHeight: 1.1,
@@ -199,11 +199,10 @@ export default function SlicerIndekseringPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1
-            className="uppercase tracking-wide"
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 800,
-              fontSize: 24,
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
+              fontSize: 18,
               color: 'var(--text-primary)',
             }}
           >

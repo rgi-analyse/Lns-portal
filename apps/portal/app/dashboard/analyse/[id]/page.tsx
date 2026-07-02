@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Download, Loader2, XCircle, AlertTriangle } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { apiFetch } from '@/lib/apiClient';
@@ -258,7 +258,7 @@ export default function AnalyseDetaljPage() {
             <h1
               className="uppercase tracking-wide truncate"
               style={{
-                fontFamily:    'Barlow Condensed, sans-serif',
+                fontFamily:    'var(--font-segoe)',
                 fontWeight:    800,
                 fontSize:      26,
                 color:         'var(--text-primary)',

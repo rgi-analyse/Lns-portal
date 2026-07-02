@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Building, Plus, Pencil, CheckCircle, XCircle } from 'lucide-react';
+import { Building, Plus, Pencil, CheckCircle, XCircle } from '@/components/ikoner';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/toast';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
@@ -158,7 +158,7 @@ export default function TenantsAdminPage() {
     <div className="p-8 max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Tenants</h1>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Tenants</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
             Administrer organisasjoner med separate databaser.
           </p>

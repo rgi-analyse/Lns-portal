@@ -6,7 +6,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HT
     <textarea
       ref={ref}
       className={cn(
-        'flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-y',
+        // D2 · Gruppe 2: Azure-stil (farge/fokus fra globals.css native-form-regel).
+        'flex w-full rounded-medium border border-[color:var(--glass-border)] bg-white/5 px-3 py-2 text-[13px] text-[color:var(--text-primary)] placeholder:text-[color:var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-y',
         className,
       )}
       {...props}

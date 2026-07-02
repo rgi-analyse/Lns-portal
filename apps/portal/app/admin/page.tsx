@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, FileBarChart2, Users, ArrowRight } from 'lucide-react';
+import { Building2, FileBarChart2, Users, ArrowRight } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -62,11 +62,10 @@ export default function AdminOverviewPage() {
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
         <h1
-          className="uppercase tracking-wide"
           style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 800,
-            fontSize: 24,
+            fontFamily: 'var(--font-segoe)',
+            fontWeight: 600,
+            fontSize: 18,
             color: 'var(--text-primary)',
           }}
         >
@@ -102,8 +101,8 @@ export default function AdminOverviewPage() {
                 {label}
               </p>
               <p style={{
-                fontFamily: 'Barlow Condensed, sans-serif',
-                fontWeight: 800,
+                fontFamily: 'var(--font-segoe)',
+                fontWeight: 600,
                 fontSize: 28,
                 color: 'var(--text-primary)',
                 lineHeight: 1,

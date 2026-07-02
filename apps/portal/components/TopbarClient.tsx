@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, User } from '@/components/ikoner';
+import { PersonCircle24Regular } from '@fluentui/react-icons';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 
@@ -12,13 +13,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export default function TopbarClient() {
   const { displayName, email, authHeaders, isLocal, rolle: localRolle, logout } = usePortalAuth();
 
-  const name     = displayName;
-  const initials = name
-    .split(' ')
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase();
+  const name = displayName;
 
   const [isAdmin,      setIsAdmin]      = useState(false);
   const [rolleLastet,  setRolleLastet]  = useState(false);
@@ -85,7 +80,7 @@ export default function TopbarClient() {
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid var(--glass-border)',
-        borderRadius: 12,
+        borderRadius: 8,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         padding: '4px 0',
       }}
@@ -148,7 +143,7 @@ export default function TopbarClient() {
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors"
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors"
         style={{ background: 'transparent' }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
@@ -158,16 +153,10 @@ export default function TopbarClient() {
         <span className="text-sm hidden sm:block font-medium" style={{ color: 'var(--text-muted)' }}>
           {name}
         </span>
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold select-none shrink-0"
-          style={{
-            background: 'var(--glass-gold-bg)',
-            border: '1px solid var(--glass-gold-border)',
-            color: 'var(--gold)',
-          }}
-        >
-          {initials}
-        </div>
+        <PersonCircle24Regular
+          className="shrink-0"
+          style={{ width: 30, height: 30, fontSize: 30, color: 'var(--text-secondary)' }}
+        />
         <ChevronDown
           className={`w-4 h-4 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
           style={{ color: 'var(--text-muted)' }}

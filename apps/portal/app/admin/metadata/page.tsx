@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Pencil, Plus, RefreshCw, Search, Trash2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { Badge } from '@/components/ui/badge';
@@ -457,7 +457,7 @@ export default function MetadataAdminPage() {
       {/* Header */}
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI Metadata-katalog</h1>
+          <h1 className="text-lg font-semibold text-gray-900">AI Metadata-katalog</h1>
           <p className="mt-1 text-sm text-gray-500">
             Administrer view-beskrivelser som brukes i AI-chat system prompt.
           </p>

@@ -11,7 +11,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import {
   AlertCircle, ArrowLeft, Database, Loader2, Pencil, Play, Power, RefreshCw, Trash2,
-} from 'lucide-react';
+} from '@/components/ikoner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -208,11 +208,11 @@ export default function SlicerKonfigDetaljPage() {
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h1
-            className="uppercase tracking-wide truncate"
+            className="truncate"
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 800,
-              fontSize: 24,
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
+              fontSize: 18,
               color: 'var(--text-primary)',
             }}
           >

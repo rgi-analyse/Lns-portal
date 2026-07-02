@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, ExternalLink } from '@/components/ikoner';
 import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { Button } from '@/components/ui/button';
@@ -133,7 +133,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
       <Link href="/admin/sensor-dashbord" className="inline-flex items-center gap-1.5 text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
         <ArrowLeft className="w-4 h-4" /> Tilbake til oversikt
       </Link>
-      <h1 className="uppercase tracking-wide mb-6" style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 24, color: 'var(--text-primary)' }}>
+      <h1 className="mb-6" style={{ fontFamily: 'var(--font-segoe)', fontWeight: 600, fontSize: 18, color: 'var(--text-primary)' }}>
         {erNy ? 'Nytt sensor-dashbord' : 'Rediger sensor-dashbord'}
       </h1>
 

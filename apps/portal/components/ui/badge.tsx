@@ -8,10 +8,11 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-        variant === 'default' && 'bg-brand-100 text-brand-700',
-        variant === 'secondary' && 'bg-gray-100 text-gray-600',
-        variant === 'outline' && 'border border-gray-200 text-gray-600',
+        // D2 · Gruppe 2: Azure-badge — token-farger, semibold, subtil radius.
+        'inline-flex items-center rounded-medium px-2 py-0.5 text-xs font-semibold',
+        variant === 'default' && 'bg-[color:var(--glass-bg)] text-[color:var(--gold)]',
+        variant === 'secondary' && 'bg-[color:var(--glass-bg)] text-[color:var(--text-secondary)]',
+        variant === 'outline' && 'border border-[color:var(--glass-border)] text-[color:var(--text-secondary)]',
         className
       )}
       {...props}

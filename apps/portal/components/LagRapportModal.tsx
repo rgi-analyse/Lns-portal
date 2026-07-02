@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/apiClient';
 import { logger } from '@/lib/logger';
-import { X } from 'lucide-react';
+import { X } from '@/components/ikoner';
 
 interface ViewInfo {
   id: string;
@@ -135,7 +135,7 @@ export default function LagRapportModal({
         }}>
           <div>
             <div style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
+              fontFamily: 'var(--font-segoe)',
               fontWeight: 700, fontSize: 16,
               color: 'var(--text-primary)',
             }}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { UserPlus, Download, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Download, KeyRound, Eye, EyeOff } from '@/components/ikoner';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -243,7 +243,7 @@ export default function BrukerAdminPage() {
     <div className="p-8 max-w-6xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Brukerregister</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Brukerregister</h1>
           <p className="mt-1 text-sm text-gray-500">
             Administrer portalbrukere — Entra-brukere og lokale brukere.
           </p>
@@ -273,7 +273,7 @@ export default function BrukerAdminPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-gray-400 text-sm">Laster brukere…</div>
         ) : brukere.length === 0 ? (
@@ -285,22 +285,22 @@ export default function BrukerAdminPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="px-4 py-3 text-left font-medium">Navn</th>
-                <th className="px-4 py-3 text-left font-medium">E-post</th>
-                <th className="px-4 py-3 text-left font-medium">Type</th>
-                <th className="px-4 py-3 text-left font-medium">Rolle</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Sist innlogget</th>
-                <th className="px-4 py-3 text-left font-medium">Opprettet</th>
-                <th className="px-4 py-3" />
+                <th className="px-3 py-3 text-left font-medium">Navn</th>
+                <th className="px-3 py-3 text-left font-medium">E-post</th>
+                <th className="px-3 py-3 text-left font-medium">Type</th>
+                <th className="px-3 py-3 text-left font-medium">Rolle</th>
+                <th className="px-3 py-3 text-left font-medium">Status</th>
+                <th className="px-3 py-3 text-left font-medium">Sist innlogget</th>
+                <th className="px-3 py-3 text-left font-medium">Opprettet</th>
+                <th className="pl-3 pr-5 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {brukere.map((b) => (
                 <tr key={b.id}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{b.displayName ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{b.email ?? '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 font-medium text-gray-900">{b.displayName ?? '—'}</td>
+                  <td className="px-3 py-3 text-gray-600">{b.email ?? '—'}</td>
+                  <td className="px-3 py-3">
                     {/* erEntraBruker kan komme som boolean eller BIT (0/1) fra SQL Server */}
                     {(b.erEntraBruker === true || (b.erEntraBruker as unknown as number) === 1) ? (
                       <span
@@ -332,7 +332,7 @@ export default function BrukerAdminPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <select
                       value={b.rolle}
                       onChange={(e) => patch(b, { rolle: e.target.value as Rolle })}
@@ -343,14 +343,14 @@ export default function BrukerAdminPage() {
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <Badge variant={b.erAktiv ? 'default' : 'secondary'}>
                       {b.erAktiv ? 'Aktiv' : 'Inaktiv'}
                     </Badge>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{formatDate(b.sistInnlogget)}</td>
-                  <td className="px-4 py-3 text-gray-500">{formatDate(b.opprettet)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-3 py-3 text-gray-500">{formatDate(b.sistInnlogget)}</td>
+                  <td className="px-3 py-3 text-gray-500">{formatDate(b.opprettet)}</td>
+                  <td className="pl-3 pr-5 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       {!(b.erEntraBruker === true || (b.erEntraBruker as unknown as number) === 1) && (
                         <Tooltip content="Reset passord" side="top">
@@ -365,7 +365,7 @@ export default function BrukerAdminPage() {
                       <button
                         onClick={() => patch(b, { chatAktivert: !b.chatAktivert })}
                         title={b.chatAktivert ? 'Deaktiver chat' : 'Aktiver chat'}
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded border transition-colors"
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
                         style={{
                           borderColor: b.chatAktivert ? 'rgba(16,185,129,0.3)' : 'rgb(229,231,235)',
                           background:  b.chatAktivert ? 'rgba(16,185,129,0.08)' : 'transparent',
@@ -381,7 +381,7 @@ export default function BrukerAdminPage() {
                       <button
                         onClick={() => patch(b, { harAnalyseTilgang: !b.harAnalyseTilgang })}
                         title={b.harAnalyseTilgang ? 'Trekk tilbake analyse-tilgang' : 'Gi analyse-tilgang'}
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded border transition-colors"
+                        className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
                         style={{
                           borderColor: b.harAnalyseTilgang ? 'var(--glass-gold-border)' : 'rgb(229,231,235)',
                           background:  b.harAnalyseTilgang ? 'var(--glass-gold-bg)' : 'transparent',
@@ -397,7 +397,7 @@ export default function BrukerAdminPage() {
                       </button>
                       <button
                         onClick={() => patch(b, { erAktiv: !b.erAktiv })}
-                        className="text-xs px-3 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
+                        className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
                       >
                         {b.erAktiv ? 'Deaktiver' : 'Aktiver'}
                       </button>

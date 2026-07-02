@@ -9,7 +9,7 @@ import { loggHendelse } from '@/lib/loggHendelse';
 import dynamic from 'next/dynamic';
 import type { FilterConfig, DateFilterConfig } from '@/components/AIChat';
 import type { SlicerConfig, SlicerInfo, SlicerState } from '@/lib/slicerOps';
-import { Sparkles } from 'lucide-react';
+import { Sparkles } from '@/components/ikoner';
 import LagRapportModal from '@/components/LagRapportModal';
 import { useLisens } from '@/components/LisensProvider';
 import { harBetaTilgang } from '@/lib/featureFlags';

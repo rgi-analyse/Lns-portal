@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { MessageCircle, Minus, X } from 'lucide-react';
+import { MessageCircle, Minus, X } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { harBetaTilgang } from '@/lib/featureFlags';
 import { useLisens } from '@/components/LisensProvider';
@@ -155,7 +155,7 @@ export default function ChatWidget() {
         maxHeight: 'calc(100vh - 48px)',
         background: 'rgba(12,20,38,0.98)',
         border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
-        borderRadius: 14,
+        borderRadius: 8,
         boxShadow: '0 12px 48px rgba(0,0,0,0.6)',
         display: 'flex',
         flexDirection: 'column',
@@ -170,7 +170,7 @@ export default function ChatWidget() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 14px',
+          padding: '8px 12px',
           background: 'rgba(10,18,35,0.95)',
           borderBottom: '1px solid var(--glass-border, rgba(255,255,255,0.08))',
           flexShrink: 0,
@@ -192,10 +192,10 @@ export default function ChatWidget() {
                 border: sidebarSynlig
                   ? '1px solid rgba(245,166,35,0.4)'
                   : '1px solid rgba(255,255,255,0.12)',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 color: sidebarSynlig ? '#f5a623' : 'rgba(255,255,255,0.65)',
                 cursor: 'pointer',
-                padding: '5px 9px',
+                padding: '4px 8px',
                 fontSize: '12px',
                 fontWeight: 500,
                 transition: 'all 0.15s ease',
@@ -212,7 +212,7 @@ export default function ChatWidget() {
             style={{
               width: 26,
               height: 26,
-              borderRadius: 6,
+              borderRadius: 4,
               background: 'var(--glass-gold-bg, rgba(245,166,35,0.12))',
               border: '1px solid var(--glass-gold-border, rgba(245,166,35,0.25))',
               display: 'flex',
@@ -224,7 +224,7 @@ export default function ChatWidget() {
             <MessageCircle size={13} />
           </div>
           <span style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
+            fontFamily: 'var(--font-segoe)',
             fontWeight: 700,
             fontSize: 14,
             letterSpacing: '0.04em',
@@ -309,7 +309,7 @@ export default function ChatWidget() {
                 onClick={() => åpneRapport(aktivSamtaleMeta.rapportId, aktivtØktId)}
                 style={{
                   background: 'rgba(245,166,35,0.9)', color: '#0a1628',
-                  border: 'none', borderRadius: 5, padding: '4px 10px',
+                  border: 'none', borderRadius: 4, padding: '4px 10px',
                   fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0, marginLeft: 8,
                 }}
               >

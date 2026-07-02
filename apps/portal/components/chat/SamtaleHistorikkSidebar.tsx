@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, ChevronLeft, ChevronRight, Pencil, Check, X } from '@/components/ikoner';
 import { apiFetch, apiHeaders } from '@/lib/apiClient';
 
 interface Samtale {
@@ -186,7 +186,7 @@ export default function SamtaleHistorikkSidebar({
             padding: '7px 10px',
             background: 'rgba(255,255,255,0.06)',
             border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 7,
+            borderRadius: 4,
             cursor: 'pointer',
             color: 'rgba(255,255,255,0.8)',
             fontSize: 13,
@@ -218,7 +218,7 @@ export default function SamtaleHistorikkSidebar({
               onClick={() => !erRedigering && onVelgSamtale(samtale.øktId)}
               style={{
                 padding: '7px 8px',
-                borderRadius: 7,
+                borderRadius: 4,
                 marginBottom: 2,
                 cursor: erRedigering ? 'default' : 'pointer',
                 background: erAktiv ? 'rgba(245,166,35,0.15)' : 'transparent',

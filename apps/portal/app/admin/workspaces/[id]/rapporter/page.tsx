@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from 'lucide-react';
+import { ArrowLeft, Plus, Shield, Trash2, Pencil, Search, FileBarChart, EyeOff, Link2 } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
@@ -319,7 +319,7 @@ export default function WorkspaceRapporterPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-lg font-semibold text-gray-900">
             {loading ? <Skeleton className="h-7 w-48 inline-block" /> : workspace?.navn}
             {!loading && (
               <Badge variant="secondary" className="ml-2 align-middle text-sm">

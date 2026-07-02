@@ -72,7 +72,7 @@ export default function SikkerhetPage() {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-lg font-semibold text-gray-900">
           Tilgangsstyring
           {!loading && workspace && (
             <span className="text-gray-400 font-normal"> – {workspace.navn}</span>

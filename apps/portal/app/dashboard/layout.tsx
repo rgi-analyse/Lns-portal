@@ -36,10 +36,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           <span
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 700,
-              fontSize: 15,
-              letterSpacing: '0.08em',
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
+              fontSize: 14,
+              letterSpacing: '0.06em',
               color: 'var(--text-secondary)',
               textTransform: 'uppercase',
             }}

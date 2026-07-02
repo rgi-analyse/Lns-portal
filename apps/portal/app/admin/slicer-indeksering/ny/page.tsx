@@ -17,7 +17,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Loader2, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Loader2, Search } from '@/components/ikoner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -398,11 +398,11 @@ export default function NyKonfigurasjonPage() {
       </Link>
 
       <h1
-        className="uppercase tracking-wide mb-1"
+        className="mb-1"
         style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontWeight: 800,
-          fontSize: 24,
+          fontFamily: 'var(--font-segoe)',
+          fontWeight: 600,
+          fontSize: 18,
           color: 'var(--text-primary)',
         }}
       >

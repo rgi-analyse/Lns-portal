@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, FileBarChart2, BarChart2, Pencil, Activity } from 'lucide-react';
+import { ArrowLeft, FileBarChart2, BarChart2, Pencil, Activity } from '@/components/ikoner';
+import { WorkspaceIkon } from '@/components/WorkspaceIkon';
 import NyRapportModal from '@/components/NyRapportModal';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { logger } from '@/lib/logger';
@@ -34,6 +35,7 @@ function antallGrafer(konfig: string): number { try { return JSON.parse(konfig).
 interface WorkspaceDetail {
   id:               string;
   navn:             string;
+  erPersonlig?:     boolean;
   beskrivelse?:     string | null;
   kontekstType?:    string | null;
   kontekstKolonne?: string | null;
@@ -43,12 +45,6 @@ interface WorkspaceDetail {
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
-function projectCode(navn: string): string {
-  const m = navn.match(/\b(\d{4,5})\b/);
-  if (m) return m[1];
-  return navn.slice(0, 3).toUpperCase();
-}
 
 export default function WorkspacePage() {
   const { id }                             = useParams<{ id: string }>();
@@ -224,7 +220,7 @@ export default function WorkspacePage() {
           <>
             {/* Header */}
             <div className="flex items-center gap-4 mb-2">
-              {/* Ikon */}
+              {/* Workspace-ikon (Star for personlig, DataArea ellers) */}
               <div
                 className="flex items-center justify-center shrink-0"
                 style={{
@@ -232,16 +228,14 @@ export default function WorkspacePage() {
                   background: 'linear-gradient(135deg, rgba(27,42,74,0.8), rgba(36,53,86,0.8))',
                   border: '1px solid var(--glass-gold-border)',
                   borderRadius: 12,
-                  fontFamily: 'Barlow Condensed, sans-serif',
-                  fontWeight: 800, fontSize: 15, color: 'var(--gold)',
                 }}
               >
-                {projectCode(workspace.navn)}
+                <WorkspaceIkon personlig={workspace.erPersonlig} size={28} />
               </div>
               <div>
                 <h1 style={{
-                  fontFamily: 'Barlow Condensed, sans-serif',
-                  fontWeight: 800,
+                  fontFamily: 'var(--font-segoe)',
+                  fontWeight: 600,
                   fontSize: 26,
                   color: 'var(--text-primary)',
                   letterSpacing: '0.02em',
@@ -285,7 +279,7 @@ export default function WorkspacePage() {
             {/* Section label */}
             <div className="flex items-center gap-3 mb-4">
               <span style={{
-                fontFamily: 'Barlow Condensed, sans-serif',
+                fontFamily: 'var(--font-segoe)',
                 fontWeight: 700, fontSize: 12,
                 letterSpacing: '0.10em',
                 textTransform: 'uppercase',
@@ -476,7 +470,7 @@ export default function WorkspacePage() {
             {dashbord.length > 0 && (
               <>
                 <div className="flex items-center gap-3 mb-4 mt-10">
-                  <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 12, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 12, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                     Sensor-dashbord
                   </span>
                   <div className="flex-1 h-px" style={{ background: 'var(--glass-bg)' }} />

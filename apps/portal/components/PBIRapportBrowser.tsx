@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { FileBarChart, Search, RefreshCw } from 'lucide-react';
+import { FileBarChart, Search, RefreshCw } from '@/components/ikoner';
 import { Dialog, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

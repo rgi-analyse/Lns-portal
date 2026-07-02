@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X } from '@/components/ikoner';
 import { cn } from '@/lib/utils';
 
 interface DialogProps {
@@ -32,18 +32,22 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       role="dialog"
       aria-modal="true"
     >
-      <div className={cn('bg-white rounded-xl shadow-xl w-full max-w-md', className)}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+      <div className={cn(
+        // D2 · Gruppe 2: Azure-modal — mørk flate, 8px radius, subtil kant, Segoe.
+        'rounded-large shadow-xl w-full max-w-md border border-[color:var(--glass-border)] bg-[color:var(--navy-dark)]',
+        className,
+      )}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[color:var(--glass-border)]">
+          <h2 className="text-base font-semibold text-[color:var(--text-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 transition-colors rounded p-0.5"
+            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors rounded p-0.5"
             aria-label="Lukk"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-5 py-4">{children}</div>
       </div>
     </div>
   );
@@ -52,7 +56,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('flex justify-end gap-2 pt-4 border-t border-gray-100 mt-4', className)}
+      className={cn('flex justify-end gap-2 pt-4 border-t border-[color:var(--glass-border)] mt-4', className)}
       {...props}
     />
   );

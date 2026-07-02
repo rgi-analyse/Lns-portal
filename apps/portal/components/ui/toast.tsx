@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Info } from '@/components/ikoner';
 import { cn } from '@/lib/utils';
 
 export type ToastVariant = 'default' | 'success' | 'destructive';

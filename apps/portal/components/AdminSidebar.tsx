@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from 'lucide-react';
+import { Activity, Building2, CreditCard, Database, Globe, LayoutDashboard, Layers, Palette, Settings2, Users } from '@/components/ikoner';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useTema } from '@/components/ThemeProvider';
@@ -61,7 +61,7 @@ export default function AdminSidebar() {
             className="w-14 h-14 object-contain shrink-0"
           />
         )}
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, color: 'var(--gold)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
+        <div style={{ fontFamily: 'var(--font-segoe)', fontWeight: 600, color: 'var(--gold)', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', marginTop: 6 }}>
           Analyseportal
         </div>
       </div>
@@ -70,7 +70,7 @@ export default function AdminSidebar() {
       <div className="px-2 pt-3 pb-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors"
           style={{ color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--glass-bg-hover)'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-primary)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-secondary)'; }}
@@ -94,7 +94,7 @@ export default function AdminSidebar() {
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all"
               style={active ? {
                 background: 'var(--glass-gold-bg)',
                 border: '1px solid var(--glass-gold-border)',
