@@ -123,8 +123,8 @@ export default function Sidebar() {
         )}
         {!collapsed && (
           <div style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 700,
+            fontFamily: 'var(--font-segoe)',
+            fontWeight: 600,
             color: 'var(--gold)',
             fontSize: 9,
             letterSpacing: '0.12em',
@@ -160,7 +160,7 @@ export default function Sidebar() {
         {/* Dashboard */}
         <Link
           href="/dashboard"
-          className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all relative', collapsed && 'justify-center')}
+          className={cn('flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all relative', collapsed && 'justify-center')}
           style={isActive('/dashboard') ? {
             background: 'var(--glass-gold-bg)',
             border: '1px solid var(--glass-gold-border)',
@@ -193,7 +193,7 @@ export default function Sidebar() {
           return (
             <Link
               href="/dashboard/analyse"
-              className={cn('flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all relative', collapsed && 'justify-center')}
+              className={cn('flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all relative', collapsed && 'justify-center')}
               style={analyseAktiv ? {
                 background: 'var(--glass-gold-bg)',
                 border: '1px solid var(--glass-gold-border)',
@@ -254,7 +254,7 @@ export default function Sidebar() {
                   <button
                     onClick={() => router.push(`/dashboard/workspace/${ws.id}`)}
                     title={ws.navn}
-                    className="w-full flex items-center justify-center px-3 py-2 rounded-lg transition-colors"
+                    className="w-full flex items-center justify-center px-3 py-2 rounded-md transition-colors"
                     style={{ color: 'var(--text-secondary)' }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
@@ -264,7 +264,7 @@ export default function Sidebar() {
                 ) : (
                   /* Expanded: navn-del navigerer, chevron toggler */
                   <div
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors"
                     style={wsActive ? {
                       background: 'var(--gold-dim)',
                       border: '1px solid var(--glass-gold-bg)',
@@ -296,8 +296,8 @@ export default function Sidebar() {
                           background: ws.erPersonlig ? 'var(--gold-dim)' : 'var(--glass-gold-bg)',
                           border: ws.erPersonlig ? '1px solid var(--gold-dim)' : '1px solid var(--glass-gold-border)',
                           color: 'var(--gold)',
-                          fontFamily: 'Barlow Condensed',
-                          fontWeight: 700,
+                          fontFamily: 'var(--font-segoe)',
+                          fontWeight: 600,
                         }}
                       >
                         {ws.erPersonlig ? '★' : projectCode(ws.navn)}
@@ -353,7 +353,7 @@ export default function Sidebar() {
                           <Link
                             key={rapport.id}
                             href={href}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all"
                             style={active ? {
                               background: 'var(--gold-dim)',
                               border: '1px solid var(--gold-dim)',

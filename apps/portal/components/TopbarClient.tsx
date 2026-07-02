@@ -85,7 +85,7 @@ export default function TopbarClient() {
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid var(--glass-border)',
-        borderRadius: 12,
+        borderRadius: 8,
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         padding: '4px 0',
       }}
@@ -148,7 +148,7 @@ export default function TopbarClient() {
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors"
+        className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors"
         style={{ background: 'transparent' }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
