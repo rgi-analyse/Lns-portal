@@ -12,6 +12,9 @@ const config: Config = {
   		fontFamily: {
   			sans:      ['Barlow', 'system-ui', 'sans-serif'],
   			condensed: ['Barlow Condensed', 'system-ui', 'sans-serif'],
+  			// Design-refresh D1: Microsoft/Azure Segoe-stack (system-font, ingen CDN).
+  			// Ny nøkkel (font-segoe) — endrer ikke eksisterende `sans`/`condensed`.
+  			segoe:     ['"Segoe UI"', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'sans-serif'],
   		},
   		colors: {
   			navy: {

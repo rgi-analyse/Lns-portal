@@ -55,6 +55,14 @@
     --text-gold:      #9ca3af;
     /* Tekstfarge på primaryColor-bakgrunn (knapper o.l.); settes per tenant av tema. */
     --primary-text:   #ffffff;
+
+    /* ── Design-refresh Fase D1 (Microsoft/Azure) — tilgjengelige tokens.
+       Global anvendelse skjer i D2; endrer ikke eksisterende UI ennå. ── */
+    --font-segoe: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --color-info:    #0078D4;   /* Azure Blue — info/lenker */
+    --color-success: #107C10;   /* Microsoft green */
+    --color-warning: #FFB900;   /* Microsoft yellow */
+    --color-danger:  #D13438;   /* Microsoft red */
   }
 
   body {
