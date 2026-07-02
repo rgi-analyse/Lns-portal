@@ -210,8 +210,8 @@ export default function SlicerKonfigDetaljPage() {
           <h1
             className="uppercase tracking-wide truncate"
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 800,
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
               fontSize: 24,
               color: 'var(--text-primary)',
             }}

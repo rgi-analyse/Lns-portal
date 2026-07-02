@@ -64,8 +64,8 @@ export default function AdminOverviewPage() {
         <h1
           className="uppercase tracking-wide"
           style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 800,
+            fontFamily: 'var(--font-segoe)',
+            fontWeight: 600,
             fontSize: 24,
             color: 'var(--text-primary)',
           }}
@@ -102,8 +102,8 @@ export default function AdminOverviewPage() {
                 {label}
               </p>
               <p style={{
-                fontFamily: 'Barlow Condensed, sans-serif',
-                fontWeight: 800,
+                fontFamily: 'var(--font-segoe)',
+                fontWeight: 600,
                 fontSize: 28,
                 color: 'var(--text-primary)',
                 lineHeight: 1,

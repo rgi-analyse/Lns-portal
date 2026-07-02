@@ -135,7 +135,7 @@ export default function LagRapportModal({
         }}>
           <div>
             <div style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
+              fontFamily: 'var(--font-segoe)',
               fontWeight: 700, fontSize: 16,
               color: 'var(--text-primary)',
             }}>

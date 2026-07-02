@@ -70,7 +70,7 @@ export default function SensorDashbordListe() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="uppercase tracking-wide" style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 800, fontSize: 24, color: 'var(--text-primary)' }}>
+        <h1 className="uppercase tracking-wide" style={{ fontFamily: 'var(--font-segoe)', fontWeight: 600, fontSize: 24, color: 'var(--text-primary)' }}>
           Sensor-dashbord
         </h1>
         <Link href="/admin/sensor-dashbord/ny"><Button size="sm"><Plus className="w-4 h-4 mr-1" /> Nytt dashbord</Button></Link>

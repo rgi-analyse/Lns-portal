@@ -47,7 +47,7 @@ export default function ProfilPage() {
               background: 'var(--gold-dim)',
               border: '2px solid var(--gold-dim)',
               color: 'var(--gold)',
-              fontFamily: 'Barlow Condensed, sans-serif',
+              fontFamily: 'var(--font-segoe)',
               letterSpacing: '0.05em',
             }}
           >

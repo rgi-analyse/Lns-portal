@@ -92,8 +92,8 @@ function NyRapportForm() {
           </div>
           <div>
             <h2 style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontSize: 22, fontWeight: 800,
+              fontFamily: 'var(--font-segoe)',
+              fontSize: 22, fontWeight: 600,
               color: 'var(--text-primary)', textTransform: 'uppercase', margin: 0,
             }}>
               Ny rapport

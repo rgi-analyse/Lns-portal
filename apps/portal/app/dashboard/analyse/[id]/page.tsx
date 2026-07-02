@@ -258,7 +258,7 @@ export default function AnalyseDetaljPage() {
             <h1
               className="uppercase tracking-wide truncate"
               style={{
-                fontFamily:    'Barlow Condensed, sans-serif',
+                fontFamily:    'var(--font-segoe)',
                 fontWeight:    800,
                 fontSize:      26,
                 color:         'var(--text-primary)',

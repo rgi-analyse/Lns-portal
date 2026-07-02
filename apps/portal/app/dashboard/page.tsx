@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Clock, FileBarChart2, RefreshCw, Star } from '@/components/ikoner';
+import { WorkspaceIkon } from '@/components/WorkspaceIkon';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { useLisens } from '@/components/LisensProvider';
@@ -39,12 +40,6 @@ function rapportHref(r: RapportRef): string | null {
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
-function projectCode(navn: string): string {
-  const m = navn.match(/\b(\d{4,5})\b/);
-  if (m) return m[1];
-  return navn.slice(0, 3).toUpperCase();
-}
 
 function formaterDato(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -150,8 +145,8 @@ export default function DashboardPage() {
           <h1
             className="uppercase tracking-wide"
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 800,
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
               fontSize: 28,
               color: 'var(--text-primary)',
               letterSpacing: '0.03em',
@@ -194,7 +189,7 @@ export default function DashboardPage() {
                 Sist innlogget
               </p>
               <p style={{
-                fontFamily: 'Barlow Condensed, sans-serif',
+                fontFamily: 'var(--font-segoe)',
                 fontWeight: 700,
                 fontSize: 18,
                 color: 'var(--text-primary)',
@@ -237,7 +232,7 @@ export default function DashboardPage() {
         {/* Section label + filter-tabs */}
         <div className="flex items-center gap-3 mb-4">
           <span style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
+            fontFamily: 'var(--font-segoe)',
             fontWeight: 700,
             fontSize: 12,
             letterSpacing: '0.10em',
@@ -332,7 +327,7 @@ export default function DashboardPage() {
                     (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--glass-bg-hover)';
                   }}
                 >
-                  {/* Prosjektnummer-ikon */}
+                  {/* Workspace-ikon (Star for personlig, DataArea ellers) */}
                   <div
                     className="flex items-center justify-center shrink-0"
                     style={{
@@ -340,11 +335,9 @@ export default function DashboardPage() {
                       background: 'linear-gradient(135deg, rgba(27,42,74,0.8), rgba(36,53,86,0.8))',
                       border: '1px solid var(--glass-gold-border)',
                       borderRadius: 10,
-                      fontFamily: 'Barlow Condensed, sans-serif',
-                      fontWeight: 800, fontSize: 13, color: 'var(--gold)',
                     }}
                   >
-                    {projectCode(ws.navn)}
+                    <WorkspaceIkon personlig={ws.erPersonlig} size={24} />
                   </div>
 
                   {/* Info */}
@@ -463,7 +456,7 @@ function RapportKort({
         ) : rapport ? (
           <>
             <p className="truncate" style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
+              fontFamily: 'var(--font-segoe)',
               fontWeight: 700,
               fontSize: 16,
               color: 'var(--text-primary)',
@@ -511,7 +504,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 mb-4">
       <span style={{
-        fontFamily: 'Barlow Condensed, sans-serif',
+        fontFamily: 'var(--font-segoe)',
         fontWeight: 700,
         fontSize: 12,
         letterSpacing: '0.10em',

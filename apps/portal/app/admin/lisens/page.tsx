@@ -107,7 +107,7 @@ export default function LisensPage() {
           }}>
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{label}</p>
             <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
-                        fontFamily: 'Barlow Condensed, sans-serif' }}>{verdi}</p>
+                        fontFamily: 'var(--font-segoe)' }}>{verdi}</p>
           </div>
         ))}
       </div>

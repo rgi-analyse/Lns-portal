@@ -56,8 +56,8 @@ function StatKort({ label, value, icon: Icon, iconBg, iconBorder, iconColor }: S
         <p
           className="truncate"
           style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
-            fontWeight: 800,
+            fontFamily: 'var(--font-segoe)',
+            fontWeight: 600,
             fontSize: 24,
             color: 'var(--text-primary)',
             lineHeight: 1.1,
@@ -201,8 +201,8 @@ export default function SlicerIndekseringPage() {
           <h1
             className="uppercase tracking-wide"
             style={{
-              fontFamily: 'Barlow Condensed, sans-serif',
-              fontWeight: 800,
+              fontFamily: 'var(--font-segoe)',
+              fontWeight: 600,
               fontSize: 24,
               color: 'var(--text-primary)',
             }}

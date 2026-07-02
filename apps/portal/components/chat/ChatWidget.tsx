@@ -224,7 +224,7 @@ export default function ChatWidget() {
             <MessageCircle size={13} />
           </div>
           <span style={{
-            fontFamily: 'Barlow Condensed, sans-serif',
+            fontFamily: 'var(--font-segoe)',
             fontWeight: 700,
             fontSize: 14,
             letterSpacing: '0.04em',

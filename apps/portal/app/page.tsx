@@ -237,7 +237,7 @@ export default function LoginPage() {
           )}
           <span
             style={{
-              fontFamily:    'Barlow Condensed, sans-serif',
+              fontFamily:    'var(--font-segoe)',
               fontWeight:    700,
               color:         'var(--gold)',
               fontSize:      11,
@@ -253,7 +253,7 @@ export default function LoginPage() {
         {step === 'email' && (
           <form onSubmit={sjekkEpost} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
+              <h1 style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Logg inn
               </h1>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -298,7 +298,7 @@ export default function LoginPage() {
         {step === 'microsoft' && (
           <div className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
+              <h1 style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Logg inn med Microsoft
               </h1>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -340,7 +340,7 @@ export default function LoginPage() {
         {step === 'passord' && (
           <form onSubmit={loggInnLokal} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
+              <h1 style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Skriv inn passord
               </h1>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -406,7 +406,7 @@ export default function LoginPage() {
         {step === 'bytt-passord' && (
           <form onSubmit={byttPassord} className="w-full flex flex-col gap-4">
             <div className="text-center">
-              <h1 style={{ fontFamily: 'Barlow Condensed', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
+              <h1 style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 22, color: 'var(--text-primary)' }}>
                 Sett nytt passord
               </h1>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>

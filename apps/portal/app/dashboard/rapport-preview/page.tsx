@@ -199,7 +199,7 @@ export default function RapportPreviewPage() {
           Tilbake
         </button>
 
-        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 700, fontSize: 14, color: 'var(--gold)', letterSpacing: '0.04em' }}>
+        <div style={{ fontFamily: 'var(--font-segoe)', fontWeight: 700, fontSize: 14, color: 'var(--gold)', letterSpacing: '0.04em' }}>
           ✏️ {tittel}
         </div>
 

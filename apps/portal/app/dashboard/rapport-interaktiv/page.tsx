@@ -1049,7 +1049,7 @@ function CardChart({ data, yCol, yLabel }: { data: Record<string,unknown>[]; yCo
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:220 }}>
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:64, fontWeight:800, color:'var(--gold)', fontFamily:'Barlow Condensed, sans-serif' }}>
+        <div style={{ fontSize:64, fontWeight:800, color:'var(--gold)', fontFamily:'var(--font-segoe)' }}>
           {isNaN(num) ? String(val??'-') : num.toLocaleString('nb-NO')}
         </div>
         <div style={{ fontSize:15, color:'var(--text-muted)', marginTop:10 }}>{yLabel}</div>
@@ -1091,7 +1091,7 @@ function DataTable({ data, visKolonner, alleViewKolonner }: {
         <thead>
           <tr>
             {cols.map(c => (
-              <th key={c} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'1px solid var(--glass-border)', color:'var(--text-secondary)', fontWeight:600, fontSize:12, whiteSpace:'nowrap', fontFamily:'Barlow Condensed, sans-serif', letterSpacing:'0.05em' }}>
+              <th key={c} style={{ padding:'8px 12px', textAlign:'left', borderBottom:'1px solid var(--glass-border)', color:'var(--text-secondary)', fontWeight:600, fontSize:12, whiteSpace:'nowrap', fontFamily:'var(--font-segoe)', letterSpacing:'0.05em' }}>
                 {c}
               </th>
             ))}
@@ -2757,7 +2757,7 @@ export default function RapportInteraktivPage() {
           <ArrowLeft style={{ width:14, height:14 }}/> Tilbake
         </button>
 
-        <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:15, color:'var(--gold)', letterSpacing:'0.04em' }}>
+        <div style={{ fontFamily:'var(--font-segoe)', fontWeight:700, fontSize:15, color:'var(--gold)', letterSpacing:'0.04em' }}>
           {forslag.tittel}
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', flex:1, minWidth:0 }}>
@@ -3167,7 +3167,7 @@ export default function RapportInteraktivPage() {
             )}
             {(visTabell||config.visualType==='table') && (
               <div className="rapport-tabell-omraade" style={{ borderRadius:12, padding:16, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)' }}>
-                <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:10, fontFamily:'Barlow Condensed', letterSpacing:'0.08em', fontWeight:700 }}>DATATABELL</div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:10, fontFamily:'var(--font-segoe)', letterSpacing:'0.08em', fontWeight:700 }}>DATATABELL</div>
                 <DataTable data={behandletData} visKolonner={visKolonner} alleViewKolonner={forslag.alleViewKolonner}/>
               </div>
             )}
@@ -3176,7 +3176,7 @@ export default function RapportInteraktivPage() {
           {/* ── Rediger-panel ── */}
           {visRediger && (
             <div className="rapport-rediger-panel" style={{ width:280, flexShrink:0, background:'var(--glass-bg)', border:'1px solid var(--glass-bg-hover)', borderRadius:12, padding:16, overflowY:'auto', display:'flex', flexDirection:'column', gap:16 }}>
-              <div style={{ fontFamily:'Barlow Condensed, sans-serif', fontWeight:700, fontSize:14, color:'var(--gold)', letterSpacing:'0.06em', textTransform:'uppercase' }}>
+              <div style={{ fontFamily:'var(--font-segoe)', fontWeight:700, fontSize:14, color:'var(--gold)', letterSpacing:'0.06em', textTransform:'uppercase' }}>
                 ⚙ Rediger rapport
               </div>
 

@@ -176,7 +176,7 @@ export default function NyAnalysePage() {
         <h1
           className="uppercase tracking-wide mb-2"
           style={{
-            fontFamily:    'Barlow Condensed, sans-serif',
+            fontFamily:    'var(--font-segoe)',
             fontWeight:    800,
             fontSize:      28,
             color:         'var(--text-primary)',

@@ -1023,7 +1023,7 @@ export default function AIChat({
               </div>
               <div>
                 <div style={{
-                  fontFamily: 'Barlow Condensed, sans-serif',
+                  fontFamily: 'var(--font-segoe)',
                   fontWeight: 700,
                   color: 'var(--text-primary)',
                   fontSize: 15,

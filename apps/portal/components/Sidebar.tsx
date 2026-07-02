@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ChevronDown, ChevronRight, LayoutDashboard, Building2, TrendingUp, PanelLeftClose, PanelLeftOpen } from '@/components/ikoner';
+import { ChevronDown, ChevronRight, LayoutDashboard, TrendingUp, PanelLeftClose, PanelLeftOpen } from '@/components/ikoner';
+import { WorkspaceIkon } from '@/components/WorkspaceIkon';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import { apiFetch } from '@/lib/apiClient';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,12 +26,6 @@ interface Workspace {
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
-
-function projectCode(navn: string): string {
-  const m = navn.match(/\b(\d{4,5})\b/);
-  if (m) return m[1];
-  return navn.slice(0, 2).toUpperCase();
-}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -259,7 +254,7 @@ export default function Sidebar() {
                     onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--glass-bg)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
                   >
-                    <Building2 className="w-4 h-4 shrink-0" />
+                    <WorkspaceIkon personlig={ws.erPersonlig} size={18} style={{ flexShrink: 0 }} />
                   </button>
                 ) : (
                   /* Expanded: navn-del navigerer, chevron toggler */
@@ -290,18 +285,7 @@ export default function Sidebar() {
                       onClick={() => router.push(`/dashboard/workspace/${ws.id}`)}
                       className="flex items-center gap-2 flex-1 min-w-0 text-left"
                     >
-                      <span
-                        className="w-7 h-6 rounded flex items-center justify-center text-[11px] shrink-0"
-                        style={{
-                          background: ws.erPersonlig ? 'var(--gold-dim)' : 'var(--glass-gold-bg)',
-                          border: ws.erPersonlig ? '1px solid var(--gold-dim)' : '1px solid var(--glass-gold-border)',
-                          color: 'var(--gold)',
-                          fontFamily: 'var(--font-segoe)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {ws.erPersonlig ? '★' : projectCode(ws.navn)}
-                      </span>
+                      <WorkspaceIkon personlig={ws.erPersonlig} size={18} style={{ flexShrink: 0 }} />
                       <span className="flex-1 truncate font-medium">{ws.navn}</span>
                       {ws.erPersonlig && (
                         <span style={{

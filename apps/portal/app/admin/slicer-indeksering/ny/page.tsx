@@ -400,8 +400,8 @@ export default function NyKonfigurasjonPage() {
       <h1
         className="uppercase tracking-wide mb-1"
         style={{
-          fontFamily: 'Barlow Condensed, sans-serif',
-          fontWeight: 800,
+          fontFamily: 'var(--font-segoe)',
+          fontWeight: 600,
           fontSize: 24,
           color: 'var(--text-primary)',
         }}
