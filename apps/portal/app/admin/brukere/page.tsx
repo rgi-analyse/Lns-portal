@@ -273,7 +273,7 @@ export default function BrukerAdminPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-gray-400 text-sm">Laster brukere…</div>
         ) : brukere.length === 0 ? (
@@ -292,7 +292,7 @@ export default function BrukerAdminPage() {
                 <th className="px-4 py-3 text-left font-medium">Status</th>
                 <th className="px-4 py-3 text-left font-medium">Sist innlogget</th>
                 <th className="px-4 py-3 text-left font-medium">Opprettet</th>
-                <th className="px-4 py-3" />
+                <th className="pl-4 pr-6 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -350,7 +350,7 @@ export default function BrukerAdminPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(b.sistInnlogget)}</td>
                   <td className="px-4 py-3 text-gray-500">{formatDate(b.opprettet)}</td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="pl-4 pr-6 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       {!(b.erEntraBruker === true || (b.erEntraBruker as unknown as number) === 1) && (
                         <Tooltip content="Reset passord" side="top">
