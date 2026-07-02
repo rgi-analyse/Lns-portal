@@ -398,11 +398,11 @@ export default function NyKonfigurasjonPage() {
       </Link>
 
       <h1
-        className="uppercase tracking-wide mb-1"
+        className="mb-1"
         style={{
           fontFamily: 'var(--font-segoe)',
           fontWeight: 600,
-          fontSize: 24,
+          fontSize: 18,
           color: 'var(--text-primary)',
         }}
       >

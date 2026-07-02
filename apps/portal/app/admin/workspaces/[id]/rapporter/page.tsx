@@ -319,7 +319,7 @@ export default function WorkspaceRapporterPage() {
 
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-lg font-semibold text-gray-900">
             {loading ? <Skeleton className="h-7 w-48 inline-block" /> : workspace?.navn}
             {!loading && (
               <Badge variant="secondary" className="ml-2 align-middle text-sm">

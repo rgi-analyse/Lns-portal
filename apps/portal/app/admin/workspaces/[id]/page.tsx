@@ -129,7 +129,7 @@ export default function RedigerWorkspacePage() {
         <ArrowLeft className="w-4 h-4" /> Tilbake til workspaces
       </Link>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Rediger workspace</h1>
+      <h1 className="text-lg font-semibold text-gray-900 mb-1">Rediger workspace</h1>
       <p className="text-sm text-gray-500 mb-6">Oppdater informasjonen om workspacet.</p>
 
       {loading ? (

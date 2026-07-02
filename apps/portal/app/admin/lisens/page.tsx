@@ -87,7 +87,7 @@ export default function LisensPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 16px' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+      <h1 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
         Lisens
       </h1>
       <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 24 }}>

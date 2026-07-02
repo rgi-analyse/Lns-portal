@@ -62,11 +62,10 @@ export default function AdminOverviewPage() {
     <div className="p-8 max-w-4xl">
       <div className="mb-8">
         <h1
-          className="uppercase tracking-wide"
           style={{
             fontFamily: 'var(--font-segoe)',
             fontWeight: 600,
-            fontSize: 24,
+            fontSize: 18,
             color: 'var(--text-primary)',
           }}
         >

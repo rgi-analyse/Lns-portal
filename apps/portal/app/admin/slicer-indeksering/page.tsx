@@ -199,11 +199,10 @@ export default function SlicerIndekseringPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1
-            className="uppercase tracking-wide"
             style={{
               fontFamily: 'var(--font-segoe)',
               fontWeight: 600,
-              fontSize: 24,
+              fontSize: 18,
               color: 'var(--text-primary)',
             }}
           >

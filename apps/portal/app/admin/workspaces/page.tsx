@@ -208,7 +208,7 @@ export default function WorkspacesPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Workspaces</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Administrer Power BI-workspaces og tilhørende rapporter. Dra <GripVertical className="inline w-3.5 h-3.5 -mt-0.5" /> for å endre rekkefølge i sidebaren.
           </p>

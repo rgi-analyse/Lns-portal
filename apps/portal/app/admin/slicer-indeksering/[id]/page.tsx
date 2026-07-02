@@ -208,11 +208,11 @@ export default function SlicerKonfigDetaljPage() {
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h1
-            className="uppercase tracking-wide truncate"
+            className="truncate"
             style={{
               fontFamily: 'var(--font-segoe)',
               fontWeight: 600,
-              fontSize: 24,
+              fontSize: 18,
               color: 'var(--text-primary)',
             }}
           >

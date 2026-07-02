@@ -119,7 +119,7 @@ export default function TemaAdminPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Tema</h1>
+      <h1 className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Tema</h1>
       <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
         Tilpass farger og utseende. Endringer vises live og lagres for alle brukere.
       </p>
