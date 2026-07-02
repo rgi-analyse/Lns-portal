@@ -38,6 +38,11 @@ const config: Config = {
   				DEFAULT: '#F5A623',
   				light:   '#F7BC55',
   			},
+  			// Design-refresh D2 · Azure-semantiske farger (fra design-tokens/CSS-vars).
+  			info:    'var(--color-info)',
+  			success: 'var(--color-success)',
+  			warning: 'var(--color-warning)',
+  			danger:  'var(--color-danger)',
   			brand: {
   				'50': '#eff6ff',
   				'100': '#dbeafe',

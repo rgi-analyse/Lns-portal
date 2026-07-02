@@ -96,13 +96,18 @@ body::before {
 
 /* ── Dark-glass overrides: erstatter hardkodede Tailwind light-theme klasser ─ */
 
-/* Skjema-elementer (native input/textarea/select) */
+/* Skjema-elementer (native input/textarea/select)
+   D2 · Gruppe 2: Segoe-font (form-elementer arver ikke body-font), Azure-radius
+   (4px, ikke-important slik at inline rounded-* fortsatt vinner), fokusring
+   følger tenant --gold via color-mix. */
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 textarea,
 select {
   color: rgba(255,255,255,0.85) !important;
   background: rgba(255,255,255,0.06) !important;
   border-color: rgba(255,255,255,0.12) !important;
+  font-family: var(--font-segoe);
+  border-radius: 4px;
 }
 input:not([type="checkbox"]):not([type="radio"])::placeholder,
 textarea::placeholder {
@@ -111,13 +116,13 @@ textarea::placeholder {
 input:not([type="checkbox"]):not([type="radio"]):focus,
 textarea:focus,
 select:focus {
-  border-color: rgba(245,166,35,0.40) !important;
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent) !important;
   background: rgba(255,255,255,0.08) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(245,166,35,0.12) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 18%, transparent) !important;
 }
 select option {
-  background: #1B2A4A;
+  background: var(--navy-dark);
   color: rgba(255,255,255,0.85);
 }
 

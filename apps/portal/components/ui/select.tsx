@@ -6,7 +6,8 @@ const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSele
     <select
       ref={ref}
       className={cn(
-        'flex h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
+        // D2 · Gruppe 2: Azure-tetthet (farge/fokus fra globals.css native-form-regel).
+        'flex h-8 rounded-medium border border-[color:var(--glass-border)] bg-white/5 px-3 py-1 text-[13px] text-[color:var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
