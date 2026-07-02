@@ -68,11 +68,14 @@
   body {
     background: var(--navy-darkest);
     color: rgba(255,255,255,0.90);
-    font-family: 'Barlow', system-ui, sans-serif;
+    /* Design-refresh D2 · Gruppe 1: global font er nå Segoe-stack (Microsoft/Azure).
+       Barlow beholdes lastet + tilgjengelig (font-condensed / font-barlow) for
+       display-headere som fortsatt bruker den; migreres i senere grupper. */
+    font-family: var(--font-segoe);
   }
 
   h1, h2, h3, h4 {
-    font-family: 'Barlow Condensed', system-ui, sans-serif;
+    font-family: var(--font-segoe);
   }
 }
 

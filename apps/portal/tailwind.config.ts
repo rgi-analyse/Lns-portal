@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import { tokens } from './lib/design-tokens';
 
 const config: Config = {
     darkMode: ['class'],
@@ -10,11 +11,22 @@ const config: Config = {
   theme: {
   	extend: {
   		fontFamily: {
-  			sans:      ['Barlow', 'system-ui', 'sans-serif'],
-  			condensed: ['Barlow Condensed', 'system-ui', 'sans-serif'],
-  			// Design-refresh D1: Microsoft/Azure Segoe-stack (system-font, ingen CDN).
-  			// Ny nøkkel (font-segoe) — endrer ikke eksisterende `sans`/`condensed`.
+  			// Design-refresh D2 · Gruppe 1: global `sans` er nå Segoe (Microsoft/Azure).
+  			sans:      ['"Segoe UI"', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'sans-serif'],
   			segoe:     ['"Segoe UI"', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'sans-serif'],
+  			// Barlow beholdt (lastet fra CDN) for display-headere som fortsatt bruker den.
+  			barlow:    ['Barlow', 'system-ui', 'sans-serif'],
+  			condensed: ['Barlow Condensed', 'system-ui', 'sans-serif'],
+  		},
+  		// Token-drevet skala (additiv — kolliderer ikke med eksisterende utilities).
+  		fontSize: {
+  			small:  [tokens.fontSize.small,  { lineHeight: String(tokens.lineHeight.normal) }],
+  			body:   [tokens.fontSize.body,   { lineHeight: String(tokens.lineHeight.normal) }],
+  			tabell: [tokens.fontSize.tabell, { lineHeight: String(tokens.lineHeight.tight) }],
+  			h4:     [tokens.fontSize.h4,     { lineHeight: String(tokens.lineHeight.tight) }],
+  			h3:     [tokens.fontSize.h3,     { lineHeight: String(tokens.lineHeight.tight) }],
+  			h2:     [tokens.fontSize.h2,     { lineHeight: String(tokens.lineHeight.tight) }],
+  			h1:     [tokens.fontSize.h1,     { lineHeight: String(tokens.lineHeight.tight) }],
   		},
   		colors: {
   			navy: {
@@ -78,7 +90,11 @@ const config: Config = {
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			// Design-refresh D2 · token-drevne Azure-radier (additiv).
+  			small:  tokens.radii.small,
+  			medium: tokens.radii.medium,
+  			large:  tokens.radii.large,
   		}
   	}
   },
