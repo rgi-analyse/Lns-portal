@@ -12,10 +12,13 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check:auth": "tsx scripts/auth-guardrail.ts",
+    "check:auth:selftest": "tsx scripts/auth-guardrail.selftest.ts"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "tsx": "^4.11.0",
     "typescript": "^5.3.3"
   },
   "dependencies": {
