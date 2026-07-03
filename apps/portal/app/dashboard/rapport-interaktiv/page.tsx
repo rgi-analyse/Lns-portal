@@ -1848,7 +1848,7 @@ export default function RapportInteraktivPage() {
         try {
           const res = await apiFetch('/api/pbi/query-sql', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ sql }),
           });
           logger.debug('[Designer] data API status:', res.status);
@@ -2060,7 +2060,7 @@ export default function RapportInteraktivPage() {
       logger.debug('[rapport-interaktiv] hentData SQL:', sql);
       const res = await apiFetch('/api/pbi/query-sql', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql }),
       });
       if (res.ok) {
