@@ -30,6 +30,7 @@ export interface Route {
   regex: RegExp;           // ^/api/rapporter/[^/]+/views$
   requiresAuth: boolean;   // preHandler inneholder en auth-guard
   conservative: boolean;   // uløst preHandler-referanse → antatt beskyttet
+  guard: string;           // hvilken backend-vakt (f.eks. 'requireBruker')
   paramCount: number;      // antall :param-segmenter (for presedens: statisk > param)
   file: string;
   line: number;
@@ -117,11 +118,12 @@ function splitTopLevelArgs(argsText: string): string[] {
 
 export function parseApiRoutes(src: string, file: string): Route[] {
   // 1. auth-bærende const-arrays: const PRE = [ ...requireBruker... ]
-  const authConstArrays = new Set<string>();
+  const authConst = new Map<string, string[]>();
   const constArrRe = /(?:const|let)\s+([A-Za-z0-9_]+)\s*(?::[^=]+)?=\s*\[([^\]]*)\]/g;
   let m: RegExpExecArray | null;
   while ((m = constArrRe.exec(src))) {
-    if (AUTH_GUARDS.some((g) => m![2].includes(g))) authConstArrays.add(m[1]);
+    const guards = AUTH_GUARDS.filter((g) => m![2].includes(g));
+    if (guards.length) authConst.set(m[1], guards);
   }
 
   // 2. rute-registreringer — ALLE ruter (også offentlige), for korrekt presedens.
@@ -140,16 +142,17 @@ export function parseApiRoutes(src: string, file: string): Route[] {
     // Options-objektet er første arg (etter path) som starter med '{' — IKKE
     // async-handleren. Slik unngår vi at preHandler fra neste rute lekker inn.
     const optionsArg = args.slice(1).find((a) => a.trim().startsWith('{')) ?? '';
-    let requiresAuth = false, conservative = false;
+    let requiresAuth = false, conservative = false, guards: string[] = [];
     const phM = optionsArg.match(/preHandler\s*:\s*(\[[^\]]*\]|[A-Za-z0-9_]+)/);
     if (phM) {
       const ph = phM[1];
-      if (ph.startsWith('[')) requiresAuth = AUTH_GUARDS.some((g) => ph.includes(g));
-      else if (authConstArrays.has(ph)) requiresAuth = true;
+      if (ph.startsWith('[')) { guards = AUTH_GUARDS.filter((g) => ph.includes(g)); requiresAuth = guards.length > 0; }
+      else if (authConst.has(ph)) { guards = authConst.get(ph)!; requiresAuth = true; }
       else conservative = true; // uløst referanse → antatt beskyttet
     }
     routes.push({
       method, rawPath, regex: pathToRegex(rawPath), requiresAuth, conservative,
+      guard: guards.join(', ') || (conservative ? 'konservativ (uløst preHandler)' : ''),
       paramCount: (rawPath.match(/:[A-Za-z0-9_]+/g) || []).length,
       file, line: lineOf(src, m.index),
     });
@@ -325,12 +328,19 @@ if (isMain) {
     for (const c of unresolvedCalls) console.log(`      ${c.file}:${c.line}  ${c.fn}(${c.rawFirstArg})`);
   }
   if (violations.length) {
-    console.error(`\n❌ ${violations.length} BRUDD — kall til requireBruker-endepunkt uten auth-header:\n`);
+    const p = (s: string) => s.replace(/\\/g, '/');
+    console.error(`\n❌ AUTH-GUARDRAIL BRUDD (${violations.length})\n`);
     for (const v of violations) {
-      console.error(`   ${v.call.file}:${v.call.line}`);
-      console.error(`      ${v.call.method} ${v.endpoint}  →  beskyttet av ${v.route.file}:${v.route.line} (${v.route.rawPath})`);
-      console.error(`      Fiks: send auth — headers: { ...authHeaders, ... } — eller legg i scripts/auth-guardrail.allow.ts med begrunnelse.\n`);
+      console.error(`  Fil:          ${p(v.call.file)}:${v.call.line}`);
+      console.error(`  Kall:         ${v.call.fn}(${v.call.rawFirstArg}, …)`);
+      console.error(`  Endepunkt:    ${v.call.method} ${v.endpoint}`);
+      console.error(`  Backend-vakt: ${v.route.guard}  (${p(v.route.file)}:${v.route.line} — ${v.route.rawPath})`);
+      console.error(`  Løsning:`);
+      console.error(`    Legg til ...authHeaders (fra usePortalAuth):`);
+      console.error(`      headers: { ...authHeaders, 'Content-Type': 'application/json' }`);
+      console.error(`    Eller legg til i scripts/auth-guardrail.allow.ts med begrunnelse.\n`);
     }
+    console.error(`Se scripts/README.md for detaljer.\n`);
     process.exit(1);
   }
   console.log(`\n✅ Ingen brudd. Alle beskyttede endepunkt-kall sender auth-header.\n`);
