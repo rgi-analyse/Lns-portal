@@ -1,0 +1,36 @@
+// Syntetiske API-ruter for selv-test av auth-guardrail. Ren tekst (kompileres ikke).
+const PRE = [resolveTenantAdmin, requireBruker, requireAdmin];
+
+export async function fixtureRoutes(fastify) {
+  // Beskyttet (requireBruker i inline-array)
+  fastify.post('/api/protected-thing', { preHandler: [resolveTenant, requireBruker] }, async () => {});
+
+  // Beskyttet med param (test template-literal-matching)
+  fastify.post<{ Params: { id: string } }>(
+    '/api/protected-thing/:id',
+    { preHandler: [requireBruker] },
+    async () => {},
+  );
+
+  // Offentlig (kun resolveTenant)
+  fastify.get('/api/public-thing', { preHandler: [resolveTenant] }, async () => {});
+
+  // Beskyttet via delt const PRE
+  fastify.get('/api/shared-pre-thing', { preHandler: PRE }, async () => {});
+
+  // Uløst preHandler-referanse → konservativt beskyttet
+  fastify.get('/api/unresolved-thing', { preHandler: EXTERNAL_PRE }, async () => {});
+
+  // Metode-mismatch: GET offentlig, POST beskyttet — samme path
+  fastify.get<{ Params: { id: string } }>('/api/items/:id', { preHandler: [resolveTenant] }, async () => {});
+  fastify.post<{ Params: { id: string } }>('/api/items/:id', { preHandler: [resolveTenant, requireBruker] }, async () => {});
+
+  // Presedens: statisk offentlig rute vs param-beskyttet — statisk skal vinne
+  fastify.get('/api/dyn/static-thing', { preHandler: [resolveTenant] }, async () => {});
+  fastify.get<{ Params: { id: string } }>('/api/dyn/:id', { preHandler: [resolveTenant, requireBruker] }, async () => {});
+
+  // Bleed-test: rute UTEN options (offentlig), etterfulgt av beskyttet rute —
+  // preHandler fra neste rute skal IKKE tilskrives denne.
+  fastify.get('/api/no-options-thing', async () => {});
+  fastify.post('/api/after-no-options', { preHandler: [requireBruker] }, async () => {});
+}

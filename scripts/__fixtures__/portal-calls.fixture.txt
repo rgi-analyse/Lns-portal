@@ -1,0 +1,35 @@
+// Syntetiske portal-kall for selv-test av auth-guardrail. Ren tekst (kompileres ikke).
+const authHeaders = entraObjectId ? { 'X-Entra-Object-Id': entraObjectId } : {};
+const jsonHeaders = { ...authHeaders, 'Content-Type': 'application/json' };
+
+// [1] beskyttet + spread authHeaders → PASS
+apiFetch('/api/protected-thing', { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body });
+
+// [2] beskyttet + ingen auth → FAIL
+apiFetch('/api/protected-thing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+
+// [3] beskyttet + alias (jsonHeaders) → PASS
+apiFetch('/api/protected-thing', { method: 'POST', headers: jsonHeaders, body });
+
+// [4] offentlig + ingen auth → PASS
+apiFetch('/api/public-thing');
+
+// [5a] GET items = offentlig (metode-mismatch) → PASS
+apiFetch(`/api/items/${id}`);
+
+// [5b] POST items = beskyttet, ingen auth → FAIL
+apiFetch(`/api/items/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+
+// [6] template-literal beskyttet + ingen auth → FAIL (matcher :id)
+apiFetch(`/api/protected-thing/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+
+// [7] shorthand `headers`-const m/ entra-assignment → PASS
+const headers = { 'Content-Type': 'application/json' };
+if (entraObjectId) headers['X-Entra-Object-Id'] = entraObjectId;
+apiFetch('/api/protected-thing', { method: 'POST', headers, body });
+
+// [8] statisk offentlig vinner over param-beskyttet → PASS
+apiFetch('/api/dyn/static-thing');
+
+// [9] param-beskyttet uten auth → FAIL
+apiFetch(`/api/dyn/${id}`);
