@@ -16,6 +16,11 @@ const GrafSchema = z.object({
   yMin:     z.number().nullable().optional(),
   yMax:     z.number().nullable().optional(),
   farge:    z.enum(FARGER),
+  // Median-vindu per graf (sek). Lagres i konfig-JSON, ikke Sensor-tabellen → samme
+  // sensor kan ha ulikt vindu i ulike dashbord. 1–1800 s (1 s–30 min); default 300 (5 min).
+  // Eksisterende lagrede dashbord uten feltet leses rått (ikke via zod) → frontend
+  // faller tilbake til default (backwards compat); neste admin-lagring baker inn 300.
+  medianVinduSek: z.number().int().min(1).max(1800).optional().default(300),
 });
 
 const KonfigSchema = z.object({

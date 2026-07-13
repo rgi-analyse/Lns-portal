@@ -20,6 +20,7 @@ interface Props {
   farge: Farge;
   yMin?: number | null;
   yMax?: number | null;
+  medianVinduSek?: number;
   tidsvinduMin: number;
   intervallSek: number;
   visSisteVerdi: boolean;
@@ -44,7 +45,7 @@ export default function SensorGrafKort(props: Props) {
   if (data) {
     const ys = data[1] as (number | null)[];
     for (let i = ys.length - 1; i >= 0; i--) { if (ys[i] != null) { siste = ys[i] as number; break; } }
-    medianNaa = sisteMedianVerdi(data[0] as number[], ys);
+    medianNaa = sisteMedianVerdi(data[0] as number[], ys, props.medianVinduSek);
   }
   const verdiEnhet = (v: number): string => `${nfmt.format(v)}${props.enhet ? ` ${props.enhet}` : ''}`;
 
@@ -72,7 +73,7 @@ export default function SensorGrafKort(props: Props) {
       <div style={{ flex: 1, minHeight: 0 }}>
         {feil
           ? <p style={{ color: '#f87171', fontSize: 13 }}>Feil: {feil}</p>
-          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} />}
+          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} medianVinduSek={props.medianVinduSek} />}
       </div>
     </div>
   );

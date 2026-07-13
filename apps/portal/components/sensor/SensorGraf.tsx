@@ -16,7 +16,7 @@ import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import { grafStroke, type Farge } from './farger';
-import { rullendeMedian, MEDIAN_FARGE } from './median';
+import { rullendeMedian, MEDIAN_FARGE, MEDIAN_VINDU_SEK } from './median';
 
 interface Props {
   data: uPlot.AlignedData;   // [tidspunkter(sek), verdier]
@@ -25,6 +25,7 @@ interface Props {
   farge?: Farge;
   yMin?: number | null;
   yMax?: number | null;
+  medianVinduSek?: number;   // median-vindu fra graf-config; fallback = MEDIAN_VINDU_SEK
 }
 
 function cssVar(navn: string, fallback: string): string {
@@ -40,14 +41,20 @@ const klokkeSekund = new Intl.DateTimeFormat('nb-NO', {
   timeZone: 'Europe/Oslo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
 });
 
-/** [xs, rå] → [xs, rå, median] slik at median blir en egen uPlot-serie. */
-function medMedian(data: uPlot.AlignedData): uPlot.AlignedData {
+/** [xs, rå] → [xs, rå, median(vinduSek)] slik at median blir en egen uPlot-serie. */
+function medMedian(data: uPlot.AlignedData, vinduSek: number): uPlot.AlignedData {
   const xs = data[0] as number[];
   const ys = data[1] as (number | null)[];
-  return [xs, ys, rullendeMedian(xs, ys)];
+  return [xs, ys, rullendeMedian(xs, ys, vinduSek)];
 }
 
-export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax }: Props) {
+/** Legende-etikett for vinduet: hele minutter → «X min», ellers «X s». */
+function vinduLabel(sek: number): string {
+  return sek % 60 === 0 ? `${sek / 60} min` : `${sek} s`;
+}
+
+export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax, medianVinduSek }: Props) {
+  const vindu = medianVinduSek ?? MEDIAN_VINDU_SEK;   // backwards compat: udefinert → default 300
   const boks = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
 
@@ -77,16 +84,16 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
         // Rå måling — uendret (solid, full farge).
         { label: etikett, stroke: strek, width: 2, spanGaps: false },
         // Median-overlay: distinkt turkis + dashet → «typisk verdi» tydelig atskilt fra rå.
-        { label: `${navn} · median (5 min)`, stroke: MEDIAN_FARGE, width: 2, dash: [6, 4], spanGaps: false },
+        { label: `${navn} · median (${vinduLabel(vindu)})`, stroke: MEDIAN_FARGE, width: 2, dash: [6, 4], spanGaps: false },
       ],
     };
-    const u = new uPlot(opts, medMedian(data), el);
+    const u = new uPlot(opts, medMedian(data, vindu), el);
     plot.current = u;
     return () => { u.destroy(); plot.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { plot.current?.setData(medMedian(data)); }, [data]);
+  useEffect(() => { plot.current?.setData(medMedian(data, vindu)); }, [data, vindu]);
 
   // Auto-resize: re-tegn uPlot når containeren endrer størrelse (viewport ELLER
   // flex-omfordeling når antall grafer endres). ResizeObserver fanger begge.

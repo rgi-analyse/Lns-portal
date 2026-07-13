@@ -18,9 +18,10 @@ import { FARGER, FARGE_HEX, FARGE_NAVN, type Farge } from './farger';
 
 interface Workspace { id: string; navn: string }
 interface Sensor { id: string; navn: string; enhet?: string | null }
-interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge }
+interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge; medianVinduSek: string }
 
-const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary' };
+const MEDIAN_VINDU_DEFAULT = '300';
+const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary', medianVinduSek: MEDIAN_VINDU_DEFAULT };
 
 const selectStil: React.CSSProperties = { background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' };
 
@@ -58,7 +59,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     setLaster(true);
     apiFetch(`/api/sensor-dashbord/${dashbordId}${gq}`, { headers: authHeaders })
       .then(async r => { if (!r.ok) throw new Error((await r.json().catch(() => ({})) as { error?: string }).error ?? `HTTP ${r.status}`); return r.json(); })
-      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
+      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
         setNavn(d.navn);
         setWorkspaceId(d.workspaceId);
         setTidsvindu(String(d.tidsvinduMinutter));
@@ -66,7 +67,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         const k = d.konfig ?? {};
         setVisSensorNavn(k.visSensorNavn ?? true);
         setVisSisteVerdi(k.visSisteVerdi ?? true);
-        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge }));
+        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek) }));
         setGrafer(g.length > 0 ? g : [{ ...TOM_GRAF }]);
       })
       .catch(e => setFeil(e instanceof Error ? e.message : 'Kunne ikke laste dashbord.'))
@@ -94,6 +95,12 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     if (!navn.trim()) { setFeil('Navn er påkrevd.'); return; }
     if (!workspaceId) { setFeil('Velg workspace.'); return; }
     if (grafer.some(g => !g.sensorId || !g.tittel.trim())) { setFeil('Hver graf trenger sensor og tittel.'); return; }
+    // Median-vindu: tom → default 300; ellers heltall 1–1800 (speiler server-zod).
+    if (grafer.some(g => {
+      if (g.medianVinduSek.trim() === '') return false;
+      const n = Number(g.medianVinduSek);
+      return !Number.isInteger(n) || n < 1 || n > 1800;
+    })) { setFeil('Median-vindu må være et heltall 1–1800 sek.'); return; }
 
     const konfig = {
       layout: 'vertikal' as const,
@@ -103,6 +110,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         yMin: g.yMin.trim() === '' ? null : Number(g.yMin),
         yMax: g.yMax.trim() === '' ? null : Number(g.yMax),
         farge: g.farge,
+        medianVinduSek: g.medianVinduSek.trim() === '' ? 300 : Number(g.medianVinduSek),
       })),
       visSensorNavn,
       visSisteVerdi,
@@ -198,6 +206,11 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
                 <div className="flex gap-2">
                   <Input type="number" placeholder="y-min (valgfri)" value={g.yMin} onChange={e => oppdaterGraf(i, { yMin: e.target.value })} />
                   <Input type="number" placeholder="y-max (valgfri)" value={g.yMax} onChange={e => oppdaterGraf(i, { yMax: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-xs" style={{ color: 'var(--text-muted)' }}>Median-vindu (sek)</Label>
+                  <Input type="number" min={1} max={1800} step={1} placeholder="300" value={g.medianVinduSek} onChange={e => oppdaterGraf(i, { medianVinduSek: e.target.value })} />
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>1–1800 sek (300 = 5 min). Tom = 300.</p>
                 </div>
               </div>
             ))}
