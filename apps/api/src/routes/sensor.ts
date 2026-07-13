@@ -5,7 +5,9 @@ import { erDuplikat } from '../lib/prismaFeil';
 import { resolveTenant, resolveTenantAdmin, type TenantRequest } from '../middleware/tenant';
 import { requireBruker, requireAdmin, erAdmin, type AuthRequest } from '../middleware/auth';
 import { hentSensorTilgang, harTilgangTilSensor } from '../services/sensorTilgang';
-import { hentSensorData, erGyldigKqlIdent } from '../services/kustoService';
+import { velgSensorKilde, GYLDIGE_DATAKILDER } from '../services/sensorKilder';
+import { verifiserTidskolonne } from '../services/azureSqlSensorService';
+import type { SensorKonfig } from '../services/sensorDataKilde';
 
 // Brukerens gruppe-OID-er (for gruppe-basert workspace-tilgang) sendes som
 // ?grupper=oid1,oid2 fra frontend. Admin bruker uansett bypass.
@@ -83,25 +85,33 @@ export async function sensorRoutes(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Du har ikke tilgang til denne sensoren.' });
       }
 
-      // KQL-identifikatorer hentes fra DB (aldri fra URL) → lukker spoofing.
-      let sensor: { sensorId: string; kqlTabell: string; kqlVerdiFelt: string } | null;
+      // Datakilde-konfig hentes fra DB (aldri fra URL) → lukker spoofing. Feltene
+      // er de SensorKonfig trenger; dataKilde velger service under (etter tilgang).
+      let sensor: SensorKonfig | null;
       try {
         sensor = await db.sensor.findFirst({
           where: { id, erAktiv: true },
-          select: { sensorId: true, kqlTabell: true, kqlVerdiFelt: true },
+          select: {
+            sensorId: true, dataKilde: true,
+            kqlTabell: true, kqlVerdiFelt: true,
+            azureSqlTabell: true, azureSqlIdKolonne: true,
+            azureSqlVerdiKolonne: true, azureSqlTidKolonne: true,
+          },
         });
       } catch (err) {
         return feilRespons(reply, 500, 'Kunne ikke slå opp sensoren.', err);
       }
       if (!sensor) return reply.status(404).send({ error: 'Sensor ikke funnet.' });
 
+      // Velg service på dataKilde. Fail-closed: ukjent kilde → henter ALDRI data.
+      const kilde = velgSensorKilde(sensor.dataKilde);
+      if (!kilde) {
+        return feilRespons(reply, 500, 'Sensoren har en ukjent datakilde.',
+          new Error(`ukjent dataKilde: ${sensor.dataKilde}`));
+      }
+
       try {
-        const punkter = await hentSensorData({
-          kqlTabell: sensor.kqlTabell,
-          kqlVerdiFelt: sensor.kqlVerdiFelt,
-          kqlSensorId: sensor.sensorId,
-          siden,
-        });
+        const punkter = await kilde.hentSerie(sensor, siden);
         return reply.send({ punkter });
       } catch (err) {
         return feilRespons(reply, 502, 'Kunne ikke hente sensor-data.', err);
@@ -110,39 +120,105 @@ export async function sensorRoutes(fastify: FastifyInstance) {
   );
 
   // ── POST /api/admin/sensor — opprett sensor (admin) ───────────────────────
-  fastify.post<{ Body: { navn: string; sensorId: string; kqlTabell: string; kqlVerdiFelt: string; enhet?: string; beskrivelse?: string } }>(
+  // Støtter begge datakilder. kqlTabell/kqlVerdiFelt (kusto) og azureSql*-feltene
+  // (azuresql) er valgfrie i schema; presens per datakilde håndheves av kildens
+  // validerKonfig. For azuresql verifiseres tid-kolonnen mot lns-dwh FØR opprettelse
+  // (fanger feilkonfig tidlig; evt. advarsel returneres til admin, ikke bare loggen).
+  fastify.post<{
+    Body: {
+      navn: string; sensorId: string; dataKilde?: string;
+      kqlTabell?: string; kqlVerdiFelt?: string;
+      azureSqlTabell?: string; azureSqlIdKolonne?: string;
+      azureSqlVerdiKolonne?: string; azureSqlTidKolonne?: string;
+      enhet?: string; beskrivelse?: string;
+    };
+  }>(
     '/api/admin/sensor',
     {
       preHandler: [resolveTenantAdmin, requireBruker, requireAdmin],
       schema: {
         body: {
           type: 'object',
-          required: ['navn', 'sensorId', 'kqlTabell', 'kqlVerdiFelt'],
+          required: ['navn', 'sensorId'],
           properties: {
-            navn:         { type: 'string', minLength: 1, maxLength: 200 },
-            sensorId:     { type: 'string', minLength: 1, maxLength: 100 },
-            kqlTabell:    { type: 'string', minLength: 1, maxLength: 100 },
-            kqlVerdiFelt: { type: 'string', minLength: 1, maxLength: 100 },
-            enhet:        { type: 'string', maxLength: 50 },
-            beskrivelse:  { type: 'string', maxLength: 500 },
+            navn:                 { type: 'string', minLength: 1, maxLength: 200 },
+            sensorId:             { type: 'string', minLength: 1, maxLength: 100 },
+            dataKilde:            { type: 'string', enum: GYLDIGE_DATAKILDER, default: 'kusto' },
+            kqlTabell:            { type: 'string', minLength: 1, maxLength: 100 },
+            kqlVerdiFelt:         { type: 'string', minLength: 1, maxLength: 100 },
+            azureSqlTabell:       { type: 'string', minLength: 1, maxLength: 200 },
+            azureSqlIdKolonne:    { type: 'string', minLength: 1, maxLength: 100 },
+            azureSqlVerdiKolonne: { type: 'string', minLength: 1, maxLength: 100 },
+            azureSqlTidKolonne:   { type: 'string', minLength: 1, maxLength: 100 },
+            enhet:                { type: 'string', maxLength: 50 },
+            beskrivelse:          { type: 'string', maxLength: 500 },
           },
           additionalProperties: false,
         },
       },
     },
     async (request, reply) => {
-      const { navn, sensorId, kqlTabell, kqlVerdiFelt, enhet, beskrivelse } = request.body;
-      if (!erGyldigKqlIdent(kqlTabell) || !erGyldigKqlIdent(kqlVerdiFelt)) {
-        return reply.status(400).send({ error: 'Ugyldig kqlTabell/kqlVerdiFelt (kun A-Z, 0-9 og _, maks 100 tegn).' });
+      const b = request.body;
+      const dataKilde = b.dataKilde ?? 'kusto';
+
+      // Fail-closed: ukjent dataKilde → avvis (schema-enum fanger normalt dette).
+      const kilde = velgSensorKilde(dataKilde);
+      if (!kilde) return reply.status(400).send({ error: `Ukjent dataKilde: ${dataKilde}` });
+
+      // Kun feltene relevant for kilden lagres; resten NULL. Én konfig valideres av
+      // SAMME validerKonfig som hentSerie bruker (presens + strikt identifier-regex).
+      const konfig: SensorKonfig = {
+        sensorId:             b.sensorId,
+        dataKilde,
+        kqlTabell:            b.kqlTabell ?? null,
+        kqlVerdiFelt:         b.kqlVerdiFelt ?? null,
+        azureSqlTabell:       b.azureSqlTabell ?? null,
+        azureSqlIdKolonne:    b.azureSqlIdKolonne ?? null,
+        azureSqlVerdiKolonne: b.azureSqlVerdiKolonne ?? null,
+        azureSqlTidKolonne:   b.azureSqlTidKolonne ?? null,
+      };
+      try {
+        kilde.validerKonfig(konfig);
+      } catch (e) {
+        return reply.status(400).send({ error: e instanceof Error ? e.message : 'Ugyldig sensor-konfig.' });
       }
+
+      // Azure SQL: verifiser tid-kolonnen mot ekte skjema før vi lagrer.
+      //  - kolonne finnes ikke  → hard 400 (feilkonfig)
+      //  - gammel `datetime`    → tillat, men returner advarsel til admin
+      //  - kunne ikke verifisere → 502 (ikke lagre en usjekket sensor)
+      let advarsel: string | undefined;
+      if (dataKilde === 'azuresql') {
+        try {
+          const res = await verifiserTidskolonne(konfig);
+          if (!res.ok) {
+            return reply.status(400).send({ error: res.advarsel ?? 'Azure SQL-tidskolonne kunne ikke verifiseres.' });
+          }
+          advarsel = res.advarsel;
+        } catch (err) {
+          return feilRespons(reply, 502, 'Kunne ikke verifisere Azure SQL-tabell/-kolonne mot lns-dwh.', err);
+        }
+      }
+
       try {
         const db = (request as TenantRequest).tenantPrisma;
         const sensor = await db.sensor.create({
-          data: { navn, sensorId, kqlTabell, kqlVerdiFelt, enhet: enhet ?? null, beskrivelse: beskrivelse ?? null },
-          select: { id: true, navn: true, sensorId: true, kqlTabell: true, kqlVerdiFelt: true, enhet: true, beskrivelse: true, erAktiv: true },
+          data: {
+            navn: b.navn, sensorId: b.sensorId, dataKilde,
+            kqlTabell: konfig.kqlTabell, kqlVerdiFelt: konfig.kqlVerdiFelt,
+            azureSqlTabell: konfig.azureSqlTabell, azureSqlIdKolonne: konfig.azureSqlIdKolonne,
+            azureSqlVerdiKolonne: konfig.azureSqlVerdiKolonne, azureSqlTidKolonne: konfig.azureSqlTidKolonne,
+            enhet: b.enhet ?? null, beskrivelse: b.beskrivelse ?? null,
+          },
+          select: {
+            id: true, navn: true, sensorId: true, dataKilde: true,
+            kqlTabell: true, kqlVerdiFelt: true,
+            azureSqlTabell: true, azureSqlIdKolonne: true, azureSqlVerdiKolonne: true, azureSqlTidKolonne: true,
+            enhet: true, beskrivelse: true, erAktiv: true,
+          },
         });
-        logger.warn('[sensor] opprettet sensor:', sensor.navn, sensor.sensorId);
-        return reply.status(201).send(sensor);
+        logger.warn('[sensor] opprettet sensor:', sensor.navn, sensor.sensorId, `(${dataKilde})`);
+        return reply.status(201).send(advarsel ? { ...sensor, advarsel } : sensor);
       } catch (err) {
         if (erDuplikat(err)) {
           return reply.status(409).send({ error: 'En sensor med denne sensorId finnes allerede.' });

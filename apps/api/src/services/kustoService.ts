@@ -16,6 +16,7 @@
 import { Client as KustoClient, KustoConnectionStringBuilder, ClientRequestProperties } from 'azure-kusto-data';
 import { ClientSecretCredential } from '@azure/identity';
 import { logger } from '../lib/logger';
+import type { SensorDataKilde, SensorKonfig, Datapunkt } from './sensorDataKilde';
 
 let klient: KustoClient | null = null;
 
@@ -109,3 +110,33 @@ export async function kjørDiagnoseKql(query: string): Promise<Record<string, un
 export function lukkKustoClient(): void {
   klient = null;
 }
+
+// ── SensorDataKilde-implementasjon (Kusto/Eventhouse) ────────────────────────
+// Eksponerer den eksisterende KQL-logikken via det felles interfacet. Ingen
+// endring i selve spørringen — kun innpakning, presens-validering av de nå
+// nullbare KQL-feltene, og default-vindu når `siden` er null.
+
+const KUSTO_STANDARDVINDU_MS = 30 * 60 * 1000; // 30 min — som rutens tidligere default.
+
+export const kustoSensorKilde: SensorDataKilde = {
+  validerKonfig(sensor: SensorKonfig): void {
+    // KQL-feltene er nullable i schema (kan tilhøre en azuresql-sensor) → krev dem
+    // eksplisitt for denne kilden, så admin får umiddelbar, tydelig feilmelding.
+    if (!sensor.kqlTabell || !sensor.kqlVerdiFelt) {
+      throw new Error('Kusto-sensor mangler kqlTabell/kqlVerdiFelt.');
+    }
+    validerIdent(sensor.kqlTabell, 'kqlTabell');
+    validerIdent(sensor.kqlVerdiFelt, 'kqlVerdiFelt');
+  },
+
+  async hentSerie(sensor: SensorKonfig, siden: Date | null): Promise<Datapunkt[]> {
+    this.validerKonfig(sensor);
+    return hentSensorData({
+      // validerKonfig over garanterer at disse ikke er null.
+      kqlTabell: sensor.kqlTabell!,
+      kqlVerdiFelt: sensor.kqlVerdiFelt!,
+      kqlSensorId: sensor.sensorId,
+      siden: siden ?? new Date(Date.now() - KUSTO_STANDARDVINDU_MS),
+    });
+  },
+};
