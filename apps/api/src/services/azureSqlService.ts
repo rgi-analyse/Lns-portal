@@ -87,7 +87,7 @@ const getPool = async (): Promise<sql.ConnectionPool> => {
 
 export const queryAzureSQL = async (
   sqlQuery: string,
-  paramsOrMaxRows?: Record<string, string | number | boolean | null> | number,
+  paramsOrMaxRows?: Record<string, string | number | boolean | Date | null> | number,
   maxRows = 1000,
 ): Promise<Record<string, unknown>[]> => {
   const p = await getPool();

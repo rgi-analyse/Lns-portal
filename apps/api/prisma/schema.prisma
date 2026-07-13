@@ -31,9 +31,18 @@ model Workspace {
 model Sensor {
   id           String            @id @default(uuid())
   navn         String            @db.NVarChar(200)
-  sensorId     String            @unique @db.NVarChar(100)   // SensorID-verdi i KQL (WHERE SensorID == ...)
-  kqlTabell    String            @db.NVarChar(100)           // KQL-tabellnavn (én tabell per sensor-type)
-  kqlVerdiFelt String            @db.NVarChar(100)           // verdi-kolonne i KQL (varierer per tabell, f.eks. fill_grade_percentage)
+  sensorId     String            @unique @db.NVarChar(100)   // sensor-identifikator: KQL SensorID *eller* Azure SQL id-verdi (WHERE idKolonne = ...)
+  // dataKilde velger service i ruten: 'kusto' (Eventhouse, default) | 'azuresql' (lns-dwh gold.*)
+  dataKilde    String            @default("kusto") @db.NVarChar(50)
+  // KQL-felter — påkrevd for dataKilde='kusto', NULL for 'azuresql' (håndheves i validerKonfig)
+  kqlTabell    String?           @db.NVarChar(100)           // KQL-tabellnavn (én tabell per sensor-type)
+  kqlVerdiFelt String?           @db.NVarChar(100)           // verdi-kolonne i KQL (varierer per tabell, f.eks. fill_grade_percentage)
+  // Azure SQL-felter — påkrevd for dataKilde='azuresql', NULL for 'kusto'. Alle valideres strikt
+  // med regex FØR interpolering i SQL (mssql har ikke parametre for identifiers).
+  azureSqlTabell       String?   @db.NVarChar(200)           // schema.tabell, f.eks. gold.Fact_Skaland_Avlesing_Sensorer
+  azureSqlIdKolonne    String?   @db.NVarChar(100)           // FK-kolonne, f.eks. SensorNr
+  azureSqlVerdiKolonne String?   @db.NVarChar(100)           // verdi-kolonne, f.eks. verdi
+  azureSqlTidKolonne   String?   @db.NVarChar(100)           // tid-kolonne, f.eks. timestamp
   enhet        String?           @db.NVarChar(50)
   beskrivelse  String?           @db.NVarChar(500)
   erAktiv      Boolean           @default(true)
