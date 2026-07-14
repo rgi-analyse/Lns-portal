@@ -33,7 +33,18 @@ export default function SensorKontrollrom() {
   const [enhetMap, setEnhetMap] = useState<Record<string, string | undefined>>({});
   const [feil, setFeil] = useState<string | null>(null);
   const [laster, setLaster] = useState(true);
+  const [smal, setSmal] = useState(false);   // < 1200px → tving vertikal (mobil-fallback)
   const aktiv = authAvklart && isAuthenticated && !!id;
+
+  // Kontrollrom-skjermer er typisk brede; på smale skjermer (< 1200px) faller
+  // rutenett-layout tilbake til vertikal stack uansett konfig.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1199px)');
+    const oppdater = () => setSmal(mq.matches);
+    oppdater();
+    mq.addEventListener('change', oppdater);
+    return () => mq.removeEventListener('change', oppdater);
+  }, []);
 
   useEffect(() => {
     if (!authAvklart) return;
@@ -65,6 +76,9 @@ export default function SensorKontrollrom() {
 
   const grafer = dashbord?.konfig?.grafer ?? [];
   const visSisteVerdi = dashbord?.konfig?.visSisteVerdi ?? true;
+  // Backwards compat: ukjent/manglende layout → vertikal. Smal skjerm overstyrer.
+  const layout = dashbord?.konfig?.layout === 'rutenett-2' ? 'rutenett-2' : 'vertikal';
+  const gridKolonner = (!smal && layout === 'rutenett-2') ? '1fr 1fr' : '1fr';
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--navy-darkest, #0a1628)', display: 'flex', flexDirection: 'column', padding: 16, gap: 12 }}>
@@ -85,7 +99,7 @@ export default function SensorKontrollrom() {
       {dashbord && grafer.length === 0 && !feil && <p style={{ color: 'rgba(255,255,255,0.7)' }}>Dashbordet har ingen grafer.</p>}
 
       {dashbord && grafer.length > 0 && (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'grid', gridTemplateColumns: gridKolonner, gridAutoRows: 'minmax(200px, 1fr)', gap: 12 }}>
           {grafer.map((g, i) => (
             <SensorGrafKort
               key={`${g.sensorId}-${i}`}

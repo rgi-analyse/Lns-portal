@@ -24,7 +24,9 @@ const GrafSchema = z.object({
 });
 
 const KonfigSchema = z.object({
-  layout:        z.literal('vertikal'),           // kun vertikal for MVP
+  // 'vertikal' = stack (1 kolonne, som før), 'rutenett-2' = 2 kolonner.
+  // default sikrer backwards compat: eksisterende body uten layout → 'vertikal'.
+  layout:        z.enum(['vertikal', 'rutenett-2']).default('vertikal'),
   grafer:        z.array(GrafSchema).min(1).max(6),
   visSensorNavn: z.boolean(),
   visSisteVerdi: z.boolean(),
