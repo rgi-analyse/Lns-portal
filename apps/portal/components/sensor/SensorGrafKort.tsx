@@ -51,8 +51,10 @@ export default function SensorGrafKort(props: Props) {
   const medianFarge = props.medianFarge ?? MEDIAN_FARGE;   // backwards compat: udefinert → #00d4ff
   const verdiEnhet = (v: number): string => `${nfmt.format(v)}${props.enhet ? ` ${props.enhet}` : ''}`;
 
+  // minWidth:0 overstyrer grid-items default min-width:auto, så 1fr 1fr faktisk
+  // utjevner (canvas-bredden tvinger ikke lenger kolonnens min-bredde).
   return (
-    <div style={{ flex: 1, minHeight: 200, background: 'var(--navy-dark, #1B2A4A)', borderRadius: 10, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))', padding: 12, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, minWidth: 0, minHeight: 200, background: 'var(--navy-dark, #1B2A4A)', borderRadius: 10, border: '1px solid var(--glass-bg, rgba(255,255,255,0.06))', padding: 12, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, gap: 12 }}>
         <span style={{ color: 'var(--text-secondary, rgba(255,255,255,0.7))', fontSize: 14, fontWeight: 600 }}>{props.tittel}</span>
         {props.visSisteVerdi && (siste != null || medianNaa != null) && (
