@@ -35,6 +35,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
   const [workspaceId, setWorkspaceId] = useState('');
   const [tidsvindu, setTidsvindu] = useState('30');
   const [intervall, setIntervall] = useState('10');
+  const [layout, setLayout] = useState<'vertikal' | 'rutenett-2'>('vertikal');
   const [grafer, setGrafer] = useState<Graf[]>([{ ...TOM_GRAF }]);
   const [visSensorNavn, setVisSensorNavn] = useState(true);
   const [visSisteVerdi, setVisSisteVerdi] = useState(true);
@@ -59,12 +60,13 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     setLaster(true);
     apiFetch(`/api/sensor-dashbord/${dashbordId}${gq}`, { headers: authHeaders })
       .then(async r => { if (!r.ok) throw new Error((await r.json().catch(() => ({})) as { error?: string }).error ?? `HTTP ${r.status}`); return r.json(); })
-      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
+      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { layout?: string; grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
         setNavn(d.navn);
         setWorkspaceId(d.workspaceId);
         setTidsvindu(String(d.tidsvinduMinutter));
         setIntervall(String(d.oppdateringsIntervallSek));
         const k = d.konfig ?? {};
+        setLayout(k.layout === 'rutenett-2' ? 'rutenett-2' : 'vertikal');   // backwards compat
         setVisSensorNavn(k.visSensorNavn ?? true);
         setVisSisteVerdi(k.visSisteVerdi ?? true);
         const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek) }));
@@ -103,7 +105,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     })) { setFeil('Median-vindu må være et heltall 1–1800 sek.'); return; }
 
     const konfig = {
-      layout: 'vertikal' as const,
+      layout,
       grafer: grafer.map(g => ({
         sensorId: g.sensorId,
         tittel: g.tittel.trim(),
@@ -171,6 +173,15 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
             <Label style={{ color: 'var(--text-primary)' }}>Intervall (sek) <span className="text-red-500">*</span></Label>
             <Input type="number" min={2} max={60} value={intervall} onChange={e => setIntervall(e.target.value)} />
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>2–60. 2–5 = sanntid, 10 = standard, 30–60 = trend.</p>
+          </div>
+          <div className="flex-1">
+            <Label style={{ color: 'var(--text-primary)' }}>Layout</Label>
+            <select value={layout} onChange={e => setLayout(e.target.value as 'vertikal' | 'rutenett-2')}
+              className="w-full mt-1 px-3 py-2 rounded-md border text-sm" style={selectStil}>
+              <option value="vertikal">Vertikal (stack)</option>
+              <option value="rutenett-2">Rutenett 2 kolonner</option>
+            </select>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Rutenett → vertikal under 1200px.</p>
           </div>
         </div>
 
