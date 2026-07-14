@@ -97,16 +97,24 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
 
   useEffect(() => { plot.current?.setData(medMedian(data, vindu)); }, [data, vindu]);
 
-  // Auto-resize: re-tegn uPlot når containeren endrer størrelse (viewport ELLER
-  // flex-omfordeling når antall grafer endres). ResizeObserver fanger begge.
+  // Auto-resize: re-tegn uPlot når containeren endrer størrelse (vindusendring,
+  // grid-reflow i rutenett-2, eller flex-omfordeling når antall grafer endres).
+  // ResizeObserver fanger alle. setSize coalesces via rAF → unngår layout-thrash
+  // og «ResizeObserver loop»-warning (setSize inne i RO-callback ville kunne loope).
   useEffect(() => {
     const el = boks.current;
     if (!el) return;
+    let rafId = 0;
     const ro = new ResizeObserver(() => {
-      if (plot.current) plot.current.setSize({ width: el.clientWidth, height: el.clientHeight });
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (!plot.current) return;
+        const w = el.clientWidth, h = el.clientHeight;
+        if (w > 0 && h > 0) plot.current.setSize({ width: w, height: h });
+      });
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { cancelAnimationFrame(rafId); ro.disconnect(); };
   }, []);
 
   return <div ref={boks} style={{ width: '100%', height: '100%' }} />;
