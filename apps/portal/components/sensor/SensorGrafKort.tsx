@@ -21,6 +21,7 @@ interface Props {
   yMin?: number | null;
   yMax?: number | null;
   medianVinduSek?: number;
+  medianFarge?: string;
   tidsvinduMin: number;
   intervallSek: number;
   visSisteVerdi: boolean;
@@ -47,6 +48,7 @@ export default function SensorGrafKort(props: Props) {
     for (let i = ys.length - 1; i >= 0; i--) { if (ys[i] != null) { siste = ys[i] as number; break; } }
     medianNaa = sisteMedianVerdi(data[0] as number[], ys, props.medianVinduSek);
   }
+  const medianFarge = props.medianFarge ?? MEDIAN_FARGE;   // backwards compat: udefinert → #00d4ff
   const verdiEnhet = (v: number): string => `${nfmt.format(v)}${props.enhet ? ` ${props.enhet}` : ''}`;
 
   return (
@@ -64,7 +66,7 @@ export default function SensorGrafKort(props: Props) {
             {medianNaa != null && (
               <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ color: 'var(--text-secondary, rgba(255,255,255,0.55))', fontSize: 12, fontWeight: 600 }}>Median</span>
-                <span style={{ color: MEDIAN_FARGE, fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{verdiEnhet(medianNaa)}</span>
+                <span style={{ color: medianFarge, fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{verdiEnhet(medianNaa)}</span>
               </span>
             )}
           </div>
@@ -73,7 +75,7 @@ export default function SensorGrafKort(props: Props) {
       <div style={{ flex: 1, minHeight: 0 }}>
         {feil
           ? <p style={{ color: '#f87171', fontSize: 13 }}>Feil: {feil}</p>
-          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} medianVinduSek={props.medianVinduSek} />}
+          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} medianVinduSek={props.medianVinduSek} medianFarge={props.medianFarge} />}
       </div>
     </div>
   );

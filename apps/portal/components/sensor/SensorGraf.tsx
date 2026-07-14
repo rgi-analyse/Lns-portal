@@ -26,6 +26,7 @@ interface Props {
   yMin?: number | null;
   yMax?: number | null;
   medianVinduSek?: number;   // median-vindu fra graf-config; fallback = MEDIAN_VINDU_SEK
+  medianFarge?: string;      // median-farge (hex) fra graf-config; fallback = MEDIAN_FARGE
 }
 
 function cssVar(navn: string, fallback: string): string {
@@ -53,8 +54,9 @@ function vinduLabel(sek: number): string {
   return sek % 60 === 0 ? `${sek / 60} min` : `${sek} s`;
 }
 
-export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax, medianVinduSek }: Props) {
+export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax, medianVinduSek, medianFarge }: Props) {
   const vindu = medianVinduSek ?? MEDIAN_VINDU_SEK;   // backwards compat: udefinert → default 300
+  const medFarge = medianFarge ?? MEDIAN_FARGE;       // backwards compat: udefinert → #00d4ff
   const boks = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
 
@@ -84,7 +86,7 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
         // Rå måling — uendret (solid, full farge).
         { label: etikett, stroke: strek, width: 2, spanGaps: false },
         // Median-overlay: distinkt turkis + dashet → «typisk verdi» tydelig atskilt fra rå.
-        { label: `${navn} · median (${vinduLabel(vindu)})`, stroke: MEDIAN_FARGE, width: 2, dash: [6, 4], spanGaps: false },
+        { label: `${navn} · median (${vinduLabel(vindu)})`, stroke: medFarge, width: 2, dash: [6, 4], spanGaps: false },
       ],
     };
     const u = new uPlot(opts, medMedian(data, vindu), el);

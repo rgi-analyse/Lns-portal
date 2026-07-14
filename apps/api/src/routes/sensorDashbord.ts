@@ -21,6 +21,9 @@ const GrafSchema = z.object({
   // Eksisterende lagrede dashbord uten feltet leses rått (ikke via zod) → frontend
   // faller tilbake til default (backwards compat); neste admin-lagring baker inn 300.
   medianVinduSek: z.number().int().min(1).max(1800).optional().default(300),
+  // Median-farge (rå hex) — styrer median-linje, footer-legend (auto fra series-stroke)
+  // OG header «Median»-verdi. Valgfri; frontend faller tilbake til #00d4ff (MEDIAN_FARGE).
+  medianFarge: z.string().optional(),
 });
 
 const KonfigSchema = z.object({

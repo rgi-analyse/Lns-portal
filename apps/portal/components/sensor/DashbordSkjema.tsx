@@ -18,10 +18,12 @@ import { FARGER, FARGE_HEX, FARGE_NAVN, type Farge } from './farger';
 
 interface Workspace { id: string; navn: string }
 interface Sensor { id: string; navn: string; enhet?: string | null }
-interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge; medianVinduSek: string }
+interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge; medianVinduSek: string; medianFarge: string }
 
 const MEDIAN_VINDU_DEFAULT = '300';
-const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary', medianVinduSek: MEDIAN_VINDU_DEFAULT };
+const MEDIAN_FARGE_DEFAULT = '#00d4ff';
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary', medianVinduSek: MEDIAN_VINDU_DEFAULT, medianFarge: MEDIAN_FARGE_DEFAULT };
 
 const selectStil: React.CSSProperties = { background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' };
 
@@ -60,7 +62,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     setLaster(true);
     apiFetch(`/api/sensor-dashbord/${dashbordId}${gq}`, { headers: authHeaders })
       .then(async r => { if (!r.ok) throw new Error((await r.json().catch(() => ({})) as { error?: string }).error ?? `HTTP ${r.status}`); return r.json(); })
-      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { layout?: string; grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
+      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { layout?: string; grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number; medianFarge?: string }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
         setNavn(d.navn);
         setWorkspaceId(d.workspaceId);
         setTidsvindu(String(d.tidsvinduMinutter));
@@ -69,7 +71,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         setLayout(k.layout === 'rutenett-2' ? 'rutenett-2' : 'vertikal');   // backwards compat
         setVisSensorNavn(k.visSensorNavn ?? true);
         setVisSisteVerdi(k.visSisteVerdi ?? true);
-        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek) }));
+        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek), medianFarge: x.medianFarge ?? MEDIAN_FARGE_DEFAULT }));
         setGrafer(g.length > 0 ? g : [{ ...TOM_GRAF }]);
       })
       .catch(e => setFeil(e instanceof Error ? e.message : 'Kunne ikke laste dashbord.'))
@@ -113,6 +115,8 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         yMax: g.yMax.trim() === '' ? null : Number(g.yMax),
         farge: g.farge,
         medianVinduSek: g.medianVinduSek.trim() === '' ? 300 : Number(g.medianVinduSek),
+        // Guard: ugyldig/tom hex → default, så median-elementene aldri får usynlig farge.
+        medianFarge: HEX_RE.test(g.medianFarge) ? g.medianFarge : MEDIAN_FARGE_DEFAULT,
       })),
       visSensorNavn,
       visSisteVerdi,
@@ -218,10 +222,22 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
                   <Input type="number" placeholder="y-min (valgfri)" value={g.yMin} onChange={e => oppdaterGraf(i, { yMin: e.target.value })} />
                   <Input type="number" placeholder="y-max (valgfri)" value={g.yMax} onChange={e => oppdaterGraf(i, { yMax: e.target.value })} />
                 </div>
-                <div>
-                  <Label className="text-xs" style={{ color: 'var(--text-muted)' }}>Median-vindu (sek)</Label>
-                  <Input type="number" min={1} max={1800} step={1} placeholder="300" value={g.medianVinduSek} onChange={e => oppdaterGraf(i, { medianVinduSek: e.target.value })} />
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>1–1800 sek (300 = 5 min). Tom = 300.</p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Label className="text-xs" style={{ color: 'var(--text-muted)' }}>Median-vindu (sek)</Label>
+                    <Input type="number" min={1} max={1800} step={1} placeholder="300" value={g.medianVinduSek} onChange={e => oppdaterGraf(i, { medianVinduSek: e.target.value })} />
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>1–1800 sek (300 = 5 min). Tom = 300.</p>
+                  </div>
+                  <div className="flex-1">
+                    <Label className="text-xs" style={{ color: 'var(--text-muted)' }}>Median-farge</Label>
+                    <div className="flex gap-2 mt-1 items-center">
+                      <input type="color" value={HEX_RE.test(g.medianFarge) ? g.medianFarge : MEDIAN_FARGE_DEFAULT}
+                        onChange={e => oppdaterGraf(i, { medianFarge: e.target.value })}
+                        className="w-9 h-9 rounded shrink-0 cursor-pointer" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)' }} title="Median-farge" />
+                      <Input placeholder="#00d4ff" value={g.medianFarge} onChange={e => oppdaterGraf(i, { medianFarge: e.target.value })} />
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Styrer median-linje, header og legend. Tom/ugyldig = #00d4ff.</p>
+                  </div>
                 </div>
               </div>
             ))}
