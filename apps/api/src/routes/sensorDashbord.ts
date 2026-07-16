@@ -24,6 +24,15 @@ const GrafSchema = z.object({
   // Median-farge (rå hex) — styrer median-linje, footer-legend (auto fra series-stroke)
   // OG header «Median»-verdi. Valgfri; frontend faller tilbake til #00d4ff (MEDIAN_FARGE).
   medianFarge: z.string().optional(),
+  // Grenseverdier/KPI (maks, min, alarm …) — horisontale linjer i grafen. Liste per graf,
+  // hver med egen farge. Lagres i konfig-JSON (ingen DB-endring). Valgfri/utelatt =
+  // ingen linjer (backwards compat). Rører ikke y-skala: frontend tegner kun linjer
+  // som ligger innenfor gjeldende dataområde.
+  grenseverdier: z.array(z.object({
+    verdi:   z.number(),
+    farge:   z.string().optional(),          // rå hex; frontend faller tilbake til #ff4444
+    etikett: z.string().max(40).optional(),
+  })).optional(),
 });
 
 const KonfigSchema = z.object({

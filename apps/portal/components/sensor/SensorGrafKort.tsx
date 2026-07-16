@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { useSensorPolling } from '@/hooks/useSensorPolling';
 import { fargeTekst, type Farge } from './farger';
 import { sisteMedianVerdi, MEDIAN_FARGE } from './median';
+import type { Grenseverdi } from './grenseverdier';
 
 const SensorGraf = dynamic(() => import('./SensorGraf'), { ssr: false });
 
@@ -22,6 +23,7 @@ interface Props {
   yMax?: number | null;
   medianVinduSek?: number;
   medianFarge?: string;
+  grenseverdier?: Grenseverdi[];
   tidsvinduMin: number;
   intervallSek: number;
   visSisteVerdi: boolean;
@@ -77,7 +79,7 @@ export default function SensorGrafKort(props: Props) {
       <div style={{ flex: 1, minHeight: 0 }}>
         {feil
           ? <p style={{ color: '#f87171', fontSize: 13 }}>Feil: {feil}</p>
-          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} medianVinduSek={props.medianVinduSek} medianFarge={props.medianFarge} />}
+          : <SensorGraf data={data ?? [[], []]} navn={props.tittel} enhet={props.enhet} farge={props.farge} yMin={props.yMin} yMax={props.yMax} medianVinduSek={props.medianVinduSek} medianFarge={props.medianFarge} grenseverdier={props.grenseverdier} />}
       </div>
     </div>
   );

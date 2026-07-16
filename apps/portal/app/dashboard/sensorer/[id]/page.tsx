@@ -12,8 +12,9 @@ import { apiFetch } from '@/lib/apiClient';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
 import SensorGrafKort from '@/components/sensor/SensorGrafKort';
 import type { Farge } from '@/components/sensor/farger';
+import type { Grenseverdi } from '@/components/sensor/grenseverdier';
 
-interface GrafKonfig { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number; medianFarge?: string }
+interface GrafKonfig { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number; medianFarge?: string; grenseverdier?: Grenseverdi[] }
 interface Dashbord {
   navn: string;
   tidsvinduMinutter: number;
@@ -111,6 +112,7 @@ export default function SensorKontrollrom() {
               yMax={g.yMax}
               medianVinduSek={g.medianVinduSek}
               medianFarge={g.medianFarge}
+              grenseverdier={g.grenseverdier}
               tidsvinduMin={dashbord.tidsvinduMinutter}
               intervallSek={dashbord.oppdateringsIntervallSek}
               visSisteVerdi={visSisteVerdi}
