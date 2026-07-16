@@ -15,15 +15,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import { FARGER, FARGE_HEX, FARGE_NAVN, type Farge } from './farger';
+import { GRENSE_FARGE, HEX_RE } from './grenseverdier';
 
 interface Workspace { id: string; navn: string }
 interface Sensor { id: string; navn: string; enhet?: string | null }
-interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge; medianVinduSek: string; medianFarge: string }
+// Skjema-rad for én grenseverdi: felt holdes som string mens brukeren skriver
+// (tomt felt ≠ 0), og konverteres til tall først ved lagring.
+interface GrenseRad { verdi: string; farge: string; etikett: string }
+interface Graf { sensorId: string; tittel: string; yMin: string; yMax: string; farge: Farge; medianVinduSek: string; medianFarge: string; grenseverdier: GrenseRad[] }
 
 const MEDIAN_VINDU_DEFAULT = '300';
 const MEDIAN_FARGE_DEFAULT = '#00d4ff';
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary', medianVinduSek: MEDIAN_VINDU_DEFAULT, medianFarge: MEDIAN_FARGE_DEFAULT };
+const TOM_GRENSE: GrenseRad = { verdi: '', farge: GRENSE_FARGE, etikett: '' };
+const TOM_GRAF: Graf = { sensorId: '', tittel: '', yMin: '', yMax: '', farge: 'primary', medianVinduSek: MEDIAN_VINDU_DEFAULT, medianFarge: MEDIAN_FARGE_DEFAULT, grenseverdier: [] };
 
 const selectStil: React.CSSProperties = { background: 'var(--glass-bg)', borderColor: 'var(--glass-bg-hover)', color: 'var(--text-primary)' };
 
@@ -62,7 +66,7 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
     setLaster(true);
     apiFetch(`/api/sensor-dashbord/${dashbordId}${gq}`, { headers: authHeaders })
       .then(async r => { if (!r.ok) throw new Error((await r.json().catch(() => ({})) as { error?: string }).error ?? `HTTP ${r.status}`); return r.json(); })
-      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { layout?: string; grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number; medianFarge?: string }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
+      .then((d: { navn: string; workspaceId: string; tidsvinduMinutter: number; oppdateringsIntervallSek: number; konfig: { layout?: string; grafer?: { sensorId: string; tittel: string; yMin?: number | null; yMax?: number | null; farge: Farge; medianVinduSek?: number; medianFarge?: string; grenseverdier?: { verdi: number; farge?: string; etikett?: string }[] }[]; visSensorNavn?: boolean; visSisteVerdi?: boolean } | null }) => {
         setNavn(d.navn);
         setWorkspaceId(d.workspaceId);
         setTidsvindu(String(d.tidsvinduMinutter));
@@ -71,7 +75,9 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         setLayout(k.layout === 'rutenett-2' ? 'rutenett-2' : 'vertikal');   // backwards compat
         setVisSensorNavn(k.visSensorNavn ?? true);
         setVisSisteVerdi(k.visSisteVerdi ?? true);
-        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek), medianFarge: x.medianFarge ?? MEDIAN_FARGE_DEFAULT }));
+        const g = (k.grafer ?? []).map(x => ({ sensorId: x.sensorId, tittel: x.tittel, yMin: x.yMin == null ? '' : String(x.yMin), yMax: x.yMax == null ? '' : String(x.yMax), farge: x.farge, medianVinduSek: x.medianVinduSek == null ? MEDIAN_VINDU_DEFAULT : String(x.medianVinduSek), medianFarge: x.medianFarge ?? MEDIAN_FARGE_DEFAULT,
+          // Backwards compat: eldre dashbord uten feltet → tom liste (ingen linjer).
+          grenseverdier: (x.grenseverdier ?? []).map(gv => ({ verdi: String(gv.verdi), farge: gv.farge ?? GRENSE_FARGE, etikett: gv.etikett ?? '' })) }));
         setGrafer(g.length > 0 ? g : [{ ...TOM_GRAF }]);
       })
       .catch(e => setFeil(e instanceof Error ? e.message : 'Kunne ikke laste dashbord.'))
@@ -91,8 +97,14 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
   }, [workspaceId, authHeaders, grupper]);
 
   const oppdaterGraf = (i: number, delta: Partial<Graf>) => setGrafer(g => g.map((x, idx) => (idx === i ? { ...x, ...delta } : x)));
-  const leggTilGraf = () => setGrafer(g => (g.length < 6 ? [...g, { ...TOM_GRAF }] : g));
+  const leggTilGraf = () => setGrafer(g => (g.length < 6 ? [...g, { ...TOM_GRAF, grenseverdier: [] }] : g));
   const fjernGraf = (i: number) => setGrafer(g => (g.length > 1 ? g.filter((_, idx) => idx !== i) : g));
+
+  // Grenseverdi-lista er per graf → alle tre operasjonene går via oppdaterGraf.
+  const leggTilGrense = (i: number) => setGrafer(g => g.map((x, idx) => (idx === i ? { ...x, grenseverdier: [...x.grenseverdier, { ...TOM_GRENSE }] } : x)));
+  const fjernGrense = (i: number, j: number) => setGrafer(g => g.map((x, idx) => (idx === i ? { ...x, grenseverdier: x.grenseverdier.filter((_, k) => k !== j) } : x)));
+  const oppdaterGrense = (i: number, j: number, delta: Partial<GrenseRad>) =>
+    setGrafer(g => g.map((x, idx) => (idx === i ? { ...x, grenseverdier: x.grenseverdier.map((gv, k) => (k === j ? { ...gv, ...delta } : gv)) } : x)));
 
   const lagre = async () => {
     setFeil(null);
@@ -105,6 +117,11 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
       const n = Number(g.medianVinduSek);
       return !Number.isInteger(n) || n < 1 || n > 1800;
     })) { setFeil('Median-vindu må være et heltall 1–1800 sek.'); return; }
+    // Grenseverdi: verdien er selve linja — tom/ikke-numerisk rad kan ikke lagres.
+    // (Farge og etikett er valgfrie; ugyldig hex faller tilbake til default.)
+    if (grafer.some(g => g.grenseverdier.some(gv => !Number.isFinite(Number(gv.verdi)) || gv.verdi.trim() === ''))) {
+      setFeil('Hver grenseverdi må ha et tall. Fjern tomme rader.'); return;
+    }
 
     const konfig = {
       layout,
@@ -117,6 +134,12 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
         medianVinduSek: g.medianVinduSek.trim() === '' ? 300 : Number(g.medianVinduSek),
         // Guard: ugyldig/tom hex → default, så median-elementene aldri får usynlig farge.
         medianFarge: HEX_RE.test(g.medianFarge) ? g.medianFarge : MEDIAN_FARGE_DEFAULT,
+        // Tom liste lagres som [] → ingen linjer (samme som graf uten feltet).
+        grenseverdier: g.grenseverdier.map(gv => ({
+          verdi: Number(gv.verdi),
+          farge: HEX_RE.test(gv.farge) ? gv.farge : GRENSE_FARGE,
+          ...(gv.etikett.trim() === '' ? {} : { etikett: gv.etikett.trim().slice(0, 40) }),
+        })),
       })),
       visSensorNavn,
       visSisteVerdi,
@@ -238,6 +261,37 @@ export default function DashbordSkjema({ dashbordId }: { dashbordId?: string }) 
                     </div>
                     <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Styrer median-linje, header og legend. Tom/ugyldig = #00d4ff.</p>
                   </div>
+                </div>
+
+                {/* Grenseverdier (KPI-linjer) — dynamisk liste. Tom = ingen linjer. */}
+                <div className="pt-2" style={{ borderTop: '1px solid var(--glass-bg-hover)' }}>
+                  <Label className="text-xs" style={{ color: 'var(--text-muted)' }}>Grenseverdier</Label>
+                  {g.grenseverdier.length === 0
+                    ? <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Ingen. Horisontal linje vises kun når verdien er innenfor grafens dataområde.</p>
+                    : (
+                      <div className="space-y-2 mt-1">
+                        {g.grenseverdier.map((gv, j) => (
+                          <div key={j} className="flex gap-2 items-center">
+                            <Input type="number" step="any" placeholder="Verdi" value={gv.verdi}
+                              onChange={e => oppdaterGrense(i, j, { verdi: e.target.value })} style={{ maxWidth: 120 }} />
+                            <input type="color" value={HEX_RE.test(gv.farge) ? gv.farge : GRENSE_FARGE}
+                              onChange={e => oppdaterGrense(i, j, { farge: e.target.value })}
+                              className="w-9 h-9 rounded shrink-0 cursor-pointer" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-bg-hover)' }} title="Linjefarge" />
+                            <Input placeholder={GRENSE_FARGE} value={gv.farge}
+                              onChange={e => oppdaterGrense(i, j, { farge: e.target.value })} style={{ maxWidth: 110 }} />
+                            <Input placeholder="Etikett (valgfri)" maxLength={40} value={gv.etikett}
+                              onChange={e => oppdaterGrense(i, j, { etikett: e.target.value })} />
+                            <button type="button" onClick={() => fjernGrense(i, j)}
+                              className="inline-flex items-center gap-1 text-xs shrink-0" style={{ color: 'rgba(252,165,165,0.95)' }}>
+                              <Trash2 className="w-3.5 h-3.5" /> Fjern
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  <Button type="button" variant="outline" size="sm" onClick={() => leggTilGrense(i)} className="mt-2">
+                    <Plus className="w-4 h-4 mr-1" /> Legg til grenseverdi
+                  </Button>
                 </div>
               </div>
             ))}

@@ -11,12 +11,15 @@
  *   mot outliers. Egen turkis farge (distinkt fra gull rå-linje). Rent frontend,
  *   beregnes fra punkter-arrayen → generisk for BEGGE datakilder (Kusto + Azure SQL).
  * - Legende/tooltip viser klokkeslett i 24-t norsk med sekunder (Europe/Oslo).
+ * - Grenseverdier (KPI) som horisontale linjer via draw-hook — ren overlay, rører
+ *   ALDRI y-skalaen (data styrer oppløsningen alene). Se tegnGrenseverdier.
  */
 import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import { grafStroke, type Farge } from './farger';
 import { rullendeMedian, MEDIAN_FARGE, MEDIAN_VINDU_SEK } from './median';
+import { grenseFarge, type Grenseverdi } from './grenseverdier';
 
 interface Props {
   data: uPlot.AlignedData;   // [tidspunkter(sek), verdier]
@@ -27,6 +30,7 @@ interface Props {
   yMax?: number | null;
   medianVinduSek?: number;   // median-vindu fra graf-config; fallback = MEDIAN_VINDU_SEK
   medianFarge?: string;      // median-farge (hex) fra graf-config; fallback = MEDIAN_FARGE
+  grenseverdier?: Grenseverdi[];   // KPI-linjer fra graf-config; udefinert/tom = ingen linjer
 }
 
 function cssVar(navn: string, fallback: string): string {
@@ -54,11 +58,68 @@ function vinduLabel(sek: number): string {
   return sek % 60 === 0 ? `${sek / 60} min` : `${sek} s`;
 }
 
-export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax, medianVinduSek, medianFarge }: Props) {
+/**
+ * Tegner grenseverdi-linjene på toppen av seriene (draw-hook kjører etter drawSeries,
+ * og på HVER tegning → følger automatisk resize/reflow).
+ *
+ * Y-skalaen røres bevisst ikke: en grense langt utenfor dataområdet ville ellers zoomet
+ * ut streamingdata til en flat strek. I stedet clip-sjekkes hver linje mot gjeldende
+ * y-område — utenfor → hoppes helt over (ingen linje, ingen etikett). Linja dukker opp
+ * av seg selv når data nærmer seg grensen.
+ */
+function tegnGrenseverdier(u: uPlot, grenser: Grenseverdi[]): void {
+  if (grenser.length === 0) return;
+  const yMin = u.scales.y.min, yMax = u.scales.y.max;
+  if (yMin == null || yMax == null) return;   // ingen data ennå → ingenting å tegne mot
+
+  const { ctx } = u;
+  const { left, top, width, height } = u.bbox;
+  const dpr = (typeof window === 'undefined' ? 1 : window.devicePixelRatio) || 1;
+
+  ctx.save();
+  // Clip til plot-området: etikett nær kanten kan aldri lekke ut over aksene.
+  ctx.beginPath();
+  ctx.rect(left, top, width, height);
+  ctx.clip();
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.setLineDash([]);   // median-serien tegnes dashet — nullstill så grensa blir heltrukket
+  // canvas font-shorthand kan ikke parse var() → resolver CSS-variabelen først.
+  ctx.font = `${11 * dpr}px ${cssVar('--font-segoe', 'system-ui, sans-serif')}`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+
+  for (const gv of grenser) {
+    if (!Number.isFinite(gv.verdi)) continue;
+    if (gv.verdi < yMin || gv.verdi > yMax) continue;   // utenfor dataområdet → tegn ikke
+
+    const y = Math.round(u.valToPos(gv.verdi, 'y', true));
+    const farge = grenseFarge(gv.farge);   // hex-guard: ugyldig/tom → default rød
+
+    ctx.strokeStyle = farge;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(left + width, y);
+    ctx.stroke();
+
+    const etikett = gv.etikett?.trim();
+    if (etikett) {
+      ctx.fillStyle = farge;
+      ctx.fillText(etikett, left + width - 6 * dpr, y - 3 * dpr);
+    }
+  }
+  ctx.restore();
+}
+
+export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin, yMax, medianVinduSek, medianFarge, grenseverdier }: Props) {
   const vindu = medianVinduSek ?? MEDIAN_VINDU_SEK;   // backwards compat: udefinert → default 300
   const medFarge = medianFarge ?? MEDIAN_FARGE;       // backwards compat: udefinert → #00d4ff
   const boks = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
+
+  // Grensene leses via ref inne i draw-hooken (opts bygges kun én gang, og hooken
+  // kjører på hver tegning) → endret konfig slår gjennom uten å bygge plottet på nytt.
+  const grenser = useRef<Grenseverdi[]>(grenseverdier ?? []);
+  grenser.current = grenseverdier ?? [];
 
   useEffect(() => {
     const el = boks.current;
@@ -88,6 +149,9 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
         // Median-overlay: distinkt turkis + dashet → «typisk verdi» tydelig atskilt fra rå.
         { label: `${navn} · median (${vinduLabel(vindu)})`, stroke: medFarge, width: 2, dash: [6, 4], spanGaps: false },
       ],
+      // Grenseverdi-overlay. draw kjører etter drawSeries → linjene legger seg øverst,
+      // og kjøres på hver tegning (setData, setSize/resize, tema-reflow).
+      hooks: { draw: [(u: uPlot) => tegnGrenseverdier(u, grenser.current)] },
     };
     const u = new uPlot(opts, medMedian(data, vindu), el);
     plot.current = u;
@@ -96,6 +160,11 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
   }, []);
 
   useEffect(() => { plot.current?.setData(medMedian(data, vindu)); }, [data, vindu]);
+
+  // Endret grense-konfig uten nye data (f.eks. admin-preview) → tving én tegning.
+  // rebuildPaths=false: serie-stiene er uendret, kun overlayet skal på nytt.
+  const grenserNokkel = JSON.stringify(grenseverdier ?? []);
+  useEffect(() => { plot.current?.redraw(false); }, [grenserNokkel]);
 
   // Auto-resize: re-tegn uPlot når containeren endrer størrelse (vindusendring,
   // grid-reflow i rutenett-2, eller flex-omfordeling når antall grafer endres).
