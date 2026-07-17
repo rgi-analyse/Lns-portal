@@ -163,8 +163,22 @@ export default function SensorGraf({ data, navn, enhet, farge = 'primary', yMin,
 
   // Endret grense-konfig uten nye data (f.eks. admin-preview) → tving én tegning.
   // rebuildPaths=false: serie-stiene er uendret, kun overlayet skal på nytt.
+  //
+  // status===1-gaten er IKKE defensiv pynt: uPlots konstruktør tegner ikke synkront —
+  // den setter shouldConvergeSize=true og køer første _commit på microtask-køen. Denne
+  // effekten kjører synkront i samme React-commit, altså FØR den microtasken. Og
+  // redraw(rebuildPaths, recalcAxes) SETTER shouldConvergeSize = recalcAxes || false —
+  // den or-er ikke. Et ugatet redraw(false) her nullstiller derfor konstruktørens
+  // ventende flagg, første commit hopper over akse-sizingen (axesCalc), og axis._found
+  // forblir null mens axis._show står igjen på init-verdien true. Akse-tegningen guarder
+  // kun på _show og destrukturerer _found → «object null is not iterable».
+  // Grensene går ikke tapt av å hoppe over: første commit tegner dem uansett via
+  // draw-hooken, som leser grenser.current.
   const grenserNokkel = JSON.stringify(grenseverdier ?? []);
-  useEffect(() => { plot.current?.redraw(false); }, [grenserNokkel]);
+  useEffect(() => {
+    const u = plot.current;
+    if (u && u.status === 1) u.redraw(false);
+  }, [grenserNokkel]);
 
   // Auto-resize: re-tegn uPlot når containeren endrer størrelse (vindusendring,
   // grid-reflow i rutenett-2, eller flex-omfordeling når antall grafer endres).
