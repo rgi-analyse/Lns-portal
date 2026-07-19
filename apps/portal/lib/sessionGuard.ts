@@ -10,14 +10,24 @@ import { logger } from './logger';
 const INAKTIVITETS_MS = 8 * 60 * 60 * 1000; // 8 timer
 const STORAGE_KEY = 'lns-siste-aktivitet';
 
+/** Callback som vises i stedet for redirect når en kontrollrom-rute mister sesjonen. */
+export type KontrollromUtloptHandler = (loginUrl: string, tidspunkt: Date) => void;
+
 export class SessionGuard {
   private msalInstance: PublicClientApplication;
   private loginScopes: string[];
   private timerId: ReturnType<typeof setTimeout> | null = null;
+  private onKontrollromUtlopt?: KontrollromUtloptHandler;
+  private overlayVist = false;
 
-  constructor(msalInstance: PublicClientApplication, loginScopes: string[]) {
+  constructor(
+    msalInstance: PublicClientApplication,
+    loginScopes: string[],
+    onKontrollromUtlopt?: KontrollromUtloptHandler,
+  ) {
     this.msalInstance = msalInstance;
     this.loginScopes = loginScopes;
+    this.onKontrollromUtlopt = onKontrollromUtlopt;
   }
 
   start() {
@@ -35,6 +45,16 @@ export class SessionGuard {
     if (typeof window === 'undefined') return true;
     const path = window.location.pathname;
     return path === '/' || path === '/login' || path.startsWith('/auth');
+  }
+
+  /**
+   * Kontrollrom-ruter (sensor-dashbord) kjører på delte, ubemannede 24/7-skjermer.
+   * Der skal utløpt sesjon vise et synlig overlay i stedet for å redirecte — en
+   * redirect-løkke ser ut som en frossen skjerm for en operatør på avstand.
+   */
+  private erKontrollrom(): boolean {
+    if (typeof window === 'undefined') return false;
+    return window.location.pathname.startsWith('/dashboard/sensorer/');
   }
 
   private registrerAktivitet = () => {
@@ -132,6 +152,18 @@ export class SessionGuard {
     const currentPath = window.location.pathname;
     const safeReturnTo = currentPath.startsWith('/dashboard') ? currentPath : '/dashboard';
     const loginUrl = `/?expired=true&returnTo=${encodeURIComponent(safeReturnTo)}`;
+
+    // Kontrollrom: vis blokkerende overlay i stedet for redirect. Gjelder begge
+    // utkastveier (inaktivitet + silent-refresh-feil) og oppstart med allerede
+    // utløpt sesjon — alt går via triggerReLogin. Overlay-knappen utfører den
+    // samme redirecten (med bevart returnTo) når operatøren selv velger det.
+    if (this.erKontrollrom() && this.onKontrollromUtlopt) {
+      if (this.overlayVist) return; // allerede vist — ikke oppdater tidspunkt/re-render på nytt
+      this.overlayVist = true;
+      logger.warn('[SessionGuard] Kontrollrom-sesjon utløpt — viser overlay i stedet for redirect');
+      this.onKontrollromUtlopt(loginUrl, new Date());
+      return;
+    }
 
     logger.warn('[SessionGuard] Timeout — sender til login:', loginUrl);
     window.location.href = loginUrl;
