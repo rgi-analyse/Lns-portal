@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MsalProvider, useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { msalConfig, loginRequest } from '@/lib/authConfig';
 import { SessionGuard } from '@/lib/sessionGuard';
+import SesjonUtloptOverlay from '@/components/SesjonUtloptOverlay';
 import { logger } from '@/lib/logger';
 
 const msalInstance = new PublicClientApplication(msalConfig);
@@ -33,9 +34,15 @@ function InnloggingsRegistrerer() {
 
 function SessionGuardSetup() {
   const { instance } = useMsal();
+  // Kun satt på kontrollrom-ruter: der viser vi overlay i stedet for redirect.
+  const [utlopt, setUtlopt] = useState<{ loginUrl: string; tidspunkt: Date } | null>(null);
 
   useEffect(() => {
-    const guard = new SessionGuard(instance as PublicClientApplication, loginRequest.scopes as string[]);
+    const guard = new SessionGuard(
+      instance as PublicClientApplication,
+      loginRequest.scopes as string[],
+      (loginUrl, tidspunkt) => setUtlopt({ loginUrl, tidspunkt }),
+    );
 
     // Sjekk ved oppstart — fanger "første gang på dagen"-tilstanden
     guard.sjekkVedOppstart().catch(err => logger.warn('[Auth] sesjonssjekk ved oppstart feilet:', err));
@@ -45,7 +52,7 @@ function SessionGuardSetup() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return null;
+  return utlopt ? <SesjonUtloptOverlay loginUrl={utlopt.loginUrl} tidspunkt={utlopt.tidspunkt} /> : null;
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
