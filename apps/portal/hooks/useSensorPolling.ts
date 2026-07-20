@@ -19,6 +19,12 @@ interface Punkt { ts: string; value: number | null }
 const GAP_MS = 10_000; // over ~1,5 s-frekvens → reell gap → null-brudd
 const klampIntervall = (sek: number): number => Math.min(60, Math.max(2, Math.round(sek)));
 
+// Backoff ved feilet fetch: et endepunkt som timer ut skal gi avtagende trafikk,
+// ikke konstant hammering av SQL-poolen. Første steg er base (eller intervallet
+// hvis det er lengre), deretter dobling opp til taket. Nullstilles ved suksess.
+const BACKOFF_BASE_MS = 10_000;      // 10 s
+const BACKOFF_MAKS_MS = 5 * 60_000;  // 5 min
+
 function tilAlignedData(punkter: Punkt[]): uPlot.AlignedData {
   const xs: number[] = [];
   const ys: (number | null)[] = [];
@@ -67,11 +73,21 @@ export function useSensorPolling(opts: {
     setData(null); setFeil(null); setLaster(true);
 
     let stoppet = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 0;   // 0 = normal kadens; >0 = aktiv feil-backoff
 
-    const hent = async (): Promise<void> => {
+    const hent = async (): Promise<boolean> => {
       try {
-        const params = new URLSearchParams({ siden: sisteRef.current });
+        // Cap på siden: be aldri om mer data enn dashbordets tidsvindu. Uten dette
+        // ville en fane som falt bak (feilet fetch → siden avanserer aldri, mens
+        // now() kryper fremover) sende et stadig større vindu og holde spiralen i
+        // gang. Klemmer siden til [now − tidsvindu, …] før hvert kall. Serveren
+        // filtrerer strengt > siden, så dette narrower bare vinduet — trygt for
+        // både Kusto og Azure SQL.
+        const eldsteTillatt = Date.now() - tidsvinduMin * 60_000;
+        const sidenEffektiv = new Date(Math.max(Date.parse(sisteRef.current), eldsteTillatt)).toISOString();
+
+        const params = new URLSearchParams({ siden: sidenEffektiv });
         if (grupperKey) params.set('grupper', grupperKey);
         const res = await apiFetch(`/api/sensor/${sensorId}/data?${params.toString()}`, { headers: authHeaders });
         if (!res.ok) {
@@ -79,7 +95,7 @@ export function useSensorPolling(opts: {
           throw new Error(kropp.error ?? `HTTP ${res.status}`);
         }
         const { punkter } = await res.json() as { punkter: Punkt[] };
-        if (stoppet) return;
+        if (stoppet) return true;
 
         if (punkter.length > 0) {
           bufferRef.current = bufferRef.current.concat(punkter);
@@ -91,22 +107,45 @@ export function useSensorPolling(opts: {
 
         setData(tilAlignedData(bufferRef.current));
         setFeil(null);
+        return true;
       } catch (e) {
         if (!stoppet) setFeil(e instanceof Error ? e.message : 'Ukjent feil');
+        return false;
       } finally {
         if (!stoppet) setLaster(false);
       }
     };
 
-    const start = (): void => { if (!timer) timer = setInterval(hent, intervallMs); };
-    const stopp = (): void => { if (timer) { clearInterval(timer); timer = null; } };
-    const påSynlighet = (): void => {
-      if (document.hidden) stopp();
-      else { void hent(); start(); }   // hent umiddelbart ved retur + gjenoppta
+    const stopp = (): void => { if (timer) { clearTimeout(timer); timer = null; } };
+    const planlegg = (delay: number): void => {
+      stopp();
+      if (stoppet || document.hidden) return;
+      timer = setTimeout(() => { void kjør(); }, delay);
     };
 
-    void hent();
-    start();
+    // Selv-planleggende loop (erstatter setInterval): lar neste delay variere med
+    // backoff. Suksess → normal intervall + backoff nullstilt. Feil → eksponentiell
+    // backoff (base/intervall → ×2 → … → tak) så et feilende endepunkt gir avtagende
+    // trafikk. setTimeout-kjede unngår også overlappende fetch ved treg respons.
+    async function kjør(): Promise<void> {
+      timer = null;
+      const ok = await hent();
+      if (stoppet || document.hidden) return;
+      if (ok) {
+        backoffMs = 0;
+        planlegg(intervallMs);
+      } else {
+        backoffMs = backoffMs === 0 ? Math.max(intervallMs, BACKOFF_BASE_MS) : Math.min(BACKOFF_MAKS_MS, backoffMs * 2);
+        planlegg(backoffMs);
+      }
+    }
+
+    const påSynlighet = (): void => {
+      stopp();
+      if (!document.hidden) { backoffMs = 0; void kjør(); }   // hent umiddelbart ved retur + gjenoppta
+    };
+
+    void kjør();
     document.addEventListener('visibilitychange', påSynlighet);
 
     return () => {
